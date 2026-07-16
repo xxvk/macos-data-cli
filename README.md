@@ -21,6 +21,7 @@ User documentation:
 - [Development Rules](docs/development/rules.md)
 - [Installation](../../../INSTALL.md)
 - [Changelog](CHANGELOG.md)
+- [Distribution Signing TODO](docs/development/distribution-signing.md)
 
 ## Goals
 
