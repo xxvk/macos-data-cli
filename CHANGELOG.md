@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 — 2026-07-16
+
+### Fixed
+
+- Resolve the contact identifier without image keys, then fetch image-related keys separately before avatar writes. This fixes avatar updates for contacts without a previous image.
+
 ## 0.1.3 — 2026-07-16
 
 ### Fixed

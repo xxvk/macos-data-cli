@@ -136,7 +136,14 @@ public final class ContactsStore: @unchecked Sendable {
     public func updateImage(externalID: String, data: Data) throws {
         try requireAccess()
         let processed = try ContactImageProcessor().process(data)
-        let contact = try findMutableContact(externalID: externalID)
+        let identifier = try findContactIdentifier(externalID: externalID)
+        let imageKeys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactImageDataKey, CNContactThumbnailImageDataKey, CNContactImageDataAvailableKey] as [CNKeyDescriptor]
+        let contact: CNMutableContact
+        do {
+            contact = try store.unifiedContact(withIdentifier: identifier, keysToFetch: imageKeys).mutableCopy() as! CNMutableContact
+        } catch {
+            throw ContactsError.readFailed("Unable to fetch image-capable contact: \(error.localizedDescription)")
+        }
         ContactsMapper().setImageData(processed.data, on: contact)
         let request = CNSaveRequest()
         request.update(contact)
@@ -163,12 +170,29 @@ public final class ContactsStore: @unchecked Sendable {
     }
 
     private func findMutableContact(externalID: String) throws -> CNMutableContact {
-        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactTypeKey, CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactDepartmentNameKey, CNContactJobTitleKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactUrlAddressesKey, CNContactPostalAddressesKey, CNContactImageDataKey, CNContactThumbnailImageDataKey, CNContactImageDataAvailableKey] as [CNKeyDescriptor]
+        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactTypeKey, CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactDepartmentNameKey, CNContactJobTitleKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactUrlAddressesKey, CNContactPostalAddressesKey] as [CNKeyDescriptor]
         var matches: [CNMutableContact] = []
         let request = CNContactFetchRequest(keysToFetch: keys)
         do {
             try store.enumerateContacts(with: request) { contact, _ in
                 if ContactsMapper().map(contact).externalID == externalID { matches.append(contact.mutableCopy() as! CNMutableContact) }
+            }
+        } catch { throw ContactsError.readFailed(error.localizedDescription) }
+        switch matches.count {
+        case 0: throw ContactsQueryError.notFound
+        case 1: return matches[0]
+        default: throw ContactsQueryError.ambiguous(matches.count)
+        }
+    }
+
+    private func findContactIdentifier(externalID: String) throws -> String {
+        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey as CNKeyDescriptor, CNContactUrlAddressesKey as CNKeyDescriptor]
+        var matches: [String] = []
+        let request = CNContactFetchRequest(keysToFetch: keys)
+        do {
+            try store.enumerateContacts(with: request) { contact, _ in
+                let urls = contact.urlAddresses.map { LabeledValue(label: $0.label, value: $0.value as String) }
+                if urls.compactMap(ContactsMapper.externalID(from:)).contains(externalID) { matches.append(contact.identifier) }
             }
         } catch { throw ContactsError.readFailed(error.localizedDescription) }
         switch matches.count {
