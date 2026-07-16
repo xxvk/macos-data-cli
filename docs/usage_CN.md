@@ -61,7 +61,7 @@ macos-data contacts edit --external-id <id> --input contact.json --dry-run
 macos-data contacts edit --external-id <id> --input contact.json --apply
 ```
 
-第一版通过 `kind` 区分 `person` 和 `organization`。`external_id` 使用保留 URL 格式 `x-macos-data://external-id/<id>` 存储。当前写入 macOS 默认 Contacts 容器；显式容器选择属于后续功能。
+第一版通过 `kind` 区分 `person` 和 `organization`。`external_id` 只能存储在 label 为 `macos-data-cli` 的 URL 中，value 格式为 `x-macos-data://external-id/<id>`。其他 URL label 都按普通网址处理。当前写入 macOS 默认 Contacts 容器；显式容器选择属于后续功能。
 
 普通编辑不会修改 `external_id`。如果输入 JSON 包含 `externalID`，它必须与 `--external-id` 完全一致；修改 external ID 应单独设计迁移功能。
 

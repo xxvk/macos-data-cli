@@ -23,11 +23,18 @@ final class ContactsStoreTests: XCTestCase {
 
     func testMapperExtractsExternalIDFromReservedURL() {
         let contact = CNMutableContact()
-        contact.urlAddresses = [CNLabeledValue(label: CNLabelURLAddressHomePage, value: "x-macos-data://external-id/xvk-test-contacts-001" as NSString)]
+        contact.urlAddresses = [CNLabeledValue(label: "macos-data-cli", value: "x-macos-data://external-id/xvk-test-contacts-001" as NSString)]
 
         let payload = ContactsMapper().map(contact)
 
         XCTAssertEqual(payload.externalID, "xvk-test-contacts-001")
+    }
+
+    func testMapperDoesNotTreatOtherURLLabelsAsExternalID() {
+        let contact = CNMutableContact()
+        contact.urlAddresses = [CNLabeledValue(label: CNLabelURLAddressHomePage, value: "x-macos-data://external-id/should-not-match" as NSString)]
+
+        XCTAssertNil(ContactsMapper().map(contact).externalID)
     }
 
     func testMapperDistinguishesOrganizationContact() {

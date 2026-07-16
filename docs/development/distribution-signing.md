@@ -23,3 +23,41 @@ Signing credentials must remain in CI secrets or the developer's keychain and mu
 
 For a release asset whose checksum has been independently verified, a user may remove the downloaded file's quarantine attribute once. This is a local trust decision, not a substitute for signing and notarization.
 
+## Homebrew update and local verification workflow
+
+After the Tap has been updated successfully, the normal local update flow is:
+
+```bash
+brew update
+brew upgrade --cask macos-data
+macos-data --version
+```
+
+If macOS displays:
+
+```text
+“macos-data” Not Opened
+Apple could not verify “macos-data” is free of malware...
+```
+
+this means the downloaded binary has a `com.apple.quarantine` attribute and is not yet signed and notarized with Apple Developer ID. It does not mean that Homebrew checksum verification failed.
+
+For the current personally controlled local installation, verify the binary and remove only its quarantine attribute:
+
+```bash
+which macos-data
+xattr -l "$(which macos-data)"
+xattr -d com.apple.quarantine "$(which macos-data)"
+macos-data --version
+```
+
+Do not disable Gatekeeper globally. The permanent public-release solution remains Developer ID signing, hardened runtime, notarization, and stapling as described above.
+
+## Release checklist
+
+1. Publish the versioned binary to GitHub Release.
+2. Update the Homebrew Cask URL, version, checksum, and archive path.
+3. Push the Tap change.
+4. On a clean local installation, run `brew update` and `brew upgrade --cask macos-data`.
+5. Verify `macos-data --version` and one read-only Contacts command.
+6. Until signing and notarization are available, document any Gatekeeper warning and local quarantine handling.

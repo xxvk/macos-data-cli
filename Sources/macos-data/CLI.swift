@@ -133,6 +133,7 @@ struct MacosDataCLI {
     }
 
     private static func report(error: String, code: String, arguments: [String], exitCode: Int32) {
+        DiagnosticLogger.record(code: code, message: error)
         if arguments.contains("--format") && arguments.contains("json") {
             let response: [String: Any] = ["ok": false, "error": ["code": code, "message": error]]
             if let data = try? JSONSerialization.data(withJSONObject: response, options: [.sortedKeys]), let text = String(data: data, encoding: .utf8) { fputs(text + "\n", stderr) }

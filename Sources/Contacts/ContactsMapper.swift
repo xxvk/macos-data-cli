@@ -108,6 +108,7 @@ public struct ContactsMapper: Sendable {
     }
 
     public static func externalID(from url: LabeledValue) -> String? {
+        guard url.label == "macos-data-cli" else { return nil }
         guard let parsed = URL(string: url.value),
               parsed.scheme == "x-macos-data",
               parsed.host == "external-id" else { return nil }

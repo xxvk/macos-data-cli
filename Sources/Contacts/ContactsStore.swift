@@ -137,18 +137,22 @@ public final class ContactsStore: @unchecked Sendable {
         try requireAccess()
         let processed = try ContactImageProcessor().process(data)
         let identifier = try findContactIdentifier(externalID: externalID)
-        let imageKeys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactImageDataKey, CNContactThumbnailImageDataKey, CNContactImageDataAvailableKey] as [CNKeyDescriptor]
+        let imageKeys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactImageDataKey] as [CNKeyDescriptor]
         let contact: CNMutableContact
         do {
             contact = try store.unifiedContact(withIdentifier: identifier, keysToFetch: imageKeys).mutableCopy() as! CNMutableContact
         } catch {
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_FETCH_FAILED", message: "external_id=\(externalID) stage=fetch-image-fields error=\(error.localizedDescription)")
             throw ContactsError.readFailed("Unable to fetch image-capable contact: \(error.localizedDescription)")
         }
         ContactsMapper().setImageData(processed.data, on: contact)
         let request = CNSaveRequest()
         request.update(contact)
         do { try store.execute(request) }
-        catch { throw ContactsError.readFailed(error.localizedDescription) }
+        catch {
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_FAILED", message: "external_id=\(externalID) stage=save error=\(error.localizedDescription)")
+            throw ContactsError.readFailed(error.localizedDescription)
+        }
     }
 
     public func delete(externalID: String) throws {

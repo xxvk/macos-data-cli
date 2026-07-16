@@ -61,7 +61,7 @@ macos-data contacts edit --external-id <id> --input contact.json --dry-run
 macos-data contacts edit --external-id <id> --input contact.json --apply
 ```
 
-The first Contacts version distinguishes `person` and `organization`. `external_id` is stored in a reserved URL using the form `x-macos-data://external-id/<id>`. The current writer uses the macOS default Contacts container; explicit container selection is planned.
+The first Contacts version distinguishes `person` and `organization`. `external_id` is stored only in a URL labeled `macos-data-cli`, using the form `x-macos-data://external-id/<id>`. Other URL labels are ordinary URLs. The current writer uses the macOS default Contacts container; explicit container selection is planned.
 
 During a regular edit, `external_id` is immutable. If the input contains an `externalID`, it must equal the ID in `--external-id`; changing an external ID requires a separate migration feature.
 

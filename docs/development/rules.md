@@ -18,7 +18,8 @@ Tests must not create real Contacts records repeatedly. Use deterministic pure t
 - `kind` is `person` or `organization` and comes from the native Contacts record type.
 - `external_id` is optional in read models but required for creation.
 - External IDs are encoded as `x-macos-data://external-id/<id>` in the URL field.
-- The reserved URL label is `macos-data-cli`; readers remain compatible with older records labeled `Homepage`.
+- The reserved URL label is strictly `macos-data-cli`. Readers must not treat `Homepage` or other labels as an external ID.
+- The reserved URL value is `x-macos-data://external-id/<id>`.
 - Apple contact identifiers are local implementation details, not cross-system IDs.
 - Query fields are normalized according to their data type; combined queries use AND semantics and accept at most three distinct fields.
 - Ambiguous matches must be reported; the CLI must not silently choose a record for a write.

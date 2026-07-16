@@ -99,6 +99,8 @@ The planned minimum deployment target is macOS 26.0+. The project uses Swift Pac
 
 Contacts access requires user authorization. The CLI should check and explain authorization status and require explicit confirmation before writes.
 
+See [`docs/development/distribution-signing.md`](docs/development/distribution-signing.md) for the Homebrew update, Gatekeeper, quarantine, and local release verification workflow.
+
 ## Future direction
 
 Future versions may add vCard support, batch operations, and change detection, followed by adapters for Calendar, Reminders, Notes, Mail, and other Apple public frameworks. Each adapter should define its own authorization requirements, data mapping, error format, and tests.

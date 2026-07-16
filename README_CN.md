@@ -104,6 +104,8 @@ macos-data contacts export --format vcard
 
 Contacts 数据访问需要用户授予系统权限。CLI 应负责检查权限、说明授权状态，并在写入前要求明确确认。
 
+Homebrew 更新、Gatekeeper、quarantine 处理和本地发布验证流程，请参阅 [`docs/development/distribution-signing.md`](docs/development/distribution-signing.md)。
+
 ## 后续方向
 
 后续版本可能增加 vCard、批量操作和变更检测，并逐步支持 Calendar、Reminders、Notes、Mail 等 Apple 公共 Framework。每个 adapter 都应独立定义权限要求、数据映射、错误格式和测试策略。
