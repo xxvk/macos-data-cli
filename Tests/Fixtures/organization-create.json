@@ -1,0 +1,11 @@
+{
+  "kind": "organization",
+  "externalID": "org-create-dry-001",
+  "organizationName": "Dry Run Example",
+  "emails": [
+    {
+      "label": "work",
+      "value": "dry-run@example.invalid"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "organization",
+  "externalID": "xvk-integration-20260716-001",
+  "organizationName": "macos-data Integration Temporary",
+  "emails": [
+    { "label": "work", "value": "macos-data-integration@example.invalid" }
+  ],
+  "metadata": {
+    "fixture": "crud-integration",
+    "source": "test"
+  }
+}

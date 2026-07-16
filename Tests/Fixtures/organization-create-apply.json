@@ -1,0 +1,11 @@
+{
+  "kind": "organization",
+  "externalID": "org-create-apply-001",
+  "organizationName": "Apply Test Organization",
+  "emails": [
+    {
+      "label": "work",
+      "value": "apply-test@example.invalid"
+    }
+  ]
+}
