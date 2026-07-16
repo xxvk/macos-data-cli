@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 — 2026-07-16
+
+### Fixed
+
+- Request all Contacts image-related keys before writing an avatar, including for contacts that had no previous avatar.
+
 ## 0.1.2 — 2026-07-16
 
 Patch release aligning the CLI version with the published binary and Homebrew Cask.

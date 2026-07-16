@@ -37,3 +37,5 @@ The current deployment target is macOS 26.0+. Use the repository's Swift/Xcode t
 ## Metadata (0.1)
 
 `metadata` belongs to the JSON contract only. Contacts 0.1 does not promise to write it into Apple Contacts; it must not be silently encoded into Notes, URLs, or another field. Any future persistence requires a versioned encoding and migration rule.
+
+Before writing an avatar, the Contacts fetch must request `CNContactImageDataKey`, `CNContactThumbnailImageDataKey`, and `CNContactImageDataAvailableKey` so contacts without an existing avatar remain writable.

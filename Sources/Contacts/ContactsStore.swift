@@ -163,7 +163,7 @@ public final class ContactsStore: @unchecked Sendable {
     }
 
     private func findMutableContact(externalID: String) throws -> CNMutableContact {
-        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactTypeKey, CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactDepartmentNameKey, CNContactJobTitleKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactUrlAddressesKey, CNContactPostalAddressesKey, CNContactImageDataKey] as [CNKeyDescriptor]
+        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactTypeKey, CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactDepartmentNameKey, CNContactJobTitleKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactUrlAddressesKey, CNContactPostalAddressesKey, CNContactImageDataKey, CNContactThumbnailImageDataKey, CNContactImageDataAvailableKey] as [CNKeyDescriptor]
         var matches: [CNMutableContact] = []
         let request = CNContactFetchRequest(keysToFetch: keys)
         do {

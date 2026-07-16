@@ -37,3 +37,5 @@
 ## Metadata（0.1）
 
 `metadata` 只属于 JSON contract。Contacts 0.1 不保证把它写入 Apple Contacts；不得偷偷写入 Notes、URL 或其他字段。未来如需持久化，必须先定义版本化编码和迁移规则。
+
+头像写入前必须在 Contacts fetch 中同时请求 `CNContactImageDataKey`、`CNContactThumbnailImageDataKey` 和 `CNContactImageDataAvailableKey`，以兼容原本没有头像的联系人。
