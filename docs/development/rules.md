@@ -20,6 +20,7 @@ Tests must not create real Contacts records repeatedly. Use deterministic pure t
 - External IDs are encoded as `x-macos-data://external-id/<id>` in the URL field.
 - The reserved URL label is strictly `macos-data-cli`. Readers must not treat `Homepage` or other labels as an external ID.
 - The reserved URL value is `x-macos-data://external-id/<id>`.
+- If a write fails with CoreData error `134092`, the CLI must treat the record as potentially corrupted, preserve diagnostic details, and tell the Agent to preserve the JSON fields, delete the record with explicit confirmation, recreate it, and retry. The CLI must never auto-delete or auto-recreate a contact.
 - Apple contact identifiers are local implementation details, not cross-system IDs.
 - Query fields are normalized according to their data type; combined queries use AND semantics and accept at most three distinct fields.
 - Ambiguous matches must be reported; the CLI must not silently choose a record for a write.

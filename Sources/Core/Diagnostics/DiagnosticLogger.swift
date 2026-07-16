@@ -26,4 +26,23 @@ public enum DiagnosticLogger {
             // Diagnostics must never replace the original CLI error.
         }
     }
+
+    public static func errorDetails(_ error: Error) -> String {
+        let nsError = error as NSError
+        var details = "domain=\(nsError.domain) code=\(nsError.code)"
+        if !nsError.userInfo.isEmpty {
+            details += " userInfoKeys=\(nsError.userInfo.keys.map { String(describing: $0) }.sorted().joined(separator: ","))"
+        }
+        if let exception = nsError.userInfo["NSUnderlyingException"] {
+            details += " underlyingException=\(String(describing: exception))"
+        }
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            details += " underlyingDomain=\(underlying.domain) underlyingCode=\(underlying.code)"
+        }
+        return details
+    }
+
+    public static func stackTrace() -> String {
+        Thread.callStackSymbols.joined(separator: " || ")
+    }
 }

@@ -65,6 +65,8 @@ macos-data contacts edit --external-id <id> --input contact.json --apply
 
 普通编辑不会修改 `external_id`。如果输入 JSON 包含 `externalID`，它必须与 `--external-id` 完全一致；修改 external ID 应单独设计迁移功能。
 
+如果写入返回 CoreData 错误 `134092`，说明 macOS Contacts 记录可能已经损坏或无法保存。应先保留 JSON 表示，再明确确认删除并重新创建联系人，然后重试。`macos-data` 不会自动执行这个破坏性恢复操作。
+
 头像使用独立参数写入，不进入普通联系人 JSON：
 
 ```text

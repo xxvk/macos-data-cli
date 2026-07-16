@@ -65,6 +65,8 @@ The first Contacts version distinguishes `person` and `organization`. `external_
 
 During a regular edit, `external_id` is immutable. If the input contains an `externalID`, it must equal the ID in `--external-id`; changing an external ID requires a separate migration feature.
 
+If a write reports CoreData error `134092`, macOS may have a corrupted or unsavable Contacts record. Preserve the JSON representation, then explicitly delete and recreate the contact before retrying. `macos-data` never performs that destructive recovery automatically.
+
 Set a contact image through a separate argument instead of embedding image data in the regular contact JSON:
 
 ```text

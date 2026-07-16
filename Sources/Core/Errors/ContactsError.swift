@@ -3,6 +3,7 @@ public enum ContactsError: Error, Equatable, Sendable, CustomStringConvertible {
     case permissionDenied
     case permissionRestricted
     case readFailed(String)
+    case recordNeedsRecreation(String)
     case invalidInput(String)
     case duplicateExternalID(String)
     case externalIDImmutable
@@ -15,6 +16,7 @@ public enum ContactsError: Error, Equatable, Sendable, CustomStringConvertible {
         case .permissionDenied: return "Contacts permission was denied. Enable access in System Settings > Privacy & Security > Contacts."
         case .permissionRestricted: return "Contacts access is restricted by macOS or device policy."
         case .readFailed(let message): return "Unable to read Contacts: \(message)"
+        case .recordNeedsRecreation(let externalID): return "Contacts record for external_id '\(externalID)' could not be saved because macOS Contacts reported CoreData error 134092. Preserve the JSON fields, then delete and recreate this contact before retrying the operation."
         case .invalidInput(let message): return "Invalid contact input: \(message)"
         case .duplicateExternalID(let id): return "A contact with external ID '\(id)' already exists."
         case .externalIDImmutable: return "external_id cannot be changed by a regular contact edit."

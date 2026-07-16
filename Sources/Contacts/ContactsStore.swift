@@ -134,25 +134,64 @@ public final class ContactsStore: @unchecked Sendable {
     }
 
     public func updateImage(externalID: String, data: Data) throws {
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_START", message: "external_id=\(externalID) inputBytes=\(data.count)")
         try requireAccess()
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_PERMISSION_OK", message: "external_id=\(externalID)")
         let processed = try ContactImageProcessor().process(data)
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_PROCESSED", message: "external_id=\(externalID) outputBytes=\(processed.data.count) width=\(processed.width) height=\(processed.height)")
         let identifier = try findContactIdentifier(externalID: externalID)
-        let imageKeys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactImageDataKey] as [CNKeyDescriptor]
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_IDENTIFIER_FOUND", message: "external_id=\(externalID) identifierLength=\(identifier.count)")
+        // Fetch every writable contact field needed by CNSaveRequest.update,
+        // but omit thumbnail/availability fields which can fault on iCloud records.
+        let imageKeys: [CNKeyDescriptor] = [
+            CNContactIdentifierKey,
+            CNContactTypeKey,
+            CNContactGivenNameKey,
+            CNContactFamilyNameKey,
+            CNContactOrganizationNameKey,
+            CNContactDepartmentNameKey,
+            CNContactJobTitleKey,
+            CNContactEmailAddressesKey,
+            CNContactPhoneNumbersKey,
+            CNContactUrlAddressesKey,
+            CNContactPostalAddressesKey,
+            CNContactImageDataKey
+        ] as [CNKeyDescriptor]
         let contact: CNMutableContact
         do {
-            contact = try store.unifiedContact(withIdentifier: identifier, keysToFetch: imageKeys).mutableCopy() as! CNMutableContact
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_FETCH_START", message: "external_id=\(externalID) keyCount=\(imageKeys.count) includesImageData=true includesThumbnail=false includesAvailability=false")
+            // Fetch the specific record through a predicate rather than using a
+            // unified aggregate as the mutable object for the write.
+            let request = CNContactFetchRequest(keysToFetch: imageKeys)
+            request.unifyResults = false
+            request.predicate = CNContact.predicateForContacts(withIdentifiers: [identifier])
+            var fetched: CNMutableContact?
+            try store.enumerateContacts(with: request) { candidate, _ in
+                fetched = candidate.mutableCopy() as? CNMutableContact
+            }
+            guard let fetched else { throw ContactsQueryError.notFound }
+            contact = fetched
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_FETCH_OK", message: "external_id=\(externalID) contactType=\(contact.contactType.rawValue) emailCount=\(contact.emailAddresses.count) phoneCount=\(contact.phoneNumbers.count) urlCount=\(contact.urlAddresses.count) postalCount=\(contact.postalAddresses.count) hasImage=\(contact.imageData != nil)")
         } catch {
-            DiagnosticLogger.record(code: "CONTACT_IMAGE_FETCH_FAILED", message: "external_id=\(externalID) stage=fetch-image-fields error=\(error.localizedDescription)")
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_FETCH_FAILED", message: "external_id=\(externalID) stage=fetch-image-fields error=\(error.localizedDescription) \(DiagnosticLogger.errorDetails(error)) stack=\(DiagnosticLogger.stackTrace())")
             throw ContactsError.readFailed("Unable to fetch image-capable contact: \(error.localizedDescription)")
         }
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_SET_START", message: "external_id=\(externalID)")
         ContactsMapper().setImageData(processed.data, on: contact)
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_SET_OK", message: "external_id=\(externalID) imageBytes=\(contact.imageData?.count ?? 0)")
         let request = CNSaveRequest()
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_REQUEST_CREATED", message: "external_id=\(externalID)")
         request.update(contact)
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_START", message: "external_id=\(externalID)")
         do { try store.execute(request) }
         catch {
-            DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_FAILED", message: "external_id=\(externalID) stage=save error=\(error.localizedDescription)")
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_FAILED", message: "external_id=\(externalID) stage=save error=\(error.localizedDescription) \(DiagnosticLogger.errorDetails(error)) stack=\(DiagnosticLogger.stackTrace())")
+            if Self.isCoreDataFault134092(error) {
+                throw ContactsError.recordNeedsRecreation(externalID)
+            }
             throw ContactsError.readFailed(error.localizedDescription)
         }
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_OK", message: "external_id=\(externalID)")
     }
 
     public func delete(externalID: String) throws {
@@ -190,6 +229,7 @@ public final class ContactsStore: @unchecked Sendable {
     }
 
     private func findContactIdentifier(externalID: String) throws -> String {
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_IDENTIFIER_SEARCH_START", message: "external_id=\(externalID) keys=identifier,urlAddresses")
         let keys: [CNKeyDescriptor] = [CNContactIdentifierKey as CNKeyDescriptor, CNContactUrlAddressesKey as CNKeyDescriptor]
         var matches: [String] = []
         let request = CNContactFetchRequest(keysToFetch: keys)
@@ -198,11 +238,24 @@ public final class ContactsStore: @unchecked Sendable {
                 let urls = contact.urlAddresses.map { LabeledValue(label: $0.label, value: $0.value as String) }
                 if urls.compactMap(ContactsMapper.externalID(from:)).contains(externalID) { matches.append(contact.identifier) }
             }
-        } catch { throw ContactsError.readFailed(error.localizedDescription) }
+        } catch {
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_IDENTIFIER_SEARCH_FAILED", message: "external_id=\(externalID) error=\(error.localizedDescription) \(DiagnosticLogger.errorDetails(error))")
+            throw ContactsError.readFailed(error.localizedDescription)
+        }
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_IDENTIFIER_SEARCH_OK", message: "external_id=\(externalID) matches=\(matches.count)")
         switch matches.count {
         case 0: throw ContactsQueryError.notFound
         case 1: return matches[0]
         default: throw ContactsQueryError.ambiguous(matches.count)
         }
+    }
+
+    private static func isCoreDataFault134092(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain && nsError.code == 134092 { return true }
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return underlying.domain == NSCocoaErrorDomain && underlying.code == 134092
+        }
+        return false
     }
 }

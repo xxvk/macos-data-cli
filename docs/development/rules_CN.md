@@ -20,6 +20,7 @@
 - `external_id` 使用 `x-macos-data://external-id/<id>` 写入 URL 字段。
 - 保留 URL 的 label 必须严格为 `macos-data-cli`；读取端不得把 `Homepage` 或其他 label 识别为 `external_id`。
 - 保留 URL 的 value 格式为 `x-macos-data://external-id/<id>`。
+- 如果写入时出现 CoreData 错误 `134092`，CLI 必须认为该记录可能已损坏，保留诊断信息，并提醒 Agent 先保存 JSON 字段、在明确确认后删除并重新创建联系人，再重试操作。CLI 不得自动删除或自动重建联系人。
 - Apple 联系人 identifier 只是本地实现细节，不能作为跨系统 ID。
 - 查询按字段类型做规范化；组合查询使用 AND 语义，最多三个不同字段。
 - 多条匹配必须返回歧义错误，不能静默选择联系人进行写入。
