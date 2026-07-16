@@ -16,7 +16,7 @@ struct MacosDataCLI {
         }
 
         if arguments == ["--version"] || arguments == ["-v"] {
-            print("0.1.4")
+            print("0.1.6")
             return
         }
 
@@ -180,7 +180,7 @@ struct MacosDataCLI {
 
     private static func printHelp() {
         print("""
-        macos-data 0.1.4 — local macOS data CLI for agents and developers
+        macos-data 0.1.6 — local macOS data CLI for agents and developers
 
         Usage:
           macos-data --version | -v
@@ -216,7 +216,7 @@ struct MacosDataCLI {
           Add --format json to commands that support machine-readable output.
 
         Safety and limits:
-          Writes target only the iCloud Contacts container in 0.1.4.
+          Writes target only the iCloud Contacts container in 0.1.6.
           Writes require --dry-run or explicit --apply.
           Avatar input is limited to 10 MB; output is <= 1024 px and 200 KB.
           metadata remains in JSON and is not written to Apple Contacts.

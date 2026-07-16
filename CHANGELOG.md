@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6 — 2026-07-16
+
+### Fixed
+
+- Synchronize the CLI-reported version with the published release.
+
 ## 0.1.4 — 2026-07-16
 
 ### Fixed
