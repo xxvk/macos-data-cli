@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 — 2026-07-16
+
+Patch release aligning the CLI version with the published binary and Homebrew Cask.
+
 ## 0.1.0 — 2026-07-16
 
 First Contacts adapter release.

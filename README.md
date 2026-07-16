@@ -6,7 +6,7 @@ Agents that need to work with macOS data often depend on fragile GUI automation,
 
 ## Project status
 
-The first Contacts adapter is available as version 0.1.0. It supports permission checks, iCloud container verification, JSON reads, queries, controlled writes, avatars, deletion, and JSON snapshots.
+The first Contacts adapter is available as version 0.1.2. It supports permission checks, iCloud container verification, JSON reads, queries, controlled writes, avatars, deletion, and JSON snapshots.
 
 Version 0.1 is the first Contacts adapter. Only commands explicitly marked as available below should be expected to work.
 
