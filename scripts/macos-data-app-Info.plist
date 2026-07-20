@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>macos-data</string>
+	<key>CFBundleExecutable</key>
+	<string>macos-data</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.xvk.macos-data-cli</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>macos-data</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.7</string>
+	<key>CFBundleVersion</key>
+	<string>0.1.7</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>macos-data needs Contacts access to read and manage your iCloud contacts from the local CLI.</string>
+</dict>
+</plist>

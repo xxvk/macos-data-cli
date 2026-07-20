@@ -39,8 +39,21 @@ let package = Package(
         .executableTarget(
             name: "macos-data",
             dependencies: ["Core", "ContactsAdapter"],
+            exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker",
+                    "-sectcreate",
+                    "-Xlinker",
+                    "__TEXT",
+                    "-Xlinker",
+                    "__info_plist",
+                    "-Xlinker",
+                    "Sources/macos-data/Info.plist"
+                ])
             ]
         ),
         .testTarget(

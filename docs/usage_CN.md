@@ -2,6 +2,8 @@
 
 `macos-data` 是一个本地 Terminal CLI。它通过 Apple 公共 Framework 访问 macOS 数据，Agent 不需要专用集成即可调用。
 
+本机 Debug、Xcode 工具链和 Contacts 授权流程请先阅读[本机 Debug 与 Contacts 授权](development/local-debug-and-tcc_CN.md)。
+
 ## Contacts
 
 列出当前 Contacts 容器：
