@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-项目当前处于 Contacts adapter 的 `0.1.6` 收尾阶段。CLI 和主要联系人流程
+项目当前处于 Contacts adapter 的 `0.1.7` 收尾阶段。CLI 和主要联系人流程
 已经实现；本路线图用勾选状态区分已完成能力与剩余的加固工作。
 
 项目的长期目标是建立一个通用的 macOS 原生数据访问基础设施，让不同 Agent 和脚本通过统一的 CLI 与 JSON contract 使用 Apple 公共 Framework。项目不绑定 Codex、Claude Code 或其他特定 Agent 平台。

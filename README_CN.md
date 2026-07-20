@@ -6,7 +6,7 @@
 
 ## 项目状态
 
-Contacts 第一版当前为 0.1.6。已经支持权限检查、iCloud 容器验证、JSON
+Contacts 第一版当前为 0.1.7。已经支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 第一版（0.1）先实现 macOS Contacts adapter。路线图中的命令只有标记为已实现的部分可以直接运行。

@@ -1,6 +1,6 @@
 # macos-data-cli Roadmap
 
-The project is currently at the Contacts adapter release baseline `0.1.6`.
+The project is currently at the Contacts adapter release baseline `0.1.7`.
 The CLI and its core Contacts workflows are implemented locally; this roadmap
 now distinguishes completed 0.1 behavior from remaining hardening work.
 
