@@ -6,7 +6,10 @@ Agents that need to work with macOS data often depend on fragile GUI automation,
 
 ## Project status
 
-The first Contacts adapter is available as version 0.1.2. It supports permission checks, iCloud container verification, JSON reads, queries, controlled writes, avatars, deletion, and JSON snapshots.
+The first Contacts adapter is currently at version 0.1.6. It supports
+permission checks, iCloud container verification, JSON reads, queries,
+controlled writes, avatars, deletion, external ID migration, and JSON
+snapshots.
 
 Version 0.1 is the first Contacts adapter. Only commands explicitly marked as available below should be expected to work.
 
@@ -19,7 +22,8 @@ User documentation:
 
 - [Usage](docs/usage.md)
 - [Development Rules](docs/development/rules.md)
-- [Installation](../../../INSTALL.md)
+- [Installation](INSTALL.md)
+- [Agent integration guide](AGENTS.md)
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
 
@@ -40,23 +44,30 @@ Obsidian is the author's current use case, not a required part of the public con
 The first version distinguishes personal and organization contacts through an explicit `kind` field (`person` or `organization`) and plans to support controlled reads and writes, including:
 
 - Names, organizations, departments, and roles
+- Phonetic given and family names
 - Email addresses, phone numbers, URLs, and postal addresses
 - Contact images
-- An optional `external_id`
+- A required `external_id` for every CLI-created contact
 - Multi-factor matching using organization names, emails, phone numbers, and other available data
 - JSON input and output
 - `--dry-run` and explicit `--apply`
 
-If a query matches multiple contacts, the CLI should return an ambiguous result and refuse an automatic write. The calling agent can inspect the result and decide what to do next.
+Avatar apply responses include a verification status. `readback_confirmed`
+means the saved record returned non-empty image data; `verification_unknown`
+means the save was accepted but the Contacts framework could not safely read
+the image back. `imageAvailable` is not definitive GUI truth for iCloud avatars.
+
+If a query matches multiple contacts, the CLI returns an ambiguous result and refuses an automatic write. The calling agent must inspect the results and decide what to do next.
 
 Currently available:
 
 ```text
 macos-data contacts permission
-macos-data contacts count
+macos-data contacts count [--format json]
 macos-data contacts list --format json
 macos-data contacts get --external-id <id> --format json
 macos-data contacts query --name "..."
+macos-data contacts query --kind organization
 macos-data contacts query --phone "..."
 macos-data contacts query --email "..."
 macos-data contacts query --url "..."
@@ -64,23 +75,43 @@ macos-data contacts query --organization "..."
 macos-data contacts query --postal-code "..."
 macos-data contacts create --input contact.json --dry-run
 macos-data contacts create --input contact.json --apply
+cat contact.json | macos-data contacts create --stdin --dry-run
+cat contact.json | macos-data contacts create --stdin --apply --idempotent
 macos-data contacts edit --external-id <id> --input contact.json --dry-run
 macos-data contacts edit --external-id <id> --input contact.json --apply
+cat patch.json | macos-data contacts edit --external-id <id> --stdin --dry-run
+macos-data contacts edit --external-id <id> --image <file> --dry-run
+macos-data contacts edit --external-id <id> --image <file> --apply
+macos-data contacts avatar verify --external-id <id> --format json
+macos-data contacts avatar replace --external-id <id> --image <file> --dry-run
+macos-data contacts avatar replace --external-id <id> --image <file> --apply --confirm "RECREATE CONTACT"
+macos-data contacts delete --external-id <id> --dry-run
+macos-data contacts delete --external-id <id> --apply --confirm "DELETE CONTACT"
+macos-data contacts delete --external-id <id> --apply --confirm "DELETE CONTACT" --ignore-not-found
+macos-data contacts external-id migrate --from <old> --to <new> --dry-run
+macos-data contacts external-id migrate --from <old> --to <new> --apply --confirm "CHANGE EXTERNAL ID"
+macos-data contacts export --format json [--output <file>]
 ```
 
 Query conditions use AND semantics. A query accepts at most three conditions, and each field can appear only once. `--format json` does not count as a condition.
 
-Planned command examples:
+Machine-readable responses use JSON contract version `0.1`, independent of the
+CLI release version. Envelope responses contain `ok`, `contractVersion`, and
+either `data` or `error`.
+See [the detailed CLI contract](docs/development/cli-contract.md) for stable
+exit codes and error codes.
+
+Current limitations and remaining 0.1 work:
 
 ```text
-macos-data contacts list --format json
-macos-data contacts get --query '{...}' --format json
-macos-data contacts create --input contact.json --dry-run
-macos-data contacts update --input contact.json --apply
-macos-data contacts export --format vcard
+- The verified iCloud container is selected by default; `--container iCloud`
+  or the exact iCloud container identifier may be used explicitly
+- `--idempotent` is opt-in for create retries; a different persisted payload
+  with the same external ID remains an error
+- `--ignore-not-found` is opt-in for delete retries
+- Real CLI CRUD integration tests remain local-only and are not run by `swift test`
+- vCard import/export, batch operations, and change detection are not implemented
 ```
-
-Update and export commands are not implemented yet. Creating a contact requires an explicit `--dry-run` or `--apply` and requires an `external_id`.
 
 ## Boundaries
 
@@ -103,7 +134,10 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-Future versions may add vCard support, batch operations, and change detection, followed by adapters for Calendar, Reminders, Notes, Mail, and other Apple public frameworks. Each adapter should define its own authorization requirements, data mapping, error format, and tests.
+The next adapter is Calendar in 0.2. Future releases may add Reminders, Notes,
+Mail, and Photos. vCard support, batch operations, and change detection remain
+Contacts-related follow-up work. Each adapter should define its own
+authorization requirements, data mapping, error format, and tests.
 
 ## License
 

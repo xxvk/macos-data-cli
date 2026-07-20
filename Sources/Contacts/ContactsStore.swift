@@ -4,12 +4,26 @@ import Foundation
 
 /// Contacts.framework access will be implemented here for version 0.1.
 public final class ContactsStore: @unchecked Sendable {
-    private let store: CNContactStore
+    private let store: CNContactStore?
     private let permission: ContactsAccessProviding
+    private let containerSelector: String?
 
-    public init(store: CNContactStore = CNContactStore(), permission: ContactsAccessProviding = ContactsPermission()) {
+    public init(store: CNContactStore? = nil, permission: ContactsAccessProviding = ContactsPermission(), containerSelector: String? = nil) {
         self.store = store
         self.permission = permission
+        self.containerSelector = containerSelector
+    }
+
+    public func containerDescriptions() throws -> [ContactContainer] {
+        try requireAccess()
+        do {
+            return try contactStore.containers(matching: nil).map(Self.describe)
+        } catch { throw ContactsError.readFailed(error.localizedDescription) }
+    }
+
+    public func selectedContainerDescription() throws -> ContactContainer {
+        try requireAccess()
+        return Self.describe(try selectedContainer())
     }
 
     public func count() throws -> Int {
@@ -20,10 +34,12 @@ public final class ContactsStore: @unchecked Sendable {
         case .restricted: throw ContactsError.permissionRestricted
         }
 
+        let container = try selectedContainer()
         var count = 0
         do {
             let request = CNContactFetchRequest(keysToFetch: [CNContactIdentifierKey as CNKeyDescriptor])
-            try store.enumerateContacts(with: request) { _, _ in count += 1 }
+            request.predicate = CNContact.predicateForContactsInContainer(withIdentifier: container.identifier)
+            try contactStore.enumerateContacts(with: request) { _, _ in count += 1 }
             return count
         } catch {
             throw ContactsError.readFailed(error.localizedDescription)
@@ -32,14 +48,12 @@ public final class ContactsStore: @unchecked Sendable {
 
     public func icloudContainer() throws -> CNContainer {
         try requireAccess()
-        do {
-            let containers = try store.containers(matching: nil)
-            guard let container = containers.first(where: { $0.name.caseInsensitiveCompare("iCloud") == .orderedSame }) else {
-                throw ContactsError.icloudContainerNotFound
-            }
-            return container
-        } catch let error as ContactsError { throw error }
-        catch { throw ContactsError.readFailed(error.localizedDescription) }
+        let container = try selectedContainer()
+        guard container.type == .cardDAV,
+              container.name.caseInsensitiveCompare("iCloud") == .orderedSame else {
+            throw ContactsError.icloudContainerNotFound
+        }
+        return container
     }
 
     public func list() throws -> [ContactPayload] {
@@ -51,21 +65,26 @@ public final class ContactsStore: @unchecked Sendable {
         }
 
         let mapper = ContactsMapper()
+        let container = try selectedContainer()
         var contacts: [ContactPayload] = []
         do {
             let request = CNContactFetchRequest(keysToFetch: [
                 CNContactTypeKey as CNKeyDescriptor,
                 CNContactGivenNameKey as CNKeyDescriptor,
                 CNContactFamilyNameKey as CNKeyDescriptor,
+                CNContactPhoneticGivenNameKey as CNKeyDescriptor,
+                CNContactPhoneticFamilyNameKey as CNKeyDescriptor,
                 CNContactOrganizationNameKey as CNKeyDescriptor,
                 CNContactDepartmentNameKey as CNKeyDescriptor,
                 CNContactJobTitleKey as CNKeyDescriptor,
                 CNContactEmailAddressesKey as CNKeyDescriptor,
                 CNContactPhoneNumbersKey as CNKeyDescriptor,
                 CNContactUrlAddressesKey as CNKeyDescriptor,
-                CNContactPostalAddressesKey as CNKeyDescriptor
+                CNContactPostalAddressesKey as CNKeyDescriptor,
+                CNContactImageDataAvailableKey as CNKeyDescriptor
             ])
-            try store.enumerateContacts(with: request) { contact, _ in
+            request.predicate = CNContact.predicateForContactsInContainer(withIdentifier: container.identifier)
+            try contactStore.enumerateContacts(with: request) { contact, _ in
                 contacts.append(mapper.map(contact))
             }
             return contacts
@@ -76,11 +95,7 @@ public final class ContactsStore: @unchecked Sendable {
 
     public func get(externalID: String) throws -> ContactPayload {
         let matches = try list().filter { $0.externalID == externalID }
-        switch matches.count {
-        case 0: throw ContactsQueryError.notFound
-        case 1: return matches[0]
-        default: throw ContactsQueryError.ambiguous(matches.count)
-        }
+        return try ContactMatchResolver.requireExactlyOne(matches)
     }
 
     public func query(_ query: ContactQuerySet) throws -> [ContactPayload] {
@@ -98,9 +113,9 @@ public final class ContactsStore: @unchecked Sendable {
         }
 
         let request = CNSaveRequest()
-        request.add(ContactsMapper().makeMutableContact(from: payload), toContainerWithIdentifier: try icloudContainer().identifier)
+        request.add(ContactsMapper().makeMutableContact(from: payload), toContainerWithIdentifier: try selectedContainer().identifier)
         do {
-            try store.execute(request)
+            try contactStore.execute(request)
         } catch {
             throw ContactsError.readFailed(error.localizedDescription)
         }
@@ -112,12 +127,12 @@ public final class ContactsStore: @unchecked Sendable {
         try ContactsMapper().update(contact, from: payload, preservingExternalID: externalID)
         let request = CNSaveRequest()
         request.update(contact)
-        do { try store.execute(request) }
+        do { try contactStore.execute(request) }
         catch { throw ContactsError.readFailed(error.localizedDescription) }
     }
 
     public func update(externalID: String, with patch: ContactPatch) throws {
-        try requireAccess(); let contact = try findMutableContact(externalID: externalID); try ContactsMapper().update(contact, from: patch, preservingExternalID: externalID); let request = CNSaveRequest(); request.update(contact); do { try store.execute(request) } catch { throw ContactsError.readFailed(error.localizedDescription) }
+        try requireAccess(); let contact = try findMutableContact(externalID: externalID); try ContactsMapper().update(contact, from: patch, preservingExternalID: externalID); let request = CNSaveRequest(); request.update(contact); do { try contactStore.execute(request) } catch { throw ContactsError.readFailed(error.localizedDescription) }
     }
 
     public func migrateExternalID(from oldID: String, to newID: String) throws {
@@ -129,11 +144,11 @@ public final class ContactsStore: @unchecked Sendable {
         try ContactsMapper().migrateExternalID(on: contact, from: oldID, to: newID)
         let request = CNSaveRequest()
         request.update(contact)
-        do { try store.execute(request) }
+        do { try contactStore.execute(request) }
         catch { throw ContactsError.readFailed(error.localizedDescription) }
     }
 
-    public func updateImage(externalID: String, data: Data) throws {
+    public func updateImage(externalID: String, data: Data) throws -> AvatarWriteVerification {
         DiagnosticLogger.record(code: "CONTACT_IMAGE_START", message: "external_id=\(externalID) inputBytes=\(data.count)")
         try requireAccess()
         DiagnosticLogger.record(code: "CONTACT_IMAGE_PERMISSION_OK", message: "external_id=\(externalID)")
@@ -148,6 +163,8 @@ public final class ContactsStore: @unchecked Sendable {
             CNContactTypeKey,
             CNContactGivenNameKey,
             CNContactFamilyNameKey,
+            CNContactPhoneticGivenNameKey,
+            CNContactPhoneticFamilyNameKey,
             CNContactOrganizationNameKey,
             CNContactDepartmentNameKey,
             CNContactJobTitleKey,
@@ -166,7 +183,7 @@ public final class ContactsStore: @unchecked Sendable {
             request.unifyResults = false
             request.predicate = CNContact.predicateForContacts(withIdentifiers: [identifier])
             var fetched: CNMutableContact?
-            try store.enumerateContacts(with: request) { candidate, _ in
+            try contactStore.enumerateContacts(with: request) { candidate, _ in
                 fetched = candidate.mutableCopy() as? CNMutableContact
             }
             guard let fetched else { throw ContactsQueryError.notFound }
@@ -183,7 +200,7 @@ public final class ContactsStore: @unchecked Sendable {
         DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_REQUEST_CREATED", message: "external_id=\(externalID)")
         request.update(contact)
         DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_START", message: "external_id=\(externalID)")
-        do { try store.execute(request) }
+        do { try contactStore.execute(request) }
         catch {
             DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_FAILED", message: "external_id=\(externalID) stage=save error=\(error.localizedDescription) \(DiagnosticLogger.errorDetails(error)) stack=\(DiagnosticLogger.stackTrace())")
             if Self.isCoreDataFault134092(error) {
@@ -192,6 +209,101 @@ public final class ContactsStore: @unchecked Sendable {
             throw ContactsError.readFailed(error.localizedDescription)
         }
         DiagnosticLogger.record(code: "CONTACT_IMAGE_SAVE_OK", message: "external_id=\(externalID)")
+        do {
+            let readBack = try readBackImageData(identifier: identifier)
+            if let readBack, !readBack.isEmpty {
+                DiagnosticLogger.record(code: "CONTACT_IMAGE_READBACK_CONFIRMED", message: "external_id=\(externalID) readBackBytes=\(readBack.count)")
+                return AvatarWriteVerification(status: .readbackConfirmed, saveAccepted: true, requestedBytes: processed.data.count, readBackBytes: readBack.count)
+            }
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_READBACK_UNKNOWN", message: "external_id=\(externalID) reason=empty-image-data")
+            return AvatarWriteVerification(status: .verificationUnknown, saveAccepted: true, requestedBytes: processed.data.count, nextAction: "retry_verification_after_iCloud_sync_or_recreate_after_confirmation")
+        } catch {
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_READBACK_UNKNOWN", message: "external_id=\(externalID) reason=readback-failed \(DiagnosticLogger.errorDetails(error)) stack=\(DiagnosticLogger.stackTrace())")
+            return AvatarWriteVerification(status: .verificationUnknown, saveAccepted: true, requestedBytes: processed.data.count, nextAction: "retry_verification_after_iCloud_sync_or_recreate_after_confirmation")
+        }
+    }
+
+    public func verifyImage(externalID: String) throws -> AvatarWriteVerification {
+        try requireAccess()
+        let identifier = try findContactIdentifier(externalID: externalID)
+        do {
+            // Avoid requesting imageData for records whose lightweight
+            // availability flag is false. On some iCloud/CardDAV records,
+            // faulting imageData can produce CoreData 134092 even though the
+            // Contacts GUI can display a remote avatar.
+            guard try readImageDataAvailability(identifier: identifier) else {
+                return AvatarWriteVerification(
+                    status: .verificationUnknown,
+                    saveAccepted: false,
+                    requestedBytes: 0,
+                    nextAction: "verify_in_contacts_app_or_retry_after_iCloud_sync"
+                )
+            }
+            let imageData = try readBackImageData(identifier: identifier)
+            if let imageData, !imageData.isEmpty {
+                return AvatarWriteVerification(status: .readbackConfirmed, saveAccepted: false, requestedBytes: 0, readBackBytes: imageData.count)
+            }
+            return AvatarWriteVerification(status: .notAvailable, saveAccepted: false, requestedBytes: 0)
+        } catch {
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_VERIFY_UNKNOWN", message: "external_id=\(externalID) reason=readback-failed \(DiagnosticLogger.errorDetails(error)) stack=\(DiagnosticLogger.stackTrace())")
+            return AvatarWriteVerification(status: .verificationUnknown, saveAccepted: false, requestedBytes: 0, nextAction: "retry_verification_after_iCloud_sync_or_recreate_after_confirmation")
+        }
+    }
+
+    public func replaceImage(externalID: String, data: Data) throws -> AvatarWriteVerification {
+        try requireAccess()
+        let processed = try ContactImageProcessor().process(data)
+        let oldContact = try findMutableContact(externalID: externalID)
+        let payload = ContactsMapper().map(oldContact)
+        let replacement = ContactsMapper().makeMutableContact(from: payload)
+        ContactsMapper().setImageData(processed.data, on: replacement)
+
+        let request = CNSaveRequest()
+        request.delete(oldContact)
+        request.add(replacement, toContainerWithIdentifier: try selectedContainer().identifier)
+        do {
+            try contactStore.execute(request)
+        } catch {
+            DiagnosticLogger.record(code: "CONTACT_IMAGE_REPLACE_FAILED", message: "external_id=\(externalID) error=\(error.localizedDescription) \(DiagnosticLogger.errorDetails(error)) stack=\(DiagnosticLogger.stackTrace())")
+            throw ContactsError.readFailed(error.localizedDescription)
+        }
+        DiagnosticLogger.record(code: "CONTACT_IMAGE_REPLACE_SAVED", message: "external_id=\(externalID) bytes=\(processed.data.count)")
+        do {
+            let verification = try verifyImage(externalID: externalID)
+            return verification
+        } catch {
+            return AvatarWriteVerification(status: .verificationUnknown, saveAccepted: true, requestedBytes: processed.data.count, nextAction: "verify_in_contacts_app_or_retry_after_iCloud_sync")
+        }
+    }
+
+    private func readImageDataAvailability(identifier: String) throws -> Bool {
+        let keys: [CNKeyDescriptor] = [
+            CNContactIdentifierKey as CNKeyDescriptor,
+            CNContactImageDataAvailableKey as CNKeyDescriptor
+        ]
+        let request = CNContactFetchRequest(keysToFetch: keys)
+        request.unifyResults = false
+        request.predicate = CNContact.predicateForContacts(withIdentifiers: [identifier])
+        var available = false
+        try contactStore.enumerateContacts(with: request) { contact, _ in
+            available = contact.imageDataAvailable
+        }
+        return available
+    }
+
+    private func readBackImageData(identifier: String) throws -> Data? {
+        let keys: [CNKeyDescriptor] = [
+            CNContactIdentifierKey as CNKeyDescriptor,
+            CNContactImageDataKey as CNKeyDescriptor
+        ]
+        let request = CNContactFetchRequest(keysToFetch: keys)
+        request.unifyResults = false
+        request.predicate = CNContact.predicateForContacts(withIdentifiers: [identifier])
+        var imageData: Data?
+        try contactStore.enumerateContacts(with: request) { contact, _ in
+            imageData = contact.imageData
+        }
+        return imageData
     }
 
     public func delete(externalID: String) throws {
@@ -199,8 +311,12 @@ public final class ContactsStore: @unchecked Sendable {
         let contact = try findMutableContact(externalID: externalID)
         let request = CNSaveRequest()
         request.delete(contact)
-        do { try store.execute(request) }
+        do { try contactStore.execute(request) }
         catch { throw ContactsError.readFailed(error.localizedDescription) }
+    }
+
+    private var contactStore: CNContactStore {
+        store ?? CNContactStore()
     }
 
     private func requireAccess() throws {
@@ -213,19 +329,16 @@ public final class ContactsStore: @unchecked Sendable {
     }
 
     private func findMutableContact(externalID: String) throws -> CNMutableContact {
-        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactTypeKey, CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactDepartmentNameKey, CNContactJobTitleKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactUrlAddressesKey, CNContactPostalAddressesKey] as [CNKeyDescriptor]
+        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey, CNContactTypeKey, CNContactGivenNameKey, CNContactFamilyNameKey, CNContactPhoneticGivenNameKey, CNContactPhoneticFamilyNameKey, CNContactOrganizationNameKey, CNContactDepartmentNameKey, CNContactJobTitleKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactUrlAddressesKey, CNContactPostalAddressesKey, CNContactImageDataAvailableKey] as [CNKeyDescriptor]
         var matches: [CNMutableContact] = []
         let request = CNContactFetchRequest(keysToFetch: keys)
+        request.predicate = CNContact.predicateForContactsInContainer(withIdentifier: try selectedContainer().identifier)
         do {
-            try store.enumerateContacts(with: request) { contact, _ in
+            try contactStore.enumerateContacts(with: request) { contact, _ in
                 if ContactsMapper().map(contact).externalID == externalID { matches.append(contact.mutableCopy() as! CNMutableContact) }
             }
         } catch { throw ContactsError.readFailed(error.localizedDescription) }
-        switch matches.count {
-        case 0: throw ContactsQueryError.notFound
-        case 1: return matches[0]
-        default: throw ContactsQueryError.ambiguous(matches.count)
-        }
+        return try ContactMatchResolver.requireExactlyOne(matches)
     }
 
     private func findContactIdentifier(externalID: String) throws -> String {
@@ -233,8 +346,9 @@ public final class ContactsStore: @unchecked Sendable {
         let keys: [CNKeyDescriptor] = [CNContactIdentifierKey as CNKeyDescriptor, CNContactUrlAddressesKey as CNKeyDescriptor]
         var matches: [String] = []
         let request = CNContactFetchRequest(keysToFetch: keys)
+        request.predicate = CNContact.predicateForContactsInContainer(withIdentifier: try selectedContainer().identifier)
         do {
-            try store.enumerateContacts(with: request) { contact, _ in
+            try contactStore.enumerateContacts(with: request) { contact, _ in
                 let urls = contact.urlAddresses.map { LabeledValue(label: $0.label, value: $0.value as String) }
                 if urls.compactMap(ContactsMapper.externalID(from:)).contains(externalID) { matches.append(contact.identifier) }
             }
@@ -243,10 +357,46 @@ public final class ContactsStore: @unchecked Sendable {
             throw ContactsError.readFailed(error.localizedDescription)
         }
         DiagnosticLogger.record(code: "CONTACT_IMAGE_IDENTIFIER_SEARCH_OK", message: "external_id=\(externalID) matches=\(matches.count)")
-        switch matches.count {
-        case 0: throw ContactsQueryError.notFound
-        case 1: return matches[0]
-        default: throw ContactsQueryError.ambiguous(matches.count)
+        return try ContactMatchResolver.requireExactlyOne(matches)
+    }
+
+    private func selectedContainer() throws -> CNContainer {
+        let containers = try contactStore.containers(matching: nil)
+        if let selector = containerSelector, selector.caseInsensitiveCompare("iCloud") != .orderedSame {
+            guard let exact = containers.first(where: { $0.identifier == selector }) else {
+                throw ContactsError.invalidInput("container not found: \(selector)")
+            }
+            guard exact.type == .cardDAV && exact.name.caseInsensitiveCompare("iCloud") == .orderedSame else {
+                throw ContactsError.invalidInput("only the iCloud Contacts container is supported in 0.1")
+            }
+            return exact
+        }
+        let candidates = containers.filter {
+            $0.type == .cardDAV && $0.name.caseInsensitiveCompare("iCloud") == .orderedSame
+        }
+        guard candidates.count == 1, let candidate = candidates.first else {
+            if candidates.isEmpty { throw ContactsError.icloudContainerNotFound }
+            throw ContactsError.invalidInput("multiple iCloud containers found; specify --container <identifier>")
+        }
+        return candidate
+    }
+
+    private static func describe(_ container: CNContainer) -> ContactContainer {
+        ContactContainer(
+            name: container.name,
+            identifier: container.identifier,
+            type: containerTypeName(container.type),
+            isICloud: container.type == .cardDAV && container.name.caseInsensitiveCompare("iCloud") == .orderedSame
+        )
+    }
+
+    private static func containerTypeName(_ type: CNContainerType) -> String {
+        switch type {
+        case .local: return "local"
+        case .exchange: return "exchange"
+        case .cardDAV: return "cardDAV"
+        case .unassigned: return "unassigned"
+        @unknown default: return "unknown"
         }
     }
 

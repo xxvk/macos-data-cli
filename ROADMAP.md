@@ -1,13 +1,17 @@
 # macos-data-cli Roadmap
 
-The project is currently in the design and prototype stage. No formal CLI commands have been implemented yet; command examples in the README describe the planned interface.
+The project is currently at the Contacts adapter release baseline `0.1.6`.
+The CLI and its core Contacts workflows are implemented locally; this roadmap
+now distinguishes completed 0.1 behavior from remaining hardening work.
 
 The long-term goal is to provide a general macOS native data access layer for agents and scripts. Different agents should be able to use the same CLI and JSON contract without depending on Codex, Claude Code, or another specific platform.
 
 ## Confirmed 0.1 design decisions
 
 - `external_id` is a generic JSON field; the Contacts adapter should prefer storing it in a URL field rather than depending on the Contacts Notes entitlement.
-- Accounts or containers must be selectable explicitly; the first implementation prioritizes the container that can sync with iCloud Contacts.
+- The first implementation targets the iCloud-capable Contacts container. The
+  current CLI verifies and uses that container, with explicit iCloud selection
+  available through `--container iCloud` or its exact identifier.
 - The JSON contract supports `metadata`, but 0.1 does not promise to persist arbitrary metadata in Contacts.
 - Deletion requires an explicit confirmation phrase in addition to `--apply`.
 - The minimum target is macOS 26+; macOS 27 beta may be used for development and compatibility testing, but is not the stable support baseline.
@@ -16,25 +20,37 @@ The long-term goal is to provide a general macOS native data access layer for ag
 
 The first version targets macOS 26+. macOS 27 beta may be used for early development testing.
 
-- [ ] Create the Swift Package and CLI entry point
-- [ ] Define stable JSON input, output, error, and exit-code formats
-- [ ] Support `--help` and `--version`
-- [ ] Read JSON from stdin or a file
+- [x] Create the Swift Package and CLI entry point
+- [x] Define the JSON success/error contract for implemented commands
+- [x] Support `--help`, `--version`, and `-v`
+- [x] Read JSON from stdin with `--stdin` (file input remains supported)
 - [x] Check and explain Contacts authorization
-- [ ] Provide dry-run by default and require explicit apply for writes
+- [x] Redact contact-sensitive values from diagnostics logs
+- [x] Provide dry-run and require explicit apply for writes
 - [x] List personal and organization contacts as JSON
 - [x] Distinguish `person` and `organization` through `kind`
+- [x] Filter queries by `kind` with `--kind person|organization`
 - [x] Support names, organizations, roles, email addresses, phone numbers, URLs, and postal addresses
+- [x] Support `phoneticGivenName` and `phoneticFamilyName` in the JSON contract and Contacts adapter
 - [x] Get a single contact by `external_id`
 - [x] Query contacts by name, phone, email, URL, organization, and postal code
 - [x] Support AND queries with up to three conditions
 - [x] Add the basic contact create dry-run and apply flow
 - [x] Reject duplicate `external_id` values before creation
-- [ ] Support optional `external_id` and multi-factor matching
-- [ ] Refuse automatic writes when a match is ambiguous
-- [ ] Create, update, and delete contacts
-- [ ] Return before/after changes and the final saved state
-- [ ] Keep repeated operations as idempotent as practical
+- [x] Support partial edit, avatar update, deletion, and external ID migration
+- [x] Export a JSON snapshot
+- [x] Report whether a contact has an avatar without fetching image bytes
+- [x] Return explicit avatar write verification status after image apply
+- [x] Add read-only `contacts avatar verify` with tri-state results
+- [x] Add an explicit confirmed avatar replacement path for unsafe iCloud records
+- [x] Require `external_id` for every CLI-created contact and support multi-factor matching
+- [x] Refuse automatic writes when a match is ambiguous
+- [x] Keep query matching and unique-match resolution in the framework-free `Core` layer
+- [x] Return the final saved state consistently after create, edit, avatar, and
+  delete apply operations
+- [x] Return and locally verify the final saved state for external ID migration apply
+- [x] Provide opt-in idempotent create retries and delete retries
+- [x] Support `contacts containers` and explicit `--container iCloud`/identifier selection
 
 ## Version roadmap
 
@@ -82,17 +98,33 @@ Each release is centered on one macOS data-domain adapter. Reliability, agent in
 
 ## Cross-cutting requirements for every release
 
-- [ ] Document Terminal, stdin, and stdout usage
-- [ ] Update the shared agent invocation JSON contract
-- [ ] Define consistent exit codes, errors, and authorization failures
+- [x] Document Terminal, stdin, and stdout usage
+- [x] Update the shared agent invocation JSON contract
+- [x] Define consistent errors and authorization failures for implemented paths
 - [x] Return structured JSON for the implemented read operations
-- [ ] Provide dry-run, diffs, and explicit apply for writes
-- [ ] Keep repeated operations as idempotent as practical
-- [ ] Add unit tests, fixtures, and required integration tests
-- [ ] Test on macOS 26+
-- [ ] Update CLI help, README, and adapter documentation
-- [ ] Provide reproducible source builds
+- [x] Provide dry-run and explicit apply for implemented writes
+- [x] Keep repeated operations idempotent when explicitly requested
+- [x] Add unit tests and reusable local fixtures
+- [x] Add a local CLI integration smoke test for reads and dry-runs
+- [x] Run the optional disposable-contact CRUD path locally; temporary contact
+  was created, edited, given an avatar, deleted, and verified absent
+- [x] Test on macOS 26+ (verified on macOS 27.0 with Xcode 26.6 / SDK 26.5)
+- [x] Update CLI help, README, and adapter documentation
+- [x] Provide reproducible source builds
 - [ ] Update binaries and Homebrew installation when ready for release
+
+## Pre-release hardening TODO
+
+- [x] Add process-level CLI tests for malformed JSON, empty stdin, missing flags,
+  duplicate external ID conflicts, and container argument combinations
+  (`scripts/run_cli_contract_tests.sh`)
+- [x] Run one explicitly authorized local write integration pass covering create,
+  edit, avatar, external ID migration, delete, and cleanup
+  (`scripts/run_local_contacts_integration.sh --with-writes`)
+- [ ] Verify the installed/Homebrew binary version separately from the source
+  Release build
+- [x] Verify phonetic fields with one explicitly authorized Japanese contact
+  apply and read-back test (`xvk-test-contacts-001`)
 
 ## Standard development workflow: TDD to local release
 
@@ -131,7 +163,7 @@ Organization external_id: xvk-test-organizations-001
 Create smoke-test external_id: org-create-apply-001
 URL format: x-macos-data://external-id/<id>
 
-The local Mac currently exposes one Contacts container named `iCloud`. The create smoke test wrote through the default container and verified the record by reading it back through the CLI. Explicit `--container` selection remains a future enhancement.
+The local Mac currently exposes one Contacts container named `iCloud`. The create smoke test wrote through the default container and verified the record by reading it back through the CLI. Explicit `--container` selection is also verified locally against this container.
 ```
 
 Standard verification command:
@@ -142,6 +174,23 @@ macos-data contacts get --external-id xvk-test-organizations-001 --format json
 macos-data contacts get --external-id org-create-apply-001 --format json
 ```
 
+Local CLI integration smoke test:
+
+```bash
+bash scripts/run_local_contacts_integration.sh
+```
+
+The default path is read-only plus dry-run. The optional full CRUD path creates
+the disposable fixture from `Tests/Fixtures/integration-contact.json`, edits
+it, writes an avatar, deletes it, and verifies that it is gone:
+
+```bash
+bash scripts/run_local_contacts_integration.sh --with-writes
+```
+
+This script is intentionally manual and local; it is not a CI job and is not
+invoked by `swift test`. It must never delete the three permanent fixtures.
+
 Computer Use is allowed only for the initial creation or manual recovery of these fixtures. Normal development, testing, Release builds, and CLI smoke tests must not create more contacts. If a fixture is deleted, its URL is changed, or its type is changed, restore it before continuing.
 
 ## Long-term direction
@@ -149,7 +198,7 @@ Computer Use is allowed only for the initial creation or manual recovery of thes
 - [ ] Evaluate additional Apple public frameworks
 - [ ] Define a common adapter lifecycle and capability declaration
 - [ ] Add cross-adapter batch operations and change detection
-- [ ] Version the shared JSON contract
+- [x] Version the shared JSON contract independently from the CLI release
 
 Each adapter should define its own authorization requirements, model mapping, read/write capabilities, errors, and tests.
 

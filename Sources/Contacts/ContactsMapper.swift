@@ -12,6 +12,8 @@ public struct ContactsMapper: Sendable {
             externalID: urls.compactMap(Self.externalID(from:)).first,
             givenName: contact.givenName.nilIfEmpty,
             familyName: contact.familyName.nilIfEmpty,
+            phoneticGivenName: contact.phoneticGivenName.nilIfEmpty,
+            phoneticFamilyName: contact.phoneticFamilyName.nilIfEmpty,
             organizationName: contact.organizationName.nilIfEmpty,
             department: contact.departmentName.nilIfEmpty,
             jobTitle: contact.jobTitle.nilIfEmpty,
@@ -29,6 +31,7 @@ public struct ContactsMapper: Sendable {
                     country: address.country.nilIfEmpty
                 )
             }
+            , imageAvailable: contact.isKeyAvailable(CNContactImageDataAvailableKey) && contact.imageDataAvailable
         )
     }
 
@@ -37,6 +40,8 @@ public struct ContactsMapper: Sendable {
         contact.contactType = payload.kind == .organization ? .organization : .person
         contact.givenName = payload.givenName ?? ""
         contact.familyName = payload.familyName ?? ""
+        contact.phoneticGivenName = payload.phoneticGivenName ?? ""
+        contact.phoneticFamilyName = payload.phoneticFamilyName ?? ""
         contact.organizationName = payload.organizationName ?? ""
         contact.departmentName = payload.department ?? ""
         contact.jobTitle = payload.jobTitle ?? ""
@@ -68,6 +73,8 @@ public struct ContactsMapper: Sendable {
             externalID: externalID,
             givenName: payload.givenName,
             familyName: payload.familyName,
+            phoneticGivenName: payload.phoneticGivenName,
+            phoneticFamilyName: payload.phoneticFamilyName,
             organizationName: payload.organizationName,
             department: payload.department,
             jobTitle: payload.jobTitle,
@@ -80,6 +87,8 @@ public struct ContactsMapper: Sendable {
         contact.contactType = replacement.contactType
         contact.givenName = replacement.givenName
         contact.familyName = replacement.familyName
+        contact.phoneticGivenName = replacement.phoneticGivenName
+        contact.phoneticFamilyName = replacement.phoneticFamilyName
         contact.organizationName = replacement.organizationName
         contact.departmentName = replacement.departmentName
         contact.jobTitle = replacement.jobTitle
@@ -94,6 +103,8 @@ public struct ContactsMapper: Sendable {
         if patch.has("kind"), let kind = patch.kind { contact.contactType = kind == .organization ? .organization : .person }
         if patch.has("givenName") { contact.givenName = patch.givenName ?? "" }
         if patch.has("familyName") { contact.familyName = patch.familyName ?? "" }
+        if patch.has("phoneticGivenName") { contact.phoneticGivenName = patch.phoneticGivenName ?? "" }
+        if patch.has("phoneticFamilyName") { contact.phoneticFamilyName = patch.phoneticFamilyName ?? "" }
         if patch.has("organizationName") { contact.organizationName = patch.organizationName ?? "" }
         if patch.has("department") { contact.departmentName = patch.department ?? "" }
         if patch.has("jobTitle") { contact.jobTitle = patch.jobTitle ?? "" }

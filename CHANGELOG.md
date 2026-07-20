@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added a manual local Contacts integration smoke test with a read-only/dry-run
+  mode and an explicit disposable-contact CRUD mode.
+- Added `--stdin` JSON input for Contacts create and regular edit commands;
+  file input remains supported.
+- Added `--kind person|organization` as a Contacts query condition.
+- Added opt-in idempotent create retries and `--ignore-not-found` delete retries.
+- Centralized unique-match resolution so ambiguous external IDs always refuse
+  automatic reads or writes.
+- Added JSON contract version `0.1` to machine-readable success and error
+  envelopes, and standardized `contacts count --format json`.
+- Centralized and documented stable CLI exit codes and error codes.
+- Redacted common contact-sensitive diagnostic values and removed underlying
+  exception text from persisted logs.
+- Added phonetic given/family name fields to the JSON model and Contacts mapper;
+  verified apply/read-back on the fixed Japanese test contact.
+- Added a local process-level CLI contract and negative-path test runner;
+  unknown and missing arguments now also return the JSON error contract.
+- Verified the complete local Contacts CRUD path with a temporary iCloud
+  contact, including avatar update, external ID migration, deletion, and cleanup.
+- Added explicit avatar write verification results, separating save acceptance
+  from successful image-data read-back.
+- Added a separately confirmed avatar replacement flow for records that cannot
+  be safely edited in place, plus local contract coverage for its dry-run and
+  confirmation guard.
+- Verified the macOS 26 deployment target on macOS 27.0 with Xcode 26.6 and
+  SDK 26.5; Debug and Release tests and CLI contract tests passed.
+
+### Fixed
+
+- Fixed `contacts export --format json --output <file>`, which previously
+  failed to match the CLI argument parser after format flags were normalized.
+- Apply responses for create, edit, avatar, delete, and external ID migration
+  now include the final contact state in the JSON contract.
+- Contact JSON now includes `imageAvailable`, read through
+  `CNContactImageDataAvailableKey` without fetching avatar bytes.
+- Added `contacts containers` and explicit `--container iCloud` or iCloud
+  container identifier selection. Unknown or non-iCloud containers fail
+  without fallback.
+
 ## 0.1.6 — 2026-07-16
 
 ### Fixed

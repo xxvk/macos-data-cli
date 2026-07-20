@@ -1,4 +1,5 @@
 public enum ContactQuery: Equatable, Sendable {
+    case kind(ContactKind)
     case name(String)
     case phone(String)
     case email(String)
@@ -36,6 +37,8 @@ public struct ContactQueryMatcher: Sendable {
 
     public func matches(_ contact: ContactPayload, query: ContactQuery) -> Bool {
         switch query {
+        case .kind(let kind):
+            return contact.kind == kind
         case .name(let value):
             let name = [contact.givenName, contact.familyName].compactMap { $0 }.joined(separator: " ")
             return contains(name, value)

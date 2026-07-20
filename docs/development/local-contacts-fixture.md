@@ -60,7 +60,8 @@ Do not create another copy if the record already exists.
 
 The local Contacts store currently exposes one container named `iCloud`. The create smoke test was written through the default container and verified by reading the record back through the CLI. All three fixture records use the reserved URL label `macos-data-cli`.
 
-Explicit `--container` selection remains a future enhancement for Macs with multiple accounts or containers.
+Explicit `--container iCloud` selection is also verified locally. A future
+multi-account expansion must not weaken the current iCloud-only restriction.
 
 ## Avatar fixtures
 

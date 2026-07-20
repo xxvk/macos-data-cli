@@ -21,6 +21,20 @@ final class ContactsStoreTests: XCTestCase {
         XCTAssertEqual(payload.emails.first?.value, "ada@example.com")
     }
 
+    func testMapperReadsAndWritesPhoneticNames() {
+        let contact = CNMutableContact()
+        contact.phoneticGivenName = "えいだ"
+        contact.phoneticFamilyName = "てすと"
+
+        let mapped = ContactsMapper().map(contact)
+        XCTAssertEqual(mapped.phoneticGivenName, "えいだ")
+        XCTAssertEqual(mapped.phoneticFamilyName, "てすと")
+
+        let rebuilt = ContactsMapper().makeMutableContact(from: mapped)
+        XCTAssertEqual(rebuilt.phoneticGivenName, "えいだ")
+        XCTAssertEqual(rebuilt.phoneticFamilyName, "てすと")
+    }
+
     func testMapperExtractsExternalIDFromReservedURL() {
         let contact = CNMutableContact()
         contact.urlAddresses = [CNLabeledValue(label: "macos-data-cli", value: "x-macos-data://external-id/xvk-test-contacts-001" as NSString)]
@@ -59,6 +73,14 @@ final class ContactsStoreTests: XCTestCase {
         let contact = CNMutableContact()
         ContactsMapper().setImageData(Data([0, 1, 2, 3]), on: contact)
         XCTAssertEqual(contact.imageData, Data([0, 1, 2, 3]))
+    }
+
+    func testMapperReportsImageAvailabilityWithoutReadingImageData() {
+        let contact = CNMutableContact()
+        XCTAssertFalse(ContactsMapper().map(contact).imageAvailable)
+
+        contact.imageData = Data([0, 1, 2, 3])
+        XCTAssertTrue(ContactsMapper().map(contact).imageAvailable)
     }
 
     func testProvidedAvatarFixturesAreNormalizedBelowLimit() throws {
