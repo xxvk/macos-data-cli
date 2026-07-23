@@ -2,7 +2,11 @@
 
 A CLI-first macOS native data access layer for agents and developers.
 
-Agents that need to work with macOS data often depend on fragile GUI automation, platform-specific integrations, or private and unstable data formats. `macos-data-cli` aims to provide a local, scriptable, testable interface built on Apple public frameworks.
+Agents that need to work with macOS data often depend on fragile GUI automation,
+platform-specific integrations, or private and unstable data formats.
+`macos-data-cli` provides a local, scriptable, testable interface that prefers
+Apple public frameworks and permits narrowly scoped, documented read-only local
+adapters when no public framework exposes the required data.
 
 ## Project status
 
@@ -10,6 +14,11 @@ The first Contacts adapter is currently at version 0.1.7. It supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
+
+Mail 0.2 is under development. Read-only capability checks, account and mailbox
+discovery, bounded message-metadata queries, explicit cached text/raw reads,
+Mail.app text fallback, and visual reveal are now available. The adapter uses a
+runtime-verified V10 SQLite/EMLX fast path and never writes the Mail store.
 
 Version 0.1 is the first Contacts adapter. Only commands explicitly marked as available below should be expected to work.
 
@@ -26,6 +35,32 @@ User documentation:
 - [Agent integration guide](AGENTS.md)
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
+
+## Mail 0.2 development commands
+
+```text
+macos-data mail doctor --format json
+macos-data mail accounts --format json
+macos-data mail mailboxes [--account-id <id>] --format json
+macos-data mail query [filters] [--limit <1...200>] [--cursor <cursor>] --format json
+macos-data mail get --id <id> [--content metadata|text] --format json
+macos-data mail get --id <id> --content raw --output <file|->
+macos-data mail reveal --id <id> --format json
+macos-data mail attachments verify --id <id> --format json
+```
+
+`doctor` does not launch Mail.app, prompt for permission, or read message
+subjects, addresses, or bodies. `fastPathAvailable` is true only after the V10
+required structure, WAL, and read-only database checks pass at runtime.
+Metadata queries default to 50 rows and are capped at 200. They use bound SQL
+parameters, opaque local IDs, cursor pagination, and a query deadline; message
+bodies are not read.
+`mail get` defaults to metadata. Text and raw reads are explicit; missing cached
+text may use bounded Mail.app Apple Events, while raw stays cache-only and exact.
+Raw bytes are never embedded in JSON and existing output files are not
+overwritten. `mail reveal` is the only command here that intentionally activates
+Mail.app. `mail attachments verify` compares SQLite and cached MIME counts only;
+it never exports attachment names or payloads and treats partial EMLX as unverified.
 
 ## Goals
 
@@ -119,6 +154,10 @@ Current limitations and remaining 0.1 work:
 - Do not access the internal Contacts database directly
 - Do not use Apple private APIs
 - Do not make GUI automation, screen coordinates, or AppleScript the core write path
+- Mail 0.2 has one documented exception for strictly read-only access to Mail's
+  local index and cached message files because no public framework exposes
+  general mailbox enumeration. The adapter must validate the schema, fail
+  closed, and never write those files.
 - Do not treat an Apple contact identifier as a cross-system stable key
 - Do not upload contacts, addresses, phone numbers, or images
 - Do not include a built-in AI agent
@@ -134,10 +173,13 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-The next adapter is Calendar in 0.2. Future releases may add Reminders, Notes,
-Mail, and Photos. vCard support, batch operations, and change detection remain
-Contacts-related follow-up work. Each adapter should define its own
-authorization requirements, data mapping, error format, and tests.
+The next adapter is Mail in 0.2, using a read-only local SQLite/EMLX path with
+Mail.app Apple Events fallback and visual verification. Calendar moves to 0.3,
+followed by Reminders, Notes, and Photos. See the
+[Mail architecture decision](docs/development/mail-adapter-architecture.md).
+vCard support, batch operations, and change detection remain Contacts-related
+follow-up work. Each adapter should define its own authorization requirements,
+data mapping, error format, and tests.
 
 ## License
 

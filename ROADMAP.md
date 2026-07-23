@@ -56,7 +56,36 @@ The first version targets macOS 26+. macOS 27 beta may be used for early develop
 
 Each release is centered on one macOS data-domain adapter. Reliability, agent invocation, testing, installation, and release work are cross-cutting requirements for every iteration rather than separate releases.
 
-### 0.2: Calendar adapter
+### 0.2: Mail adapter
+
+Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-architecture.md).
+
+- [x] Implement a read-only `mail doctor` for Mail-store discovery, Full Disk
+  Access, Automation, and schema capability checks
+- [x] Keep macOS 26.0 as the release baseline; enable the first direct-store
+  fast path only for a runtime-verified `V10` schema fingerprint
+- [x] Discover the highest supported `~/Library/Mail/V*` dynamically
+- [x] Query accounts, mailboxes, counts, and bounded message metadata from
+  `Envelope Index` through a strictly read-only SQLite connection
+- [x] Parse locally cached `.emlx` and `.partial.emlx` files for explicit
+  raw/text reads and partial-cache reporting
+- [x] Enumerate and cross-check SQLite/EMLX attachment counts before any future
+  bounded attachment export; partial-only content remains explicitly unverified
+- [x] Fall back to public Mail.app Apple Events for explicit text reads when
+  content is not cached; keep raw export cache-only and byte-exact
+- [ ] Extend bounded fallback to unsupported account storage without weakening
+  the fail-closed V10 metadata/schema gate
+- [x] Add a non-mutating `mail reveal` command for visual verification in Mail.app
+- [x] Return backend provenance, cache state, truncation/cursor information, and
+  structured permission/schema errors
+- [x] Use opaque local message IDs, keep selection/content/rendering parameters
+  separate, and route raw RFC 822 bytes only through explicit `--output`
+- [x] Enforce query deadlines, result caps, Apple Event circuit breaking, and
+  prohibit recursive filesystem scans as automatic fallback
+- [x] Never write Mail's SQLite database, WAL/SHM sidecars, `.emlx` files, or
+  account configuration
+
+### 0.3: Calendar adapter
 
 - [ ] Use EventKit to access calendars and events
 - [ ] Support calendars, events, times, locations, attendees, and notes
@@ -64,7 +93,7 @@ Each release is centered on one macOS data-domain adapter. Reliability, agent in
 - [ ] Represent time zones and recurring events explicitly
 - [ ] Include dry-run, the JSON contract, and authorization checks
 
-### 0.3: Reminders adapter
+### 0.4: Reminders adapter
 
 - [ ] Use EventKit to access reminders
 - [ ] Support reminder lists, titles, notes, due dates, and completion state
@@ -72,21 +101,13 @@ Each release is centered on one macOS data-domain adapter. Reliability, agent in
 - [ ] Support list selection and multi-factor matching
 - [ ] Include dry-run, the JSON contract, and authorization checks
 
-### 0.4: Notes adapter
+### 0.5: Notes adapter
 
 - [ ] Evaluate the supported scope of Apple public Notes APIs
 - [ ] Support note query and read operations
 - [ ] Define the MVP boundary for folders, attachments, links, and rich text
 - [ ] Document API limitations rather than relying on private database formats
 - [ ] Add authorization checks, stable errors, and tests
-
-### 0.5: Mail adapter
-
-- [ ] Evaluate the supported scope of public Mail-related frameworks
-- [ ] Define permissions for reading, searching, drafting, and sending mail
-- [ ] Prioritize read-only queries and structured JSON output
-- [ ] Require stronger confirmation for sending and deleting mail
-- [ ] Avoid Mail's internal database and GUI automation
 
 ### 0.6: Photos adapter
 
@@ -108,7 +129,8 @@ Each release is centered on one macOS data-domain adapter. Reliability, agent in
 - [x] Add a local CLI integration smoke test for reads and dry-runs
 - [x] Run the optional disposable-contact CRUD path locally; temporary contact
   was created, edited, given an avatar, deleted, and verified absent
-- [x] Test on macOS 26+ (verified on macOS 27.0 with Xcode 26.6 / SDK 26.5)
+- [x] Test on macOS 26+ (verified on macOS 26.4 with Xcode 26.6 / SDK 26.5;
+  earlier development also ran on macOS 27.0)
 - [x] Update CLI help, README, and adapter documentation
 - [x] Provide reproducible source builds
 - [ ] Update binaries and Homebrew installation when ready for release
@@ -148,7 +170,10 @@ Features involving system authorization must include:
 - a real local authorization check; and
 - a clear user-facing recovery message.
 
-Unit tests should prefer mocks and fixtures instead of relying on real Contacts, Calendar, or other personal data. Real system access belongs in explicit CLI smoke tests.
+Unit tests should prefer mocks and synthetic fixtures instead of relying on real
+Contacts, Mail, Calendar, or other personal data. Real system access belongs in
+explicit CLI smoke tests. Mail fixtures must never contain data copied from a
+real user's `Envelope Index` or `.emlx` cache.
 
 ### Local Contacts integration-test fixture
 
@@ -195,7 +220,8 @@ Computer Use is allowed only for the initial creation or manual recovery of thes
 
 ## Long-term direction
 
-- [ ] Evaluate additional Apple public frameworks
+- [ ] Evaluate additional Apple public frameworks and document when a public
+  framework does not expose the data needed by an adapter
 - [ ] Define a common adapter lifecycle and capability declaration
 - [ ] Add cross-adapter batch operations and change detection
 - [x] Version the shared JSON contract independently from the CLI release
@@ -214,7 +240,8 @@ Each adapter should define its own authorization requirements, model mapping, re
 
 - GUI automation and screen-coordinate workflows
 - Apple private APIs
-- Direct access to internal macOS databases
+- Writes to internal macOS databases; the Mail adapter permits only its
+  documented, replaceable, strictly read-only local-index path
 - Cloud uploads or centralized contact synchronization
 - A built-in AI agent
 - Coupling to one agent platform

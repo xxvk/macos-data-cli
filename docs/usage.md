@@ -2,6 +2,106 @@
 
 `macos-data` is a local Terminal CLI. It reads and writes macOS data through Apple public frameworks; agents do not need a special integration.
 
+## Mail (0.2 in development)
+
+Run the read-only capability check:
+
+```text
+macos-data mail doctor --format json
+```
+
+`doctor` dynamically discovers the highest numeric `~/Library/Mail/V*`, opens
+`Envelope Index` read-only, and checks WAL, database consistency, required
+schema, Full Disk Access, and current Automation state. It does not launch
+Mail.app, prompt for permission, or read subjects, addresses, mailbox names, or
+message bodies.
+
+`fastPathAvailable: true` means the current host passes the V10 SQLite metadata
+fast-path gate. It is not a promise about future Mail schemas; every run probes
+again. `target_not_running` or `requires_consent` Automation status does not
+disable SQLite, but means text fallback or `mail reveal` is not currently available.
+
+Discover privacy-safe account scopes and mailboxes:
+
+```text
+macos-data mail accounts --format json
+macos-data mail mailboxes --format json
+macos-data mail mailboxes --account-id <opaque-account-id> --format json
+```
+
+Account IDs are derived opaque local scopes; raw account authorities and full
+mailbox URLs are not returned. Mailbox and message IDs are also opaque and must
+be treated as adapter-owned values.
+
+Query bounded message metadata:
+
+```text
+macos-data mail query --unread --limit 50 --format json
+macos-data mail query --mailbox-id <id> --subject <text> --format json
+macos-data mail query --from <text> --received-after 2026-07-01 --format json
+macos-data mail query --cursor <cursor> --limit 50 --format json
+```
+
+Filters use AND semantics. Supported filters are `--account-id`, `--mailbox-id`,
+`--from`, `--to`, `--subject`, `--received-after`, `--received-before`,
+`--unread`, `--flagged`, and `--has-attachment`. Dates use ISO 8601. The default
+limit is 50 and the maximum is 200. A truncated result includes `nextCursor`.
+Queries use bound parameters and a 250 ms SQLite deadline; they read envelope
+metadata only, not message bodies.
+
+Mail results report `backend`; query results additionally report `cacheState`,
+`truncated`, `nextCursor`, `elapsedMs`, `fallbackReason`, `incomplete`, and
+`limitations`. Metadata stays on `backend: "sqlite"`; explicit text reads may
+report `sqlite_emlx` or `mail_app` according to the observed source.
+
+Read one message by the opaque ID returned from `mail query`:
+
+```text
+macos-data mail get --id <id> --format json
+macos-data mail get --id <id> --content text --format json
+macos-data mail get --id <id> --content raw --output message.eml --format json
+macos-data mail get --id <id> --content raw --output -
+```
+
+The default projection is `metadata` and does not read the EMLX payload.
+`--content text` explicitly reads cached content, decodes common MIME transfer
+encodings and charsets, prefers a non-attachment `text/plain` part, and otherwise
+returns sanitized text from HTML. It does not use WebKit or load remote resources.
+
+`--content raw` writes exact cached RFC 822 bytes and always requires `--output`.
+Raw bytes are never embedded in JSON. `--output -` cannot be combined with
+`--format json`; a named output file must not already exist. Reads are capped at
+64 MiB with a 100 ms local-file budget; extracted text is capped at 2 MiB and
+MIME nesting at eight levels.
+
+`cacheState: "partial"` is never reported as complete. If cached text is absent,
+an explicit text read may use serialized Mail.app Apple Events with a 3-second
+timeout and 30-second circuit breaker. This fallback does not auto-launch Mail;
+permission denial, Mail not running, and lookup failure remain observable. Raw
+export never falls back because Mail.app's text `source` cannot guarantee exact
+cached bytes. Opaque local IDs can become stale after Mail reindexes or moves a
+message.
+
+Reveal one result visibly in Mail.app:
+
+```text
+macos-data mail reveal --id <id> --format json
+```
+
+`reveal` may launch and activate Mail.app. It uses the same opaque local ID and
+does not intentionally change read, flag, mailbox, or message data.
+
+Cross-check attachment metadata without exporting attachments:
+
+```text
+macos-data mail attachments verify --id <id> --format json
+```
+
+The verifier returns only SQLite and MIME counts, cache state, and whether a
+complete cached EMLX matched. It does not return names, paths, or payloads.
+Partial or missing EMLX is always `incomplete` and never `matched`, even if the
+currently visible counts happen to agree.
+
 ## Contacts
 
 List available Contacts containers:

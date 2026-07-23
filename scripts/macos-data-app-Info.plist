@@ -22,5 +22,7 @@
 	<true/>
 	<key>NSContactsUsageDescription</key>
 	<string>macos-data needs Contacts access to read and manage your iCloud contacts from the local CLI.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>macos-data uses Mail.app automation only for explicitly requested Mail fallback and reveal operations.</string>
 </dict>
 </plist>

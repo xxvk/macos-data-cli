@@ -4,6 +4,96 @@
 
 本机 Debug、Xcode 工具链和 Contacts 授权流程请先阅读[本机 Debug 与 Contacts 授权](development/local-debug-and-tcc_CN.md)。
 
+## Mail（0.2 开发中）
+
+运行只读 capability 检查：
+
+```text
+macos-data mail doctor --format json
+```
+
+`doctor` 动态发现最高数字的 `~/Library/Mail/V*`，只读打开 `Envelope Index`，检查
+WAL、数据库一致性、必需 schema、Full Disk Access 和当前 Automation 状态。它不启动
+Mail.app、不触发授权弹窗，也不读取主题、邮箱地址、mailbox 名称或正文。
+
+`fastPathAvailable: true` 表示当前主机满足 V10 SQLite metadata 快路径；这不是对未来
+macOS/Mail schema 的保证，每次运行仍会重新 probe。Automation 的
+`target_not_running` 或 `requires_consent` 不影响 SQLite 快路径，但表示 text fallback
+或 `mail reveal` 当前不可用。
+
+发现隐私安全的账号作用域和 mailbox：
+
+```text
+macos-data mail accounts --format json
+macos-data mail mailboxes --format json
+macos-data mail mailboxes --account-id <opaque-account-id> --format json
+```
+
+account ID 是 adapter 派生的 opaque local scope；响应不会返回原始账号 authority 或
+完整 mailbox URL。mailbox 和 message ID 同样是 opaque 值，调用方不应解析其内部格式。
+
+查询有限 message metadata：
+
+```text
+macos-data mail query --unread --limit 50 --format json
+macos-data mail query --mailbox-id <id> --subject <text> --format json
+macos-data mail query --from <text> --received-after 2026-07-01 --format json
+macos-data mail query --cursor <cursor> --limit 50 --format json
+```
+
+filter 使用 AND 语义，支持 `--account-id`、`--mailbox-id`、`--from`、`--to`、
+`--subject`、`--received-after`、`--received-before`、`--unread`、`--flagged`
+和 `--has-attachment`；日期使用 ISO 8601。默认 limit 为 50，最大为 200；结果被截断
+时返回 `nextCursor`。查询使用参数绑定和 250 ms SQLite deadline，只读取 envelope
+metadata，不读取正文。
+
+Mail 响应返回 `backend`；query 还返回 `cacheState`、`truncated`、`nextCursor`、
+`elapsedMs`、`fallbackReason`、`incomplete` 和 `limitations`。metadata 保持
+`backend: "sqlite"`；显式 text 读取会根据实际来源返回 `sqlite_emlx` 或 `mail_app`。
+
+使用 `mail query` 返回的 opaque ID 读取唯一一封邮件：
+
+```text
+macos-data mail get --id <id> --format json
+macos-data mail get --id <id> --content text --format json
+macos-data mail get --id <id> --content raw --output message.eml --format json
+macos-data mail get --id <id> --content raw --output -
+```
+
+默认 projection 是 `metadata`，不会读取 EMLX payload。`--content text` 才会显式
+读取本地缓存，解码常见 MIME transfer encoding 和 charset，优先非附件的
+`text/plain`；没有 plain part 时，把 HTML 清洗为纯文本。实现不调用 WebKit，也不会
+加载远程资源。
+
+`--content raw` 输出准确 RFC 822 bytes，必须指定 `--output`。raw 不嵌入 JSON；
+`--output -` 不能与 `--format json` 同用；命名文件已存在时拒绝覆盖。单封原文上限
+64 MiB，本地文件读取预算 100 ms，抽取文本上限 2 MiB，MIME 最深八层。
+
+`cacheState: "partial"` 绝不会被报告为 complete。缓存 text 缺失时，显式 text 读取
+可通过串行 Mail.app Apple Events fallback，单次超时 3 秒，超时后熔断 30 秒。普通
+fallback 不自动启动 Mail；Automation 拒绝、Mail 未运行和定位失败都会保留在结构化
+结果中。raw 不做 fallback，因为 Mail.app 的 text `source` 不能保证 byte-exact。
+Mail reindex 或移动邮件后，opaque local ID 可能变 stale。
+
+在 Mail.app 中可视化定位一条结果：
+
+```text
+macos-data mail reveal --id <id> --format json
+```
+
+`reveal` 可以启动并激活 Mail.app；它使用同一个 opaque local ID，不会主动修改 read、
+flag、mailbox 或 message 数据。
+
+不导出附件，只交叉校验 attachment metadata：
+
+```text
+macos-data mail attachments verify --id <id> --format json
+```
+
+verifier 只返回 SQLite/MIME count、cache state，以及 complete EMLX 是否一致；不返回
+附件名、路径或 payload。partial 或缺失 EMLX 始终为 `incomplete` 且不标记 `matched`，
+即使当前可见 count 恰好相等也一样。
+
 ## Contacts
 
 列出当前 Contacts 容器：

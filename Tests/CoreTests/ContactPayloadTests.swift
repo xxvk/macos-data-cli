@@ -107,9 +107,11 @@ final class ContactPayloadTests: XCTestCase {
         XCTAssertEqual(CLIExitCode.genericFailure.rawValue, 1)
         XCTAssertEqual(CLIExitCode.contactsFailure.rawValue, 2)
         XCTAssertEqual(CLIExitCode.queryFailure.rawValue, 3)
+        XCTAssertEqual(CLIExitCode.mailFailure.rawValue, 4)
         XCTAssertEqual(CLIExitCode.usage.rawValue, 64)
         XCTAssertEqual(CLIErrorCode.contacts.rawValue, "CONTACTS_ERROR")
         XCTAssertEqual(CLIErrorCode.query.rawValue, "CONTACT_QUERY_ERROR")
+        XCTAssertEqual(CLIErrorCode.mail.rawValue, "MAIL_ERROR")
         XCTAssertEqual(CLIErrorCode.invalidQuery.rawValue, "INVALID_QUERY")
     }
 

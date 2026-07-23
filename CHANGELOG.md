@@ -1,5 +1,57 @@
 # Changelog
 
+## Unreleased — Mail 0.2 development
+
+### Added
+
+- Added read-only `mail doctor --format json` with dynamic numeric `V*`
+  discovery, read-only SQLite/WAL checks, schema fingerprinting, required V10
+  structure recognition, Full Disk Access inference, and non-interactive
+  Mail.app Automation status.
+- Verified the V10 SQLite fast path on macOS 26.4 with Xcode 26.6 / SDK 26.5.
+- Added Mail doctor fixtures covering highest-version selection, fail-closed
+  unknown schemas, fast-path gating, and privacy-safe JSON output.
+- Added read-only `mail accounts`, `mail mailboxes`, and bounded `mail query`
+  commands backed by a query-only SQLite connection.
+- Added opaque account, mailbox, message, and cursor IDs; bound metadata filters;
+  default/maximum result limits of 50/200; a 250 ms SQLite deadline; and backend,
+  cache, truncation, fallback, completeness, limitation, and elapsed-time fields.
+- Added explicit `mail get` metadata/text/raw projections with variable-depth V10
+  EMLX path resolution, `.partial.emlx` reporting, exact byte-count extraction,
+  bounded MIME text decoding, sanitized HTML-to-text fallback, and no-overwrite
+  raw file output.
+- Added EMLX/MIME fixtures for Unicode byte lengths, malformed/truncated input,
+  path traversal and symlink escape, partial/full precedence, transfer encodings,
+  attachment exclusion, and remote-resource-free HTML handling.
+- Preserved the V10 `messages_deleted_date_received_index` query plan by ordering
+  directly on `date_received`; this avoids a full temporary sort under the
+  250 ms metadata-query deadline.
+- Added serialized Mail.app Apple Events text fallback for uncached/empty partial
+  content, with a 3-second timeout, 30-second timeout circuit breaker, explicit
+  backend/fallback reporting, and no automatic Mail launch for ordinary reads.
+- Added `mail reveal --id <opaque-id>` as the isolated visible Mail.app action.
+  Message references use the V10 mailbox account UUID/path plus validated numeric
+  ROWID; Automation denial, timeout, circuit-open, and lookup failures have stable
+  machine codes.
+- Added a signed-app Automation smoke test and verified Automation plus real
+  `mail reveal` on macOS 26.4. The bounded latest-200 sample contained no
+  metadata-only message, so live text fallback was skipped rather than forced;
+  deterministic fixtures cover both fallback success and failure behavior.
+- Added privacy-safe `mail attachments verify`, which compares the SQLite
+  attachment-row count with bounded MIME-part inspection without returning names,
+  paths, or payloads. Synthetic complete/mismatch/missing fixtures pass.
+- The macOS 26.4 live V10 cross-check observed 1,146 attachment rows across 509
+  non-deleted messages while Mail was syncing; all 509 resolved to partial EMLX,
+  so none was labeled verified. This confirms future attachment export must fail
+  closed unless complete content is independently available.
+- Added `run_mail_release_gate.sh` for the reproducible Xcode test, Release,
+  signed Debug app, and read-only Mail smoke matrix. The non-UI gate passes on
+  macOS 26.4. Its attended Automation mode also demonstrated the fail-closed
+  `MAIL_APP_TIMEOUT` path while Mail was actively syncing; it did not auto-retry.
+- Added a checked-in Mail Automation entitlement to the ad-hoc Debug app. The
+  release gate now validates both plists, verifies the app signature, and reads
+  `com.apple.security.automation.apple-events=true` back from the signed bundle.
+
 ## 0.1.7 — 2026-07-20
 
 ### Added

@@ -20,6 +20,6 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 cp "$ROOT_DIR/.build/debug/macos-data" "$APP_DIR/Contents/MacOS/macos-data"
 cp "$ROOT_DIR/scripts/macos-data-app-Info.plist" "$APP_DIR/Contents/Info.plist"
 xattr -cr "$APP_DIR"
-codesign --force --sign - "$APP_DIR"
+codesign --force --sign - --entitlements "$ROOT_DIR/scripts/macos-data.entitlements" "$APP_DIR"
 
 echo "$APP_DIR"

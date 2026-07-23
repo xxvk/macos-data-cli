@@ -10,6 +10,8 @@ The Homebrew Cask currently distributes an Apple Silicon prebuilt binary from th
 - Create a Developer ID Application certificate.
 - Build the release binary in a controlled CI environment.
 - Sign the binary with `codesign`, hardened runtime, and a secure timestamp.
+- Preserve `scripts/macos-data.entitlements`; Mail.app Automation requires
+  `com.apple.security.automation.apple-events` when Hardened Runtime is enabled.
 - Package the signed binary for distribution.
 - Submit the package with `xcrun notarytool`.
 - Staple the notarization ticket with `xcrun stapler`.
@@ -18,6 +20,13 @@ The Homebrew Cask currently distributes an Apple Silicon prebuilt binary from th
 - Update the Homebrew Cask checksum and test installation without quarantine overrides.
 
 Signing credentials must remain in CI secrets or the developer's keychain and must never be committed to the repository.
+
+The local ad-hoc Debug app uses the same checked-in Automation entitlement so
+development catches entitlement drift before Developer ID signing is available.
+It is still not a notarized distribution artifact.
+`scripts/run_mail_release_gate.sh` validates the plist, verifies the app signature,
+and reads the entitlement back from the signed app rather than trusting the source
+file alone.
 
 ## Local workaround
 

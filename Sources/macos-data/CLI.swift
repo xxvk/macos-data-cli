@@ -2,6 +2,7 @@ import Foundation
 import Core
 import Contacts
 import ContactsAdapter
+import MailAdapter
 
 @main
 struct MacosDataCLI {
@@ -19,7 +20,7 @@ struct MacosDataCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] {
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] {
             printHelp()
             return
         }
@@ -33,6 +34,54 @@ struct MacosDataCLI {
             let permission = ContactsPermission()
             let store = ContactsStore(permission: permission, containerSelector: containerSelector)
             switch arguments {
+            case ["mail", "doctor"]:
+                emitJSONSuccess(MailDoctor().run())
+            case ["mail", "accounts"]:
+                emitJSONSuccess(MailAccountListResult(accounts: try makeValidatedMailStore().accounts()))
+            case ["mail", "mailboxes"]:
+                emitJSONSuccess(MailboxListResult(mailboxes: try makeValidatedMailStore().mailboxes()))
+            case let args where args.count == 4 && args[0] == "mail" && args[1] == "mailboxes" && args[2] == "--account-id":
+                emitJSONSuccess(MailboxListResult(mailboxes: try makeValidatedMailStore().mailboxes(accountID: args[3])))
+            case let args where args.count >= 2 && args[0] == "mail" && args[1] == "query":
+                emitJSONSuccess(try makeValidatedMailStore().query(parseMailQuery(Array(args.dropFirst(2)))))
+            case let args where args.count >= 2 && args[0] == "mail" && args[1] == "get":
+                let request = try parseMailGet(Array(args.dropFirst(2)), jsonRequested: jsonRequested)
+                let mailStore = try makeValidatedMailStore()
+                if request.projection == .raw {
+                    let raw = try mailStore.rawMessage(id: request.id)
+                    if request.output == "-" {
+                        do { try FileHandle.standardOutput.write(contentsOf: raw.data) }
+                        catch { throw MailStoreError.outputFailed }
+                    } else {
+                        guard let output = request.output else {
+                            throw MailStoreError.invalidArgument("Raw content requires --output <file|->.")
+                        }
+                        do {
+                            try raw.data.write(to: URL(fileURLWithPath: output), options: .withoutOverwriting)
+                        } catch let error as CocoaError where error.code == .fileWriteFileExists {
+                            throw MailStoreError.outputAlreadyExists
+                        } catch {
+                            throw MailStoreError.outputFailed
+                        }
+                        emitJSONSuccess(MailRawWriteResult(
+                            backend: "sqlite_emlx",
+                            cacheState: raw.cacheState,
+                            id: raw.message.id,
+                            output: "file",
+                            bytesWritten: raw.data.count,
+                            fallbackReason: raw.incomplete ? "partial_emlx" : nil,
+                            incomplete: raw.incomplete,
+                            limitations: raw.limitations
+                        ))
+                    }
+                } else {
+                    emitJSONSuccess(try mailStore.get(id: request.id, projection: request.projection))
+                }
+            case let args where args.count == 4 && args[0] == "mail" && args[1] == "reveal" && args[2] == "--id":
+                emitJSONSuccess(try makeValidatedMailStore().reveal(id: args[3]))
+            case let args where args.count == 5 && args[0] == "mail" && args[1] == "attachments" &&
+                args[2] == "verify" && args[3] == "--id":
+                emitJSONSuccess(try makeValidatedMailStore().verifyAttachments(id: args[4]))
             case ["contacts", "permission"]:
                 let granted = try await permission.requestAccess()
                 print(granted ? "Contacts permission granted." : "Contacts permission not granted.")
@@ -173,6 +222,9 @@ struct MacosDataCLI {
         } catch let error as ContactQuerySetError {
             report(error: error.description, code: CLIErrorCode.invalidQuery.rawValue, arguments: rawArguments, exitCode: CLIExitCode.usage.rawValue)
             Foundation.exit(CLIExitCode.usage.rawValue)
+        } catch let error as MailStoreError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.mailFailure.rawValue)
+            Foundation.exit(CLIExitCode.mailFailure.rawValue)
         } catch {
             report(error: error.localizedDescription, code: CLIErrorCode.cli.rawValue, arguments: rawArguments, exitCode: CLIExitCode.genericFailure.rawValue)
             Foundation.exit(CLIExitCode.genericFailure.rawValue)
@@ -286,6 +338,110 @@ struct MacosDataCLI {
         return try ContactQuerySet(conditions)
     }
 
+    private static func makeValidatedMailStore() throws -> SQLiteMailStore {
+        let report = MailDoctor(databaseProbe: SQLiteMailDatabaseProbe(performQuickCheck: false)).run()
+        guard report.fastPathAvailable else {
+            if report.fullDiskAccess == .denied { throw MailStoreError.fullDiskAccessRequired }
+            if report.mailStoreVersion == nil { throw MailStoreError.mailStoreNotFound }
+            if report.schema.status == .unsupported { throw MailStoreError.schemaUnsupported }
+            throw MailStoreError.databaseUnavailable
+        }
+        return SQLiteMailStore(databaseURL: try MailStoreLocator().locate().databaseURL)
+    }
+
+    private static func parseMailQuery(_ arguments: [String]) throws -> MailQuery {
+        var query = MailQuery()
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard seen.insert(option).inserted else {
+                throw MailStoreError.invalidArgument("Duplicate Mail query option: \(option)")
+            }
+            switch option {
+            case "--unread": query.unread = true; index += 1
+            case "--flagged": query.flagged = true; index += 1
+            case "--has-attachment": query.hasAttachment = true; index += 1
+            case "--account-id", "--mailbox-id", "--from", "--to", "--subject", "--received-after", "--received-before", "--limit", "--cursor":
+                guard index + 1 < arguments.count else {
+                    throw MailStoreError.invalidArgument("Mail query option requires a value: \(option)")
+                }
+                let value = arguments[index + 1]
+                switch option {
+                case "--account-id": query.accountID = value
+                case "--mailbox-id": query.mailboxID = value
+                case "--from": query.from = value
+                case "--to": query.to = value
+                case "--subject": query.subject = value
+                case "--received-after": query.receivedAfter = try parseMailDate(value, option: option)
+                case "--received-before": query.receivedBefore = try parseMailDate(value, option: option)
+                case "--limit":
+                    guard let limit = Int(value) else { throw MailStoreError.invalidArgument("--limit requires an integer") }
+                    query.limit = limit
+                case "--cursor": query.cursor = value
+                default: break
+                }
+                index += 2
+            default:
+                throw MailStoreError.invalidArgument("Unsupported Mail query option: \(option)")
+            }
+        }
+        return query
+    }
+
+    private static func parseMailDate(_ value: String, option: String) throws -> Date {
+        let timestampFormatter = ISO8601DateFormatter()
+        if let date = timestampFormatter.date(from: value) { return date }
+        let dayFormatter = ISO8601DateFormatter()
+        dayFormatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
+        if let date = dayFormatter.date(from: value) { return date }
+        throw MailStoreError.invalidArgument("\(option) requires ISO 8601, for example 2026-07-23 or 2026-07-23T00:00:00Z")
+    }
+
+    private struct MailGetArguments {
+        let id: String
+        let projection: MailContentProjection
+        let output: String?
+    }
+
+    private static func parseMailGet(_ arguments: [String], jsonRequested: Bool) throws -> MailGetArguments {
+        var id: String?
+        var projection = MailContentProjection.metadata
+        var output: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--id", "--content", "--output"].contains(option), seen.insert(option).inserted,
+                  index + 1 < arguments.count else {
+                throw MailStoreError.invalidArgument("mail get accepts --id, --content metadata|text|raw, and --output <file|->.")
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--id": id = value
+            case "--content":
+                guard let parsed = MailContentProjection(rawValue: value) else {
+                    throw MailStoreError.invalidArgument("--content requires metadata, text, or raw.")
+                }
+                projection = parsed
+            case "--output": output = value
+            default: break
+            }
+            index += 2
+        }
+        guard let id, !id.isEmpty else { throw MailStoreError.invalidArgument("mail get requires --id <opaque-local-id>.") }
+        if projection == .raw, output == nil {
+            throw MailStoreError.invalidArgument("Raw content requires --output <file|->.")
+        }
+        if projection != .raw, output != nil {
+            throw MailStoreError.invalidArgument("--output is valid only with --content raw.")
+        }
+        if projection == .raw, output == "-", jsonRequested {
+            throw MailStoreError.invalidArgument("--output - cannot be combined with --format json.")
+        }
+        return MailGetArguments(id: id, projection: projection, output: output)
+    }
+
     private static func printHelp() {
         print("""
         macos-data 0.1.7 — local macOS data CLI for agents and developers
@@ -293,6 +449,27 @@ struct MacosDataCLI {
         Usage:
           macos-data --version | -v
           macos-data contacts <command> [options]
+          macos-data mail <command> [options]
+
+        Mail commands:
+          doctor --format json               Inspect Mail store, schema, and permissions
+          accounts --format json             List privacy-safe local account scopes
+          mailboxes [--account-id <id>] --format json
+                                             List mailboxes and local counts
+          query [filters] [--limit <n>] [--cursor <cursor>] --format json
+                                             Query bounded message metadata
+          get --id <id> [--content metadata|text] --format json
+                                             Read one message; metadata is default
+          get --id <id> --content raw --output <file|->
+                                             Export exact cached RFC 822 bytes
+          reveal --id <id> --format json     Open one message visibly in Mail.app
+          attachments verify --id <id> --format json
+                                             Compare SQLite and MIME attachment counts
+
+        Mail query filters:
+          --account-id <id> --mailbox-id <id> --from <text> --to <text>
+          --subject <text> --received-after <iso8601> --received-before <iso8601>
+          --unread --flagged --has-attachment --limit <1...200> --cursor <cursor>
 
         Contacts commands:
           permission                         Check/request Contacts permission
@@ -336,7 +513,8 @@ struct MacosDataCLI {
         JSON contract:
           Version: 0.1 (independent from the CLI release version)
           Exit codes: 0 success, 1 unexpected CLI error, 2 Contacts error,
-            3 ambiguous/not-found query error, 64 usage or invalid query
+            3 ambiguous/not-found query error, 4 Mail error,
+            64 usage or invalid query
           Success: {"ok": true, "contractVersion": "0.1", "data": ...}
           Failure: {"ok": false, "contractVersion": "0.1", "error": {"code": ..., "message": ...}}
           Add --format json to commands that support machine-readable output.

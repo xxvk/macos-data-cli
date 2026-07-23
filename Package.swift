@@ -16,6 +16,10 @@ let package = Package(
             name: "ContactsAdapter",
             targets: ["ContactsAdapter"]
         ),
+        .library(
+            name: "MailAdapter",
+            targets: ["MailAdapter"]
+        ),
         .executable(
             name: "macos-data",
             targets: ["macos-data"]
@@ -36,9 +40,20 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        .target(
+            name: "MailAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Mail",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3")
+            ]
+        ),
         .executableTarget(
             name: "macos-data",
-            dependencies: ["Core", "ContactsAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -66,6 +81,13 @@ let package = Package(
         .testTarget(
             name: "ContactsTests",
             dependencies: ["ContactsAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "MailTests",
+            dependencies: ["MailAdapter"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
