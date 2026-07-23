@@ -26,7 +26,7 @@ struct MacosDataCLI {
         }
 
         if arguments == ["--version"] || arguments == ["-v"] {
-            print("0.1.7")
+            print(CLIVersion.current)
             return
         }
 
@@ -37,11 +37,11 @@ struct MacosDataCLI {
             case ["mail", "doctor"]:
                 emitJSONSuccess(MailDoctor().run())
             case ["mail", "accounts"]:
-                emitJSONSuccess(MailAccountListResult(accounts: try makeValidatedMailStore().accounts()))
+                emitJSONSuccess(try makeValidatedMailStore().accounts())
             case ["mail", "mailboxes"]:
-                emitJSONSuccess(MailboxListResult(mailboxes: try makeValidatedMailStore().mailboxes()))
+                emitJSONSuccess(try makeValidatedMailStore().mailboxes())
             case let args where args.count == 4 && args[0] == "mail" && args[1] == "mailboxes" && args[2] == "--account-id":
-                emitJSONSuccess(MailboxListResult(mailboxes: try makeValidatedMailStore().mailboxes(accountID: args[3])))
+                emitJSONSuccess(try makeValidatedMailStore().mailboxes(accountID: args[3]))
             case let args where args.count >= 2 && args[0] == "mail" && args[1] == "query":
                 emitJSONSuccess(try makeValidatedMailStore().query(parseMailQuery(Array(args.dropFirst(2)))))
             case let args where args.count >= 2 && args[0] == "mail" && args[1] == "get":
@@ -338,15 +338,72 @@ struct MacosDataCLI {
         return try ContactQuerySet(conditions)
     }
 
-    private static func makeValidatedMailStore() throws -> SQLiteMailStore {
-        let report = MailDoctor(databaseProbe: SQLiteMailDatabaseProbe(performQuickCheck: false)).run()
-        guard report.fastPathAvailable else {
-            if report.fullDiskAccess == .denied { throw MailStoreError.fullDiskAccessRequired }
-            if report.mailStoreVersion == nil { throw MailStoreError.mailStoreNotFound }
-            if report.schema.status == .unsupported { throw MailStoreError.schemaUnsupported }
-            throw MailStoreError.databaseUnavailable
+    private enum ValidatedMailStore {
+        case sqlite(SQLiteMailStore)
+        case mailApp(MailAppMetadataStore)
+
+        func accounts() throws -> MailAccountListResult {
+            switch self {
+            case .sqlite(let store): MailAccountListResult(accounts: try store.accounts())
+            case .mailApp(let store): try store.accounts()
+            }
         }
-        return SQLiteMailStore(databaseURL: try MailStoreLocator().locate().databaseURL)
+
+        func mailboxes(accountID: String? = nil) throws -> MailboxListResult {
+            switch self {
+            case .sqlite(let store): MailboxListResult(mailboxes: try store.mailboxes(accountID: accountID))
+            case .mailApp(let store): try store.mailboxes(accountID: accountID)
+            }
+        }
+
+        func query(_ query: MailQuery) throws -> MailQueryResult {
+            switch self {
+            case .sqlite(let store): try store.query(query)
+            case .mailApp(let store): try store.query(query)
+            }
+        }
+
+        func get(id: String, projection: MailContentProjection) throws -> MailGetResult {
+            switch self {
+            case .sqlite(let store): try store.get(id: id, projection: projection)
+            case .mailApp(let store): try store.get(id: id, projection: projection)
+            }
+        }
+
+        func rawMessage(id: String) throws -> MailRawMessage {
+            switch self {
+            case .sqlite(let store): try store.rawMessage(id: id)
+            case .mailApp: throw MailStoreError.contentNotCached
+            }
+        }
+
+        func reveal(id: String) throws -> MailRevealResult {
+            switch self {
+            case .sqlite(let store): try store.reveal(id: id)
+            case .mailApp(let store): try store.reveal(id: id)
+            }
+        }
+
+        func verifyAttachments(id: String) throws -> MailAttachmentVerificationResult {
+            switch self {
+            case .sqlite(let store): try store.verifyAttachments(id: id)
+            case .mailApp:
+                throw MailStoreError.invalidArgument("Attachment verification requires the recognized SQLite/EMLX fast path.")
+            }
+        }
+    }
+
+    private static func makeValidatedMailStore() throws -> ValidatedMailStore {
+        let report = MailDoctor(databaseProbe: SQLiteMailDatabaseProbe(performQuickCheck: false)).run()
+        let forceMailApp = ProcessInfo.processInfo.environment["MACOS_DATA_MAIL_FORCE_APP_FALLBACK"] == "1"
+        switch MailBackendSelector.select(report: report, forceMailAppFallback: forceMailApp) {
+        case .sqlite:
+            return .sqlite(SQLiteMailStore(databaseURL: try MailStoreLocator().locate().databaseURL))
+        case .mailApp(let reason):
+            return .mailApp(MailAppMetadataStore(fallbackReason: reason))
+        case .unavailable(let error):
+            throw error
+        }
     }
 
     private static func parseMailQuery(_ arguments: [String]) throws -> MailQuery {
@@ -444,7 +501,7 @@ struct MacosDataCLI {
 
     private static func printHelp() {
         print("""
-        macos-data 0.1.7 — local macOS data CLI for agents and developers
+        macos-data \(CLIVersion.current) — local macOS data CLI for agents and developers
 
         Usage:
           macos-data --version | -v
@@ -520,7 +577,9 @@ struct MacosDataCLI {
           Add --format json to commands that support machine-readable output.
 
         Safety and limits:
-          Writes target only the iCloud Contacts container in 0.1.7.
+          Mail.app metadata fallback is limited to 25 message candidates,
+            always incomplete, and has no cursor; raw remains cache-only.
+          Contacts writes target only the verified iCloud container.
           Writes require --dry-run or explicit --apply.
           Avatar input is limited to 10 MB; output is <= 1024 px and 200 KB.
           metadata remains in JSON and is not written to Apple Contacts.

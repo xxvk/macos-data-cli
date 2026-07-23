@@ -6,8 +6,10 @@
 	<string>com.xvk.macos-data-cli</string>
 	<key>CFBundleName</key>
 	<string>macos-data</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.2.0</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.7</string>
+	<string>0.2.0</string>
 	<key>NSContactsUsageDescription</key>
 	<string>macos-data needs Contacts access to read and manage your iCloud contacts from the local CLI.</string>
 	<key>NSAppleEventsUsageDescription</key>

@@ -80,6 +80,11 @@ not assume a Homebrew or Release binary while development is in progress.
 - Missing cached text may fall back to Mail.app only for explicit `--content text`.
   Ordinary fallback must not launch Mail.app; raw RFC 822 never falls back because
   AppleScript text cannot provide a byte-exact replacement.
+- When SQLite is unavailable, Mail.app metadata fallback requires Mail to be
+  running and Automation to be authorized. It is limited to 32 accounts, 200
+  top-level mailboxes, 25 message candidates, and five seconds. Preserve its
+  `incomplete`, no-cursor, fallback-reason, and limitation fields; never treat a
+  no-match response as complete. Its `ambx_`/`appmsg_` IDs are backend-specific.
 - `mail reveal` is an explicit visible operation that may launch and activate
   Mail.app. Do not use it as a hidden read path or claim it verifies content bytes.
 - `mail attachments verify` is metadata-only validation. It may compare SQLite
@@ -102,6 +107,9 @@ not assume a Homebrew or Release binary while development is in progress.
   outside the loginwindow bootstrap namespace. It verifies Automation and one
   visible reveal without printing message fields. Add `--with-text-fallback`
   only when reading one uncached body is explicitly acceptable.
+- `scripts/run_mail_app_metadata_smoke.sh` forces the bounded metadata backend
+  only for development verification. It stores JSON in an auto-deleted private
+  temp directory and prints aggregate counts only.
 
 ## Local verification
 
@@ -115,13 +123,25 @@ bash scripts/run_mail_doctor_smoke.sh --require-fast-path
 bash scripts/run_mail_metadata_smoke.sh
 bash scripts/run_mail_content_smoke.sh
 bash scripts/run_mail_attachment_smoke.sh
+bash scripts/run_mail_app_metadata_smoke.sh
 bash scripts/run_mail_automation_smoke.sh --gui-session
 bash scripts/run_mail_release_gate.sh
+bash scripts/run_installed_release_smoke.sh
+bash scripts/check_public_release_prerequisites.sh
 ```
 
 Use `scripts/run_mail_release_gate.sh --with-automation` only for an attended
 check: it performs a visible reveal and intentionally fails without retry when
 Mail.app exceeds the 3-second Apple Event budget.
+
+Run `scripts/run_installed_release_smoke.sh` only after installing the Release
+binary. It verifies the installed version and V10 SQLite path without printing
+mail fields.
+
+Before any external release action, run
+`scripts/check_public_release_prerequisites.sh`. Treat a missing Developer ID,
+notary profile, valid GitHub login, or clean worktree as a hard stop; the script
+does not authorize committing, tagging, pushing, or publishing.
 
 The contract script uses the raw Debug executable and therefore requires the
 calling process to have Contacts permission. For this machine's TCC behavior,

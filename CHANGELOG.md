@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Mail 0.2 development
+## 0.2.0 — 2026-07-23
 
 ### Added
 
@@ -51,6 +51,20 @@
 - Added a checked-in Mail Automation entitlement to the ad-hoc Debug app. The
   release gate now validates both plists, verifies the app signature, and reads
   `com.apple.security.automation.apple-events=true` back from the signed bundle.
+- Added a bounded Mail.app metadata fallback for unavailable FDA or unsupported
+  storage schemas. It requires a running authorized Mail.app, has a five-second
+  timeout, caps enumeration at 32 accounts / 200 top-level mailboxes / 25
+  messages, returns backend-specific opaque IDs, no cursor, and always marks
+  queries incomplete. The privacy-safe macOS 26.4 smoke observed 3 account
+  scopes and 35 top-level mailboxes and verified one targeted metadata get.
+- Centralized the 0.2.0 CLI and bundle version through `VERSION` and
+  `CLIVersion`, with release-gate drift checks across the binary and plists.
+- Added a privacy-safe installed-release smoke. The locally installed 0.2.0
+  binary passed version/help checks and used the V10 SQLite fast path for a
+  bounded query on macOS 26.4.
+- Added a public-release prerequisite audit for version drift, worktree state,
+  Developer ID, notarization profile, GitHub authentication, and optional Cask
+  checkout availability. It prints status only and performs no release action.
 
 ## 0.1.7 — 2026-07-20
 

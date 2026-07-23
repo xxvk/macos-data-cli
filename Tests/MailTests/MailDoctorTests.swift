@@ -58,6 +58,38 @@ final class MailDoctorTests: XCTestCase {
         XCTAssertFalse(json.localizedCaseInsensitiveContains("sender"))
     }
 
+    func testBackendSelectorKeepsRecognizedFastPathIndependentOfAutomation() {
+        let report = backendReport(fastPath: true, automation: .denied)
+        XCTAssertEqual(MailBackendSelector.select(report: report), .sqlite)
+    }
+
+    func testBackendSelectorUsesBoundedFallbackForUnknownSchemaOrDeniedFDA() {
+        let unsupported = backendReport(fastPath: false, automation: .available, schema: .unsupported)
+        XCTAssertEqual(
+            MailBackendSelector.select(report: unsupported),
+            .mailApp(fallbackReason: "mail_schema_unsupported")
+        )
+
+        let denied = backendReport(fastPath: false, automation: .available, fullDiskAccess: .denied)
+        XCTAssertEqual(
+            MailBackendSelector.select(report: denied),
+            .mailApp(fallbackReason: "full_disk_access_required")
+        )
+    }
+
+    func testBackendSelectorFailsClosedWhenFallbackIsUnavailable() {
+        let report = backendReport(fastPath: false, automation: .targetNotRunning, schema: .unsupported)
+        XCTAssertEqual(MailBackendSelector.select(report: report), .unavailable(.schemaUnsupported))
+    }
+
+    func testBackendSelectorCanForceFallbackOnlyWhenAutomationIsAvailable() {
+        let report = backendReport(fastPath: true, automation: .available)
+        XCTAssertEqual(
+            MailBackendSelector.select(report: report, forceMailAppFallback: true),
+            .mailApp(fallbackReason: "developer_forced_mail_app_fallback")
+        )
+    }
+
     private func makeFixtureRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("macos-data-mail-tests-(UUID().uuidString)", isDirectory: true)
@@ -71,6 +103,25 @@ final class MailDoctorTests: XCTestCase {
             mailRoot: root,
             databaseProbe: databaseProbe,
             automationProbe: StubAutomationProbe(result: .requiresConsent)
+        )
+    }
+
+    private func backendReport(
+        fastPath: Bool,
+        automation: MailAutomationStatus,
+        schema: MailSchemaStatus = .supported,
+        fullDiskAccess: MailCapabilityStatus = .available
+    ) -> MailDoctorReport {
+        MailDoctorReport(
+            osVersion: "26.4.0",
+            sdkBaseline: "macOS 26.0",
+            mailStoreVersion: "V10",
+            fullDiskAccess: fullDiskAccess,
+            automation: automation,
+            sqlite: MailSQLiteCapability(status: fastPath ? .available : .unavailable, journalMode: "wal", quickCheck: "ok", walPresent: true, shmPresent: true),
+            schema: MailSchemaCapability(status: schema, fingerprint: "fixture", recognition: schema == .supported ? "fixture" : nil),
+            fastPathAvailable: fastPath,
+            limitations: []
         )
     }
 }

@@ -2,7 +2,7 @@
 
 `macos-data` is a local Terminal CLI. It reads and writes macOS data through Apple public frameworks; agents do not need a special integration.
 
-## Mail (0.2 in development)
+## Mail (0.2)
 
 Run the read-only capability check:
 
@@ -33,6 +33,14 @@ Account IDs are derived opaque local scopes; raw account authorities and full
 mailbox URLs are not returned. Mailbox and message IDs are also opaque and must
 be treated as adapter-owned values.
 
+When the V10 schema/FDA fast path is unavailable, the CLI may use Mail.app only
+if Mail is already running and Automation is authorized. This metadata fallback
+has a five-second Apple Event timeout and hard caps of 32 accounts, 200 top-level
+mailboxes, and 25 message candidates. Its query result is always `incomplete`,
+has no cursor, and reports `backend: "mail_app"` plus the fallback reason.
+Fallback `ambx_`/`appmsg_` IDs are local adapter values and are not interchangeable
+with SQLite IDs. Raw export and attachment verification remain fast-path-only.
+
 Query bounded message metadata:
 
 ```text
@@ -48,6 +56,11 @@ Filters use AND semantics. Supported filters are `--account-id`, `--mailbox-id`,
 limit is 50 and the maximum is 200. A truncated result includes `nextCursor`.
 Queries use bound parameters and a 250 ms SQLite deadline; they read envelope
 metadata only, not message bodies.
+
+On the Mail.app metadata fallback, filters are applied only to the bounded
+candidate set, nested mailboxes are not enumerated, and `--cursor` is rejected.
+Callers must preserve the returned limitations rather than treating a no-match
+result as a complete mailbox search.
 
 Mail results report `backend`; query results additionally report `cacheState`,
 `truncated`, `nextCursor`, `elapsedMs`, `fallbackReason`, `incomplete`, and

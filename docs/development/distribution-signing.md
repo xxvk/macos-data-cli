@@ -2,9 +2,25 @@
 
 ## Current state
 
-The Homebrew Cask currently distributes an Apple Silicon prebuilt binary from the GitHub Release. The asset checksum is verified by Homebrew, but the binary is not signed with an Apple Developer ID or notarized. Users may therefore see a Gatekeeper warning after download.
+The existing Homebrew Cask distribution path uses an Apple Silicon prebuilt
+binary from GitHub Release. Version 0.2.0 has been built, installed, and
+verified locally, but its public release asset and Cask update have not been
+published. The local binary is not signed with an Apple Developer ID or
+notarized and is not a public distribution artifact.
 
 ## Future public-release plan
+
+Run the privacy-safe prerequisite audit first:
+
+```bash
+bash scripts/check_public_release_prerequisites.sh
+```
+
+It verifies version alignment, a clean worktree, Developer ID availability,
+the `macos-data-notary` keychain profile, and GitHub CLI authentication. Set
+`MACOS_DATA_NOTARY_PROFILE` when using another profile and
+`MACOS_DATA_CASK_FILE` when the Tap checkout is available locally. The script
+reports only status and never prints credentials or notarization history.
 
 - Enroll in the Apple Developer Program.
 - Create a Developer ID Application certificate.
@@ -27,6 +43,11 @@ It is still not a notarized distribution artifact.
 `scripts/run_mail_release_gate.sh` validates the plist, verifies the app signature,
 and reads the entitlement back from the signed app rather than trusting the source
 file alone.
+
+After direct local installation, `scripts/run_installed_release_smoke.sh`
+independently checks the installed version, help entry point, Mail V10 fast
+path, and SQLite query backend. Its temporary JSON is automatically deleted and
+it prints no message fields.
 
 ## Local workaround
 
@@ -64,9 +85,10 @@ Do not disable Gatekeeper globally. The permanent public-release solution remain
 
 ## Release checklist
 
-1. Publish the versioned binary to GitHub Release.
-2. Update the Homebrew Cask URL, version, checksum, and archive path.
-3. Push the Tap change.
-4. On a clean local installation, run `brew update` and `brew upgrade --cask macos-data`.
-5. Verify `macos-data --version` and one read-only Contacts command.
-6. Until signing and notarization are available, document any Gatekeeper warning and local quarantine handling.
+1. Run `scripts/check_public_release_prerequisites.sh` and resolve every failure.
+2. Sign, package, notarize, staple, and locally assess the 0.2.0 artifact.
+3. Publish the versioned binary to GitHub Release.
+4. Update the Homebrew Cask URL, version, checksum, and archive path.
+5. Push the Tap change.
+6. On a clean local installation, run `brew update` and `brew upgrade --cask macos-data`.
+7. Verify `macos-data --version` and one bounded read-only Mail command.

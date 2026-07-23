@@ -4,7 +4,7 @@
 
 本机 Debug、Xcode 工具链和 Contacts 授权流程请先阅读[本机 Debug 与 Contacts 授权](development/local-debug-and-tcc_CN.md)。
 
-## Mail（0.2 开发中）
+## Mail（0.2）
 
 运行只读 capability 检查：
 
@@ -32,6 +32,12 @@ macos-data mail mailboxes --account-id <opaque-account-id> --format json
 account ID 是 adapter 派生的 opaque local scope；响应不会返回原始账号 authority 或
 完整 mailbox URL。mailbox 和 message ID 同样是 opaque 值，调用方不应解析其内部格式。
 
+V10 schema/FDA 快路径不可用时，仅当 Mail.app 已运行且 Automation 已授权，CLI 才会
+使用 metadata fallback。其 Apple Event 超时为 5 秒，硬上限为 32 个账号、200 个
+顶层 mailbox 和 25 个 message 候选；query 始终返回 `incomplete`、不提供 cursor，
+并报告 `backend: "mail_app"` 和 fallback reason。fallback 的 `ambx_`/`appmsg_` ID
+不能与 SQLite ID 混用。raw export 和 attachment verify 仍只允许 fast path。
+
 查询有限 message metadata：
 
 ```text
@@ -46,6 +52,9 @@ filter 使用 AND 语义，支持 `--account-id`、`--mailbox-id`、`--from`、`
 和 `--has-attachment`；日期使用 ISO 8601。默认 limit 为 50，最大为 200；结果被截断
 时返回 `nextCursor`。查询使用参数绑定和 250 ms SQLite deadline，只读取 envelope
 metadata，不读取正文。
+
+Mail.app metadata fallback 只在有限候选中应用 filter，不枚举嵌套 mailbox，并拒绝
+`--cursor`。调用方必须保留 `limitations`，不能把无匹配结果解释成完整 mailbox 搜索。
 
 Mail 响应返回 `backend`；query 还返回 `cacheState`、`truncated`、`nextCursor`、
 `elapsedMs`、`fallbackReason`、`incomplete` 和 `limitations`。metadata 保持

@@ -22,3 +22,8 @@
 
 错误写入 stderr，成功的 JSON 写入 stdout。调用方应先根据退出码分支，
 再在请求 JSON 错误 envelope 时读取 `error.code` 和 `error.message`。
+
+Mail 调用方还必须按 `data.backend` 分支。SQLite message/mailbox ID 与 Mail.app
+fallback 的 `appmsg_`/`ambx_` ID 是 backend-specific opaque 值。fallback query
+始终返回 `incomplete: true`、`nextCursor: null` 和有限候选范围的 limitations；无匹配
+响应不能解释为完整 mailbox 搜索。

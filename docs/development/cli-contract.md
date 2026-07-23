@@ -24,3 +24,9 @@ CLI release version.
 Errors are written to stderr. Successful JSON responses are written to stdout.
 The caller should branch on the exit code first, then inspect `error.code` and
 `error.message` when a JSON error envelope is requested.
+
+Mail callers must also branch on `data.backend`. SQLite message/mailbox IDs and
+Mail.app fallback `appmsg_`/`ambx_` IDs are backend-specific opaque values. A
+fallback query always returns `incomplete: true`, `nextCursor: null`, and
+limitations describing the bounded candidate set. A no-match fallback response
+must not be interpreted as a complete mailbox search.

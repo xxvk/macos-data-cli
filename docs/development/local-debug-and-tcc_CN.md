@@ -93,6 +93,15 @@ bash scripts/run_mail_release_gate.sh
 3 秒 Apple Event budget 可能返回 `MAIL_APP_TIMEOUT`；这是 fail-closed 结果，脚本不会
 自动重试。
 
+只验证未知 schema/FDA 路径的有限 Mail.app metadata backend 时，运行：
+
+```bash
+bash scripts/run_mail_app_metadata_smoke.sh
+```
+
+脚本在登录用户 GUI session 中强制选择 fallback，仅打印账号、顶层 mailbox 和 message
+聚合数量；完整 JSON 只写入自动删除的私有临时目录。它不会读取正文或执行 reveal。
+
 ## Mail Automation
 
 Debug app 已包含 `NSAppleEventsUsageDescription`。先通过 UI 启动 Mail.app，再用同一个

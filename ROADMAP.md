@@ -1,8 +1,8 @@
 # macos-data-cli Roadmap
 
-The project is currently at the Contacts adapter release baseline `0.1.7`.
-The CLI and its core Contacts workflows are implemented locally; this roadmap
-now distinguishes completed 0.1 behavior from remaining hardening work.
+The project is currently at the Mail adapter release baseline `0.2.0`.
+The Contacts and read-only Mail workflows are implemented and locally verified;
+this roadmap distinguishes released behavior from later adapters and distribution work.
 
 The long-term goal is to provide a general macOS native data access layer for agents and scripts. Different agents should be able to use the same CLI and JSON contract without depending on Codex, Claude Code, or another specific platform.
 
@@ -73,7 +73,7 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
   bounded attachment export; partial-only content remains explicitly unverified
 - [x] Fall back to public Mail.app Apple Events for explicit text reads when
   content is not cached; keep raw export cache-only and byte-exact
-- [ ] Extend bounded fallback to unsupported account storage without weakening
+- [x] Extend bounded fallback to unsupported account storage without weakening
   the fail-closed V10 metadata/schema gate
 - [x] Add a non-mutating `mail reveal` command for visual verification in Mail.app
 - [x] Return backend provenance, cache state, truncation/cursor information, and
@@ -133,7 +133,8 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
   earlier development also ran on macOS 27.0)
 - [x] Update CLI help, README, and adapter documentation
 - [x] Provide reproducible source builds
-- [ ] Update binaries and Homebrew installation when ready for release
+- [x] Build and install the local 0.2.0 Release binary under the Homebrew prefix
+- [ ] Publish the signed 0.2.0 asset and update the Homebrew Cask
 
 ## Pre-release hardening TODO
 
@@ -143,8 +144,11 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
 - [x] Run one explicitly authorized local write integration pass covering create,
   edit, avatar, external ID migration, delete, and cleanup
   (`scripts/run_local_contacts_integration.sh --with-writes`)
-- [ ] Verify the installed/Homebrew binary version separately from the source
-  Release build
+- [x] Verify the locally installed binary separately from the source Release
+  build (`scripts/run_installed_release_smoke.sh`: 0.2.0, V10 fast path,
+  SQLite query backend)
+- [ ] Verify the public Homebrew Cask on a clean installation after its release
+  asset is published
 - [x] Verify phonetic fields with one explicitly authorized Japanese contact
   apply and read-back test (`xvk-test-contacts-001`)
 

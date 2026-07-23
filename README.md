@@ -10,17 +10,17 @@ adapters when no public framework exposes the required data.
 
 ## Project status
 
-The first Contacts adapter is currently at version 0.1.7. It supports
+The current CLI release is 0.2.0. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
 
-Mail 0.2 is under development. Read-only capability checks, account and mailbox
+Mail 0.2 provides read-only capability checks, account and mailbox
 discovery, bounded message-metadata queries, explicit cached text/raw reads,
 Mail.app text fallback, and visual reveal are now available. The adapter uses a
 runtime-verified V10 SQLite/EMLX fast path and never writes the Mail store.
 
-Version 0.1 is the first Contacts adapter. Only commands explicitly marked as available below should be expected to work.
+Version 0.2.0 adds the Mail adapter while retaining the Contacts command surface.
 
 See the detailed roadmaps:
 
@@ -36,7 +36,7 @@ User documentation:
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
 
-## Mail 0.2 development commands
+## Mail 0.2 commands
 
 ```text
 macos-data mail doctor --format json
@@ -55,12 +55,18 @@ required structure, WAL, and read-only database checks pass at runtime.
 Metadata queries default to 50 rows and are capped at 200. They use bound SQL
 parameters, opaque local IDs, cursor pagination, and a query deadline; message
 bodies are not read.
+If the V10 schema/FDA fast path is unavailable but Mail.app is already running
+and Automation is authorized, accounts, top-level mailboxes, and message
+metadata use a five-second bounded Mail.app fallback. It inspects at most 32
+accounts, 200 mailboxes, and 25 message candidates; queries are always marked
+`incomplete`, provide no cursor, and return separate `appmsg_` opaque IDs.
 `mail get` defaults to metadata. Text and raw reads are explicit; missing cached
 text may use bounded Mail.app Apple Events, while raw stays cache-only and exact.
 Raw bytes are never embedded in JSON and existing output files are not
 overwritten. `mail reveal` is the only command here that intentionally activates
 Mail.app. `mail attachments verify` compares SQLite and cached MIME counts only;
 it never exports attachment names or payloads and treats partial EMLX as unverified.
+Raw export and attachment verification never use the metadata fallback.
 
 ## Goals
 
@@ -173,9 +179,9 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-The next adapter is Mail in 0.2, using a read-only local SQLite/EMLX path with
-Mail.app Apple Events fallback and visual verification. Calendar moves to 0.3,
-followed by Reminders, Notes, and Photos. See the
+The next adapter is Calendar in 0.3, followed by Reminders, Notes, and Photos.
+Mail 0.2 uses a read-only local SQLite/EMLX path with Mail.app Apple Events
+fallback and visual verification. See the
 [Mail architecture decision](docs/development/mail-adapter-architecture.md).
 vCard support, batch operations, and change detection remain Contacts-related
 follow-up work. Each adapter should define its own authorization requirements,

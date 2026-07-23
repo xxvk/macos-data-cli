@@ -33,6 +33,14 @@ final class MailAppBridgeTests: XCTestCase {
         XCTAssertEqual(executor.revealCount, 0)
     }
 
+    func testFallbackLiteralMailboxNameDoesNotBecomeNestedPath() {
+        let locator = MailAppMessageLocator(rowID: 7, accountID: "A", mailboxName: "Receipts/2026")
+        let script = SystemMailAppleEventExecutor.script(locator: locator, operation: .readText, timeoutSeconds: 3)
+
+        XCTAssertTrue(script.contains("whose name is \"Receipts/2026\""))
+        XCTAssertFalse(script.contains("mailbox \"2026\" of"))
+    }
+
     func testTimeoutOpensThirtySecondCircuitBreaker() throws {
         let executor = FakeMailAppleEventExecutor(error: .timedOut)
         let clock = TestClock(Date(timeIntervalSince1970: 1_000))

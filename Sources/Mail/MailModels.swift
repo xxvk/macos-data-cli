@@ -39,6 +39,12 @@ public struct MailAccountListResult: Codable, Equatable, Sendable {
         self.accounts = accounts
         self.limitations = []
     }
+
+    public init(backend: String, accounts: [MailAccountSummary], limitations: [String]) {
+        self.backend = backend
+        self.accounts = accounts
+        self.limitations = limitations
+    }
 }
 
 public struct MailboxListResult: Codable, Equatable, Sendable {
@@ -50,6 +56,13 @@ public struct MailboxListResult: Codable, Equatable, Sendable {
         self.backend = "sqlite"
         self.mailboxes = mailboxes
         self.limitations = []
+    }
+
+
+    public init(backend: String, mailboxes: [MailboxSummary], limitations: [String]) {
+        self.backend = backend
+        self.mailboxes = mailboxes
+        self.limitations = limitations
     }
 }
 

@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-项目当前处于 Contacts adapter 的 `0.1.7` 收尾阶段。CLI 和主要联系人流程
-已经实现；本路线图用勾选状态区分已完成能力与剩余的加固工作。
+项目当前处于 Mail adapter 的 `0.2.0` 本机发布基线。Contacts 与只读 Mail 流程
+均已实现并通过本机验证；本路线图区分已完成能力、后续 adapter 与外部分发工作。
 
 项目的长期目标是建立一个通用的 macOS 原生数据访问基础设施，让不同 Agent 和脚本
 通过统一的 CLI 与 JSON contract 优先使用 Apple 公共 Framework；公共 Framework
@@ -101,7 +101,7 @@
   partial-only 内容保持明确的 unverified 状态
 - [x] 显式 text 读取且正文未缓存时回退到公开 Mail.app Apple Events；raw 仍只允许
   byte-exact 的本地缓存导出
-- [ ] 在不放宽 V10 metadata/schema fail-closed gate 的前提下，把有限 fallback 扩展到
+- [x] 在不放宽 V10 metadata/schema fail-closed gate 的前提下，把有限 fallback 扩展到
   不受支持的账号存储
 - [x] 增加不修改邮件的 `mail reveal`，在 Mail.app 中可视化确认结果
 - [x] 返回 backend 来源、cache state、分页截断状态和结构化权限/schema 错误
@@ -150,10 +150,12 @@
 - [x] 写操作支持 dry-run、差异预览和显式 apply
 - [x] 显式请求时让重复执行保持幂等
 - [x] 增加单元测试、fixture 和必要的集成测试
-- [x] 在 macOS 26+ 测试（已在 macOS 27.0、Xcode 26.6、SDK 26.5 验证）
+- [x] 在 macOS 26+ 测试（当前已在 macOS 26.4、Xcode 26.6、SDK 26.5 验证；
+  更早的开发也在 macOS 27.0 运行过）
 - [x] 更新 CLI 帮助、README 和对应 adapter 文档
 - [x] 提供可复现的源码构建方式
-- [ ] 在适合发布时更新二进制和 Homebrew 安装方式
+- [x] 构建 0.2.0 Release 二进制并安装到本机 Homebrew prefix
+- [ ] 发布已签名的 0.2.0 asset，并更新 Homebrew Cask
 
 ## 发布前加固 TODO
 
@@ -162,7 +164,9 @@
 - [x] 在明确授权后运行一次本机真实写入集成流程，覆盖 create、edit、头像、
   external ID migration、delete 和清理
   (`scripts/run_local_contacts_integration.sh --with-writes`)
-- [ ] 单独验证已安装/Homebrew 二进制版本，而不仅是源码 Release 构建版本
+- [x] 单独验证本机安装的二进制，而不仅是源码 Release build
+  （`scripts/run_installed_release_smoke.sh`：0.2.0、V10 fast path、SQLite query backend）
+- [ ] 发布 asset 后，在干净环境单独验证公开 Homebrew Cask
 - [x] 使用一位明确授权的日文联系人完成 phonetic 字段 apply 和回读验证
   (`xvk-test-contacts-001`)
 

@@ -1,18 +1,24 @@
 # macos-data-cli Installation
 
-`macos-data-cli` is currently distributed from source for the 0.1.0 development release.
+`macos-data-cli` 0.2.0 can be built and installed locally from source. The
+public binary is not yet Developer ID signed or notarized.
 
 ## Requirements
 
 - macOS 26.0 or newer
 - Apple Contacts enabled in iCloud
-- Swift/Xcode toolchain compatible with the package
+- Full Xcode compatible with Swift tools 6.2
+- Full Disk Access for the responsible process when using the Mail SQLite/EMLX
+  fast path
+- Mail.app Automation permission for Mail metadata fallback, text fallback, and
+  `mail reveal`
 
 ## Build and install locally
 
 From the `macos-data-cli` submodule directory:
 
 ```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 swift test
 swift build -c release
 sudo install -m 755 .build/release/macos-data /opt/homebrew/bin/macos-data
@@ -39,11 +45,25 @@ Verify:
 ```bash
 macos-data --version
 macos-data --help
+macos-data mail doctor --format json
 macos-data contacts permission
 macos-data contacts container
+bash scripts/run_installed_release_smoke.sh
 ```
 
-The CLI requests Contacts permission through macOS. Version 0.1.0 writes only to the iCloud Contacts container and refuses writes when that container is unavailable.
+The installed-release smoke verifies that the installed version matches
+`VERSION`, help starts correctly, the Mail V10 fast path is available, and a
+bounded query uses the SQLite backend. It stores JSON in an auto-deleted
+temporary directory and prints no mail fields.
+
+The CLI requests Contacts and Mail Automation access through macOS. Contacts
+writes target only the verified iCloud Contacts container and are refused when
+that container is unavailable. Mail 0.2.0 never writes the Mail store.
+
+The installed raw binary and `.build/debug/macos-data.app` may be treated as
+different TCC identities. Use the signed Debug app for development permission
+work; grant FDA/Automation to the responsible installed-binary host separately
+when needed.
 
 ## JSON usage
 

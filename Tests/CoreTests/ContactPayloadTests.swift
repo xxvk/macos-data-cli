@@ -102,6 +102,10 @@ final class ContactPayloadTests: XCTestCase {
         XCTAssertEqual(JSONContract.version, "0.1")
     }
 
+    func testCLIReleaseVersionIsMailAdapterRelease() {
+        XCTAssertEqual(CLIVersion.current, "0.2.0")
+    }
+
     func testCLIExitCodesAndErrorCodesAreStable() {
         XCTAssertEqual(CLIExitCode.success.rawValue, 0)
         XCTAssertEqual(CLIExitCode.genericFailure.rawValue, 1)

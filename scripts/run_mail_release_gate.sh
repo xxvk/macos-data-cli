@@ -24,8 +24,24 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
+expected_version="$(tr -d '[:space:]' < VERSION)"
+if [[ -z "$expected_version" ]]; then
+  echo "VERSION is empty." >&2
+  exit 1
+fi
+
 swift test
 swift build -c release
+release_version="$(.build/release/macos-data --version)"
+source_bundle_version="$(plutil -extract CFBundleShortVersionString raw -o - Sources/macos-data/Info.plist)"
+debug_bundle_version="$(plutil -extract CFBundleShortVersionString raw -o - scripts/macos-data-app-Info.plist)"
+debug_build_version="$(plutil -extract CFBundleVersion raw -o - scripts/macos-data-app-Info.plist)"
+for observed_version in "$release_version" "$source_bundle_version" "$debug_bundle_version" "$debug_build_version"; do
+  if [[ "$observed_version" != "$expected_version" ]]; then
+    echo "Release version drift: expected=$expected_version observed=$observed_version" >&2
+    exit 1
+  fi
+done
 bash scripts/build_debug_app.sh
 plutil -lint scripts/macos-data-app-Info.plist scripts/macos-data.entitlements
 codesign --verify --deep --strict .build/debug/macos-data.app
@@ -43,6 +59,7 @@ bash scripts/run_mail_content_smoke.sh
 bash scripts/run_mail_attachment_smoke.sh
 
 if [[ "$WITH_AUTOMATION" == true ]]; then
+  bash scripts/run_mail_app_metadata_smoke.sh
   bash scripts/run_mail_automation_smoke.sh --gui-session
 fi
 

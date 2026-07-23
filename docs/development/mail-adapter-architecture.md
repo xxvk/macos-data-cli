@@ -110,8 +110,8 @@ runtime capabilities rather than assuming `macOS 26 == V10`:
 | Runtime state | 0.2.0 behavior |
 | --- | --- |
 | macOS 26.x + readable `V10` + recognized schema fingerprint | Full SQLite/EMLX fast path |
-| macOS 26.x + a different `V*` or unknown schema | Disable direct-store reads; use bounded Mail.app fallback |
-| macOS 26.x + `V10` but no Full Disk Access | Explain FDA; use bounded Mail.app fallback when Automation is available |
+| macOS 26.x + a different `V*` or unknown schema | Disable direct-store reads; use bounded Mail.app metadata only when Mail is running and Automation is authorized, otherwise fail closed |
+| macOS 26.x + `V10` but no Full Disk Access | Explain FDA; use the same bounded Mail.app metadata fallback when available, otherwise fail closed |
 | Mail not configured or no local store | `mail doctor` reports `MAIL_STORE_NOT_FOUND` |
 | macOS 27 development machine + recognized `V10` | Compatibility testing only; it does not redefine the release baseline |
 
@@ -166,9 +166,11 @@ recognized schema, read-only SQLite/WAL access, `.emlx` availability, optional
 FTS state, and Automation status. Then choose a plan by operation:
 
 1. **Metadata query:** indexed SQLite -> bounded SQLite scan only when the
-   requested predicate has no index -> bounded Mail.app query only if SQLite is
-   unavailable. Do not invoke Mail.app after SQLite has already returned a
-   complete empty result.
+   requested predicate has no index -> Mail.app metadata snapshot only when
+   SQLite is unavailable, Mail is already running, and Automation is authorized.
+   The snapshot is capped at 32 accounts, 200 top-level mailboxes, 25 message
+   candidates, and five seconds; it has no cursor and is always incomplete. Do
+   not invoke Mail.app after SQLite has returned a complete empty result.
 2. **Get a known message:** indexed SQLite locator -> direct `.emlx` -> targeted
    Mail.app Apple Event only when the file is missing/partial -> return explicit
    `metadata_only` if Automation is unavailable.
@@ -183,6 +185,10 @@ Every fallback must preserve semantics and report `backend`, `elapsedMs`,
 answer must never be labeled complete. Timeouts, permission failures, and
 unsupported schemas are distinct structured errors. There is no provider API,
 IMAP, recursive file walk, or GUI automation escape hatch in automatic mode.
+Fallback-generated `ambx_` and `appmsg_` selectors are backend-specific opaque
+values. An `appmsg_` selector can drive a targeted metadata/text read or reveal,
+but raw export and attachment cross-check remain SQLite/EMLX-only. The fallback
+does not enumerate nested mailboxes and a no-match result is never complete.
 
 ## Options considered
 
@@ -484,11 +490,16 @@ unverified result, not evidence that the SQLite rows are stale. Future bounded
 export must require independently available complete content or a separate
 public Mail.app path and must not synthesize files from SQLite metadata alone.
 
-The reproducible non-UI local release gate passes on macOS 26.4: 60 tests,
+The reproducible non-UI local release gate passes on macOS 26.4: 72 tests,
 Release build, signed Debug app, and doctor/metadata/content/attachment smoke.
 The attended Automation variant is deliberately separate. One run succeeded;
 another run while Mail.app was actively syncing returned `MAIL_APP_TIMEOUT` at
 the 3-second budget and stopped without retry, validating the timeout boundary.
+
+The privacy-safe forced-fallback smoke also passed in the login user's GUI
+session: 3 account scopes, 35 top-level mailboxes, one bounded message result,
+and a targeted metadata get through its `appmsg_` selector. JSON stayed in an
+auto-deleted temporary directory and no message fields were printed.
 
 ## Prior art and evidence
 
