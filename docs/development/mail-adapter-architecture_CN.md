@@ -49,13 +49,20 @@ MailKit 不作为核心读取接口。Apple 将 MailKit 定位为 Mail Extension
 
 这些观察是历史兼容性基线，不是 Apple 的公开 schema 保证。
 
-当前开发机已切换为：
+此前用于 macOS 26 正式基线验证的开发机为：
 
 - macOS 26.4（build `25E241`，Apple Silicon）。
 - Xcode 26.6（build `17F113`）。
 - macOS SDK 26.5。
 
-2026-07-23 在当前 macOS 26.4 机器上完成了不读取正文的只读 probe：
+当前开发机随后升级到 macOS 27.0。2026-07-23 在当前 macOS 27.0 机器上完成了
+不读取正文的只读 probe：
+
+- macOS 27.0（build `26A5388g`，Apple Silicon）。
+- Xcode 26.6（build `17F113`）。
+- macOS SDK 26.5。
+
+观测结果：
 
 - 动态发现 `~/Library/Mail/V10`；`Envelope Index`、`-wal`、`-shm` 均存在。
 - SQLite 以 `mode=ro` 打开，`journal_mode=wal`，`quick_check=ok`。
@@ -70,7 +77,8 @@ MailKit 不作为核心读取接口。Apple 将 MailKit 定位为 Mail Extension
 - 已实现的 0.2.0-c resolver 在本机通过 variable-depth ROWID 路径定位到完整缓存邮件；
   text 解码与准确 raw 导出均通过临时文件 smoke，未打印内容，临时文件自动删除。
 
-因此，**V10 SQLite/EMLX 快路径在当前 macOS 26.4 机器上兼容且具备实现条件**。
+因此，**V10 SQLite/EMLX 快路径在 macOS 26.4 基线和当前 macOS 27.0 开发机上均有
+本机验证记录，并具备实现条件**。
 这不是 Apple 对私有 schema 的兼容保证；`mail doctor` 仍必须在启动时重新发现版本、
 校验 schema fingerprint、确认 WAL 可读性，并在不满足条件时 fail closed。Full Disk
 Access 与 Mail.app Automation 尚未由本次 SQLite probe 单独判定，应该作为独立能力项返回。
@@ -339,6 +347,12 @@ content 或单独的公开 Mail.app 路径，不能只凭 SQLite metadata 合成
 登录用户 GUI session 中的隐私安全 forced-fallback smoke 也已通过：3 个账号 scope、
 35 个顶层 mailbox、1 条有限 message 结果，并通过其 `appmsg_` selector 完成定向
 metadata get。JSON 仅保存在自动删除的临时目录，终端没有输出 message 字段。
+
+## 手动性能 benchmark
+
+运行 `scripts/run_mail_performance_benchmark.sh`，使用不含真实邮件的 5,000 条合成 SQLite
+metadata fixture，记录 XCTest clock 和 memory metrics。它是手动诊断，不进入 CI，也不是发布
+gate；只能在相同硬件和工具链下比较结果。
 
 ## 重点参考实现
 

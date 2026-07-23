@@ -4,6 +4,9 @@
 
 ### Added
 
+- Documented the Mail 0.2 read-only boundary and added negative contract checks
+  for unsupported send, draft, reply, forward, move, archive, delete, and flag
+  commands.
 - Added read-only `mail doctor --format json` with dynamic numeric `V*`
   discovery, read-only SQLite/WAL checks, schema fingerprinting, required V10
   structure recognition, Full Disk Access inference, and non-interactive

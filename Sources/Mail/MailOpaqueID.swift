@@ -10,6 +10,7 @@ enum MailOpaqueID {
     static func mailbox(rowID: Int64) -> String { encode(prefix: "mbx_", values: [rowID]) }
     static func message(rowID: Int64) -> String { encode(prefix: "msg_", values: [rowID]) }
     static func cursor(received: Int64, rowID: Int64) -> String { encode(prefix: "cur_", values: [received, rowID]) }
+    static func conversation(_ value: Int64) -> String { encode(prefix: "thr_", values: [value]) }
     static func mailAppMailbox(accountKey: String, mailboxPath: String) -> String {
         encode(prefix: "ambx_", values: [token("account:\(accountKey)"), token("mailbox:\(accountKey):\(mailboxPath)")])
     }

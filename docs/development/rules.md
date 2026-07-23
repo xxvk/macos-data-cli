@@ -76,6 +76,21 @@ fixtures.
 - Diagnostics must not include names, organizations, postal addresses, avatar
   bytes, or full JSON contact payloads.
 
+## Codex authorization and Computer Use
+
+- Codex should automatically perform authorization and settings flows that do
+  not require a password, Apple ID entry, or security confirmation.
+- This includes opening the relevant macOS Settings pane, launching the
+  already-authorized local app, and accepting the explicitly requested ordinary
+  permission prompt through Computer Use when the system allows it.
+- Hand the flow to the user in an external Terminal or UI only when macOS asks
+  for an administrator password, Apple ID credentials, a security confirmation,
+  or another secret that Codex must not enter.
+- Do not repeatedly ask the user to click through a flow that Codex can safely
+  complete. Report the exact remaining hand-off point and the reason.
+- Computer Use actions must remain within the requested app and permission
+  scope. Never type, store, or expose passwords, tokens, or other credentials.
+
 ## Compatibility
 
 The current deployment target is macOS 26.0+. Use the repository's Swift/Xcode toolchain and keep framework availability checks close to the adapter boundary.

@@ -65,6 +65,17 @@ bash scripts/run_local_contacts_integration.sh --with-writes
   前必须脱敏。
 - 诊断日志不得包含姓名、组织、邮政地址、头像二进制数据或完整联系人 JSON。
 
+## Codex 授权与 Computer Use
+
+- 对于不需要密码、Apple ID 或安全确认的授权和设置流程，应由 Codex 自动完成。
+- 这包括打开对应的 macOS 设置页面、启动已经授权的本机应用，以及在用户明确请求
+  且系统允许的情况下，通过 Computer Use 接受普通权限提示。
+- 只有 macOS 要求管理员密码、Apple ID 凭据、安全确认或其他秘密信息时，才将流程
+  交给用户在外部 Terminal 或 UI 中输入。
+- 不要反复要求用户手动点击 Codex 可以安全完成的步骤；应明确说明剩余的交接点和原因。
+- Computer Use 必须严格限制在用户请求的应用和权限范围内，绝不输入、保存或暴露密码、
+  token 或其他凭据。
+
 ## 兼容性
 
 当前最低部署目标为 macOS 26.0+。使用仓库约定的 Swift/Xcode 工具链，并将 Framework 可用性检查放在 adapter 边界附近。

@@ -119,6 +119,37 @@ public struct MailAttachmentVerificationResult: Codable, Equatable, Sendable {
     public let limitations: [String]
 }
 
+public struct MailAttachmentExportItem: Codable, Equatable, Sendable {
+    public let filename: String
+    public let path: String
+    public let bytes: Int
+    public let contentType: String
+}
+
+public struct MailAttachmentExportResult: Codable, Equatable, Sendable {
+    public let backend: String
+    public let id: String
+    public let outputDirectory: String
+    public let files: [MailAttachmentExportItem]
+    public let incomplete: Bool
+    public let limitations: [String]
+}
+
+public struct MailThreadSummary: Codable, Equatable, Sendable {
+    public let id: String
+    public let messageCount: Int
+    public let latestReceivedAt: String?
+}
+
+public struct MailThreadListResult: Codable, Equatable, Sendable {
+    public let backend: String
+    public let items: [MailThreadSummary]
+    public let limit: Int
+    public let truncated: Bool
+    public let complete: Bool
+    public let limitations: [String]
+}
+
 public struct MailRawMessage: Equatable, Sendable {
     public let data: Data
     public let cacheState: String
@@ -162,11 +193,48 @@ public struct MailQueryResult: Codable, Equatable, Sendable {
     public let backend: String
     public let cacheState: String
     public let messages: [MailMessageMetadata]
+    /// Canonical cross-adapter page field. `messages` remains for 0.2 clients.
+    public let items: [MailMessageMetadata]
     public let truncated: Bool
     public let nextCursor: String?
     public let elapsedMs: Double
     public let fallbackReason: String?
     public let incomplete: Bool
+    public let limitations: [String]
+
+    public init(
+        backend: String,
+        cacheState: String,
+        messages: [MailMessageMetadata],
+        truncated: Bool,
+        nextCursor: String?,
+        elapsedMs: Double,
+        fallbackReason: String?,
+        incomplete: Bool,
+        limitations: [String]
+    ) {
+        self.backend = backend
+        self.cacheState = cacheState
+        self.messages = messages
+        self.items = messages
+        self.truncated = truncated
+        self.nextCursor = nextCursor
+        self.elapsedMs = elapsedMs
+        self.fallbackReason = fallbackReason
+        self.incomplete = incomplete
+        self.limitations = limitations
+    }
+}
+
+public struct MailTextSearchResult: Codable, Equatable, Sendable {
+    public let backend: String
+    public let items: [MailMessageMetadata]
+    public let text: String
+    public let scanned: Int
+    public let limit: Int
+    public let truncated: Bool
+    public let complete: Bool
+    public let elapsedMs: Double
     public let limitations: [String]
 }
 

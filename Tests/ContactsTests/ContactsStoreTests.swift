@@ -8,6 +8,19 @@ final class ContactsStoreTests: XCTestCase {
         _ = ContactsStore()
     }
 
+    func testContactsResourceMapperPreservesICloudSelectionAndCapabilities() {
+        let container = ContactContainer(name: "iCloud", identifier: "icloud-container-001", type: "cardDAV", isICloud: true)
+
+        let resource = ContactsResourceMapper.map(container, selected: true)
+
+        XCTAssertEqual(resource.kind, .contactsContainer)
+        XCTAssertEqual(resource.provider, .iCloud)
+        XCTAssertTrue(resource.capabilities.readable)
+        XCTAssertTrue(resource.capabilities.writable)
+        XCTAssertTrue(resource.capabilities.selected)
+        XCTAssertEqual(resource.capabilities.permission, .available)
+    }
+
     func testMapperReturnsContactFields() {
         let contact = CNMutableContact()
         contact.givenName = "Ada"

@@ -2,6 +2,8 @@ import Foundation
 import SQLite3
 
 public struct SQLiteMailStore {
+    public static let maximumTextSearchCandidates = 200
+    public static let textSearchDeadlineMilliseconds: UInt64 = 1_000
     private let databaseURL: URL
     private let mailStoreURL: URL
     private let mailAppBridge: any MailAppBridging
@@ -36,6 +38,30 @@ public struct SQLiteMailStore {
                 unreadCount: value.unreadCount
             )
         }.sorted { ($0.kind, $0.id) < ($1.kind, $1.id) }
+    }
+
+    public func threads(limit: Int = 50) throws -> MailThreadListResult {
+        guard (1...200).contains(limit) else { throw MailStoreError.invalidLimit }
+        let rows: [(id: Int64, count: Int, latest: Int64)] = try withDatabase { database in
+            let sql = "SELECT conversation_id, COUNT(*), MAX(COALESCE(date_received, 0)) FROM messages WHERE deleted = 0 AND conversation_id > 0 GROUP BY conversation_id ORDER BY MAX(COALESCE(date_received, 0)) DESC, conversation_id DESC LIMIT ?"
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw MailStoreError.queryFailed }
+            defer { sqlite3_finalize(statement) }
+            guard sqlite3_bind_int64(statement, 1, Int64(limit + 1)) == SQLITE_OK else { throw MailStoreError.queryFailed }
+            var result: [(Int64, Int, Int64)] = []
+            while sqlite3_step(statement) == SQLITE_ROW { result.append((sqlite3_column_int64(statement, 0), Int(sqlite3_column_int64(statement, 1)), sqlite3_column_int64(statement, 2))) }
+            return result
+        }
+        let truncated = rows.count > limit
+        let selected = Array(rows.prefix(limit))
+        return MailThreadListResult(
+            backend: "sqlite",
+            items: selected.map { MailThreadSummary(id: MailOpaqueID.conversation($0.id), messageCount: $0.count, latestReceivedAt: iso8601(epochSeconds: $0.latest)) },
+            limit: limit,
+            truncated: truncated,
+            complete: !truncated,
+            limitations: []
+        )
     }
 
     public func mailboxes(accountID: String? = nil) throws -> [MailboxSummary] {
@@ -113,6 +139,7 @@ public struct SQLiteMailStore {
         }
         if let cursor = query.cursor {
             guard let (received, rowID) = MailOpaqueID.cursorValues(cursor) else { throw MailStoreError.invalidOpaqueID }
+            guard try cursorExists(received: received, rowID: rowID) else { throw MailStoreError.invalidOpaqueID }
             conditions.append("(COALESCE(m.date_received, 0) < ? OR (COALESCE(m.date_received, 0) = ? AND m.ROWID < ?))")
             bindings.append(contentsOf: [.integer(received), .integer(received), .integer(rowID)])
         }
@@ -172,6 +199,61 @@ public struct SQLiteMailStore {
             fallbackReason: nil,
             incomplete: false,
             limitations: []
+        )
+    }
+
+    public func searchText(_ term: String, query: MailQuery = MailQuery(), resultLimit: Int = 50) throws -> MailTextSearchResult {
+        let started = DispatchTime.now().uptimeNanoseconds
+        let normalizedTerm = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTerm.isEmpty else { throw MailStoreError.invalidArgument("Mail text search requires a non-empty --text value.") }
+        guard (1...200).contains(resultLimit) else { throw MailStoreError.invalidLimit }
+        guard query.cursor == nil else { throw MailStoreError.invalidOpaqueID }
+
+        var boundedQuery = query
+        boundedQuery.limit = Self.maximumTextSearchCandidates
+        let candidates = try self.query(boundedQuery)
+        let deadline = started + Self.textSearchDeadlineMilliseconds * 1_000_000
+        var matches: [MailMessageMetadata] = []
+        var scanned = 0
+        var limitations = Set<String>()
+
+        for candidate in candidates.messages {
+            guard DispatchTime.now().uptimeNanoseconds <= deadline else {
+                limitations.insert("mail_text_search_timeout")
+                break
+            }
+            scanned += 1
+            let extracted: MailExtractedText?
+            do {
+                extracted = try cachedText(for: candidate.id)
+            } catch {
+                limitations.insert("mail_text_search_cache_unreadable")
+                continue
+            }
+            guard let extracted else {
+                limitations.insert("mail_text_search_cache_miss")
+                continue
+            }
+            if extracted.truncated { limitations.insert("text_truncated") }
+            if let body = extracted.text, body.localizedCaseInsensitiveContains(normalizedTerm) {
+                matches.append(candidate)
+                if matches.count >= resultLimit { break }
+            }
+        }
+
+        if candidates.truncated { limitations.insert("mail_text_search_candidate_cap_reached") }
+        let truncated = candidates.truncated || matches.count >= resultLimit
+        let complete = !truncated && !limitations.contains("mail_text_search_timeout")
+        return MailTextSearchResult(
+            backend: "sqlite_emlx",
+            items: matches,
+            text: normalizedTerm,
+            scanned: scanned,
+            limit: resultLimit,
+            truncated: truncated,
+            complete: complete,
+            elapsedMs: Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000,
+            limitations: limitations.sorted()
         )
     }
 
@@ -242,6 +324,14 @@ public struct SQLiteMailStore {
         )
     }
 
+    private func cachedText(for id: String) throws -> MailExtractedText? {
+        let resolved = try resolveMessage(id: id)
+        guard let location = try EmlxPathResolver(mailStoreURL: mailStoreURL)
+            .resolve(rowID: resolved.row.rowID, mailboxURL: resolved.mailboxURL) else { return nil }
+        let payload = try EmlxReader().read(location: location)
+        return try MailTextExtractor().extract(from: payload.rfc822)
+    }
+
     public func reveal(id: String) throws -> MailRevealResult {
         let started = DispatchTime.now().uptimeNanoseconds
         let resolved = try resolveMessage(id: id)
@@ -310,6 +400,43 @@ public struct SQLiteMailStore {
             elapsedMs: elapsedMilliseconds(since: started),
             incomplete: !matched,
             limitations: limitations
+        )
+    }
+
+    public func exportAttachments(id: String, to directory: URL) throws -> MailAttachmentExportResult {
+        let resolved = try resolveMessage(id: id)
+        guard let location = try EmlxPathResolver(mailStoreURL: mailStoreURL)
+            .resolve(rowID: resolved.row.rowID, mailboxURL: resolved.mailboxURL) else {
+            throw MailStoreError.contentNotCached
+        }
+        let payload = try EmlxReader().read(location: location)
+        let attachments = try MailAttachmentExtractor().extract(payload.rfc822)
+        let outputDirectory = directory.standardizedFileURL
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let safeNames = try attachments.map { attachment -> (MailAttachment, URL) in
+            let filename = attachment.filename
+            guard !filename.isEmpty, filename != ".", filename != "..",
+                  filename == URL(fileURLWithPath: filename).lastPathComponent,
+                  !filename.contains("/"), !filename.contains("\\"), !filename.contains("\0") else {
+                throw MailStoreError.invalidArgument("Attachment filename is unsafe.")
+            }
+            let target = outputDirectory.appendingPathComponent(filename, isDirectory: false).standardizedFileURL
+            guard target.deletingLastPathComponent().path == outputDirectory.path else { throw MailStoreError.invalidArgument("Attachment path escapes the output directory.") }
+            guard !FileManager.default.fileExists(atPath: target.path) else { throw MailStoreError.outputAlreadyExists }
+            return (attachment, target)
+        }
+        for (attachment, target) in safeNames {
+            try attachment.data.write(to: target, options: .withoutOverwriting)
+        }
+        return MailAttachmentExportResult(
+            backend: "sqlite_emlx",
+            id: id,
+            outputDirectory: outputDirectory.path,
+            files: safeNames.map { attachment, target in
+                MailAttachmentExportItem(filename: attachment.filename, path: target.path, bytes: attachment.data.count, contentType: attachment.contentType)
+            },
+            incomplete: payload.cacheState == .partial,
+            limitations: payload.cacheState == .partial ? ["partial_emlx"] : []
         )
     }
 
@@ -517,6 +644,22 @@ public struct SQLiteMailStore {
                 ))
             }
             return result
+        }
+    }
+
+    private func cursorExists(received: Int64, rowID: Int64) throws -> Bool {
+        try withDatabase { database in
+            let sql = "SELECT 1 FROM messages WHERE ROWID = ? AND COALESCE(date_received, 0) = ? AND deleted = 0 LIMIT 1"
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+                throw MailStoreError.queryFailed
+            }
+            defer { sqlite3_finalize(statement) }
+            guard sqlite3_bind_int64(statement, 1, rowID) == SQLITE_OK,
+                  sqlite3_bind_int64(statement, 2, received) == SQLITE_OK else {
+                throw MailStoreError.queryFailed
+            }
+            return sqlite3_step(statement) == SQLITE_ROW
         }
     }
 

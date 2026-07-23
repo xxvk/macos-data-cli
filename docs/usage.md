@@ -2,7 +2,29 @@
 
 `macos-data` is a local Terminal CLI. It reads and writes macOS data through Apple public frameworks; agents do not need a special integration.
 
+## Unified resources
+
+List the currently discoverable Contacts and Mail resource scopes in one
+machine-readable response:
+
+```text
+macos-data resources --format json
+```
+
+Each resource reports an adapter-owned opaque `id`, `kind`, `provider`,
+`displayName`, and capabilities (`readable`, `writable`, `selected`, and
+`permission`). Contacts selection reflects the verified iCloud container.
+Mail account scopes are intentionally not selected merely because one account
+exists; the preferred `aim-tech.jp` work account still requires explicit,
+privacy-safe verification. Calendar is not implemented in 0.2 and appears in
+`data.limitations` as `calendar_adapter_not_implemented`.
+
 ## Mail (0.2)
+
+Mail 0.2 is read-only. It does not send, draft, reply, forward, move, archive,
+delete, or flag messages, and it does not modify mailboxes, accounts, or Mail
+preferences. Unsupported write-like commands return a usage error before Mail
+data is accessed.
 
 Run the read-only capability check:
 
@@ -32,6 +54,29 @@ macos-data mail mailboxes --account-id <opaque-account-id> --format json
 Account IDs are derived opaque local scopes; raw account authorities and full
 mailbox URLs are not returned. Mailbox and message IDs are also opaque and must
 be treated as adapter-owned values.
+
+List conversation groups reported by the local Mail schema:
+
+```text
+macos-data mail threads --limit 50 --format json
+```
+
+Only explicit positive `conversation_id` values are grouped. The response
+contains opaque thread IDs, message counts, and the latest received timestamp;
+it does not infer relationships from subject or participants. Mail.app
+fallback does not provide this command.
+
+Search cached message bodies without launching Mail.app:
+
+```text
+macos-data mail search --text "project alpha" --limit 20 --format json
+```
+
+This command reads only locally cached EMLX text. It scans at most 200 metadata
+candidates and has a one-second budget. Missing, partial, malformed, or
+truncated cache content is reported through `limitations`; a no-match result
+is not proof that uncached or remote messages do not contain the term. The
+command never falls back to Mail.app or remote content.
 
 When the V10 schema/FDA fast path is unavailable, the CLI may use Mail.app only
 if Mail is already running and Automation is authorized. This metadata fallback
@@ -115,6 +160,17 @@ complete cached EMLX matched. It does not return names, paths, or payloads.
 Partial or missing EMLX is always `incomplete` and never `matched`, even if the
 currently visible counts happen to agree.
 
+Export cached attachments explicitly:
+
+```text
+macos-data mail attachments export --id <id> --output ./attachments --format json
+```
+
+Export requires the SQLite/EMLX fast path, creates the output directory if
+needed, rejects path traversal and unsafe filenames, refuses to overwrite an
+existing file, and caps each attachment at 20 MiB. Mail.app fallback and
+remote attachments are never used.
+
 ## Contacts
 
 List available Contacts containers:
@@ -187,6 +243,23 @@ Read records as JSON:
 macos-data contacts list --format json
 macos-data contacts get --external-id <id> --format json
 ```
+
+Bounded Contacts pages use the shared pagination contract:
+
+```text
+macos-data contacts list --limit 50 --format json
+macos-data contacts list --limit 50 --cursor <opaque-cursor> --format json
+macos-data contacts query --kind organization --limit 50 --format json
+```
+
+Paged responses contain `items`, `limit`, `nextCursor`, `truncated`, and
+`complete`. Contact cursors are adapter-owned opaque values; Agents must pass
+them back unchanged and must not derive offsets from them.
+
+Mail query responses now expose the same canonical `items` field. The existing
+`messages` field remains as a compatibility alias for 0.2 clients. Mail.app
+fallback remains explicitly incomplete and does not fabricate a cursor; its
+limitations explain why pagination cannot resume in that backend.
 
 Search with one or more conditions. Conditions use AND semantics; at most three distinct fields are allowed:
 

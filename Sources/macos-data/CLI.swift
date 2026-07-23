@@ -34,16 +34,23 @@ struct MacosDataCLI {
             let permission = ContactsPermission()
             let store = ContactsStore(permission: permission, containerSelector: containerSelector)
             switch arguments {
+            case ["resources"]:
+                emitJSONSuccess(makeResourcesResult(permission: permission, store: store))
             case ["mail", "doctor"]:
                 emitJSONSuccess(MailDoctor().run())
             case ["mail", "accounts"]:
                 emitJSONSuccess(try makeValidatedMailStore().accounts())
             case ["mail", "mailboxes"]:
                 emitJSONSuccess(try makeValidatedMailStore().mailboxes())
+            case let args where args.count >= 2 && args[0] == "mail" && args[1] == "threads":
+                emitJSONSuccess(try makeValidatedMailStore().threads(limit: parseSimpleLimit(Array(args.dropFirst(2)))))
             case let args where args.count == 4 && args[0] == "mail" && args[1] == "mailboxes" && args[2] == "--account-id":
                 emitJSONSuccess(try makeValidatedMailStore().mailboxes(accountID: args[3]))
             case let args where args.count >= 2 && args[0] == "mail" && args[1] == "query":
                 emitJSONSuccess(try makeValidatedMailStore().query(parseMailQuery(Array(args.dropFirst(2)))))
+            case let args where args.count >= 2 && args[0] == "mail" && args[1] == "search":
+                let request = try parseMailTextSearch(Array(args.dropFirst(2)))
+                emitJSONSuccess(try makeValidatedMailStore().searchText(request.text, query: request.query, resultLimit: request.limit))
             case let args where args.count >= 2 && args[0] == "mail" && args[1] == "get":
                 let request = try parseMailGet(Array(args.dropFirst(2)), jsonRequested: jsonRequested)
                 let mailStore = try makeValidatedMailStore()
@@ -82,6 +89,9 @@ struct MacosDataCLI {
             case let args where args.count == 5 && args[0] == "mail" && args[1] == "attachments" &&
                 args[2] == "verify" && args[3] == "--id":
                 emitJSONSuccess(try makeValidatedMailStore().verifyAttachments(id: args[4]))
+            case let args where args.count == 7 && args[0] == "mail" && args[1] == "attachments" &&
+                args[2] == "export" && args[3] == "--id" && args[5] == "--output":
+                emitJSONSuccess(try makeValidatedMailStore().exportAttachments(id: args[4], directory: URL(fileURLWithPath: args[6])))
             case ["contacts", "permission"]:
                 let granted = try await permission.requestAccess()
                 print(granted ? "Contacts permission granted." : "Contacts permission not granted.")
@@ -105,10 +115,9 @@ struct MacosDataCLI {
                 try encoder.encode(store.list()).write(to: URL(fileURLWithPath: args[3]), options: .atomic)
                 if jsonRequested { emitJSONSuccess(["message": "Contacts exported.", "output": args[3]]) }
                 else { print("Contacts exported.") }
-            case ["contacts", "list"], ["contacts", "list", "--format", "json"]:
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                if jsonRequested { emitJSONSuccess(try store.list()) } else { print(String(data: try encoder.encode(store.list()), encoding: .utf8)!) }
+            case let args where args.count >= 2 && args[0] == "contacts" && args[1] == "list":
+                let pagination = try parseContactPagination(Array(args.dropFirst(2)))
+                emitJSONSuccess(try store.listPage(limit: pagination.limit, cursor: pagination.cursor))
             case let args where (args.count == 4 || args.count == 6) &&
                 args[0] == "contacts" && args[1] == "get" && args[2] == "--external-id" &&
                 (args.count == 4 || (args[4] == "--format" && args[5] == "json")):
@@ -142,10 +151,9 @@ struct MacosDataCLI {
                     if jsonRequested { emitJSONSuccess(ContactImageWriteResult(operation: "avatar_replaced", contact: try store.get(externalID: externalID), avatar: verification)) } else { print("Contact avatar replaced (\(verification.status.rawValue)).") }
                 }
             case let args where args.count >= 4 && args[0] == "contacts" && args[1] == "query":
-                let query = try parseQuerySet(Array(args.dropFirst(2)))
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                emitJSONSuccess(try store.query(query))
+                let pagination = try parseContactPagination(Array(args.dropFirst(2)))
+                let query = try parseQuerySet(pagination.conditions)
+                emitJSONSuccess(try store.queryPage(query, limit: pagination.limit, cursor: pagination.cursor))
             case let args where args.count >= 4 && args[0] == "contacts" && args[1] == "create":
                 let (inputData, mode, idempotent) = try parseJSONWriteArguments(Array(args.dropFirst(2)), command: "create")
                 let payload = try JSONDecoder().decode(ContactPayload.self, from: inputData)
@@ -338,6 +346,48 @@ struct MacosDataCLI {
         return try ContactQuerySet(conditions)
     }
 
+    private struct ContactPaginationArguments {
+        let conditions: [String]
+        let limit: Int
+        let cursor: String?
+    }
+
+    private static func parseContactPagination(_ arguments: [String]) throws -> ContactPaginationArguments {
+        var conditions: [String] = []
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var seenLimit = false
+        var seenCursor = false
+        var index = 0
+
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--limit":
+                guard !seenLimit, index + 1 < arguments.count, let parsed = Int(arguments[index + 1]) else {
+                    throw ContactsQueryError.invalidLimit
+                }
+                limit = parsed
+                seenLimit = true
+                index += 2
+            case "--cursor":
+                guard !seenCursor, index + 1 < arguments.count else {
+                    throw ContactsQueryError.invalidCursor
+                }
+                cursor = arguments[index + 1]
+                seenCursor = true
+                index += 2
+            default:
+                conditions.append(arguments[index])
+                index += 1
+            }
+        }
+
+        guard (1...Pagination.maximumLimit).contains(limit) else {
+            throw ContactsQueryError.invalidLimit
+        }
+        return ContactPaginationArguments(conditions: conditions, limit: limit, cursor: cursor)
+    }
+
     private enum ValidatedMailStore {
         case sqlite(SQLiteMailStore)
         case mailApp(MailAppMetadataStore)
@@ -356,10 +406,24 @@ struct MacosDataCLI {
             }
         }
 
+        func threads(limit: Int) throws -> MailThreadListResult {
+            switch self {
+            case .sqlite(let store): try store.threads(limit: limit)
+            case .mailApp: throw MailStoreError.invalidArgument("Mail threads require the recognized SQLite fast path.")
+            }
+        }
+
         func query(_ query: MailQuery) throws -> MailQueryResult {
             switch self {
             case .sqlite(let store): try store.query(query)
             case .mailApp(let store): try store.query(query)
+            }
+        }
+
+        func searchText(_ text: String, query: MailQuery, resultLimit: Int) throws -> MailTextSearchResult {
+            switch self {
+            case .sqlite(let store): try store.searchText(text, query: query, resultLimit: resultLimit)
+            case .mailApp: throw MailStoreError.invalidArgument("Mail text search requires the recognized SQLite/EMLX fast path; it never falls back to Mail.app.")
             }
         }
 
@@ -391,6 +455,13 @@ struct MacosDataCLI {
                 throw MailStoreError.invalidArgument("Attachment verification requires the recognized SQLite/EMLX fast path.")
             }
         }
+
+        func exportAttachments(id: String, directory: URL) throws -> MailAttachmentExportResult {
+            switch self {
+            case .sqlite(let store): try store.exportAttachments(id: id, to: directory)
+            case .mailApp: throw MailStoreError.invalidArgument("Attachment export requires the recognized SQLite/EMLX fast path.")
+            }
+        }
     }
 
     private static func makeValidatedMailStore() throws -> ValidatedMailStore {
@@ -404,6 +475,49 @@ struct MacosDataCLI {
         case .unavailable(let error):
             throw error
         }
+    }
+
+    private static func makeResourcesResult(
+        permission: ContactsPermission,
+        store: ContactsStore
+    ) -> DataResourcesResult {
+        var resources: [DataResource] = []
+        var limitations: [String] = []
+
+        switch permission.status {
+        case .authorized, .limited:
+            do {
+                let containers = try store.containerDescriptions()
+                let selectedID = try store.selectedContainerDescription().identifier
+                resources.append(contentsOf: containers.map { container in
+                    ContactsResourceMapper.map(container, selected: container.identifier == selectedID)
+                })
+            } catch {
+                limitations.append("contacts_resource_discovery_failed")
+            }
+        case .notDetermined:
+            limitations.append("contacts_permission_not_determined")
+        case .denied:
+            limitations.append("contacts_permission_denied")
+        case .restricted:
+            limitations.append("contacts_permission_restricted")
+        }
+
+        do {
+            let mailAccounts = try makeValidatedMailStore().accounts()
+            resources.append(contentsOf: mailAccounts.accounts.map { account in
+                MailResourceMapper.map(account, selected: false)
+            })
+            limitations.append(contentsOf: mailAccounts.limitations)
+            if !mailAccounts.accounts.isEmpty {
+                limitations.append("mail_preferred_aim_tech_account_requires_explicit_verification")
+            }
+        } catch {
+            limitations.append("mail_resource_discovery_unavailable")
+        }
+
+        limitations.append("calendar_adapter_not_implemented")
+        return DataResourcesResult(resources: resources, limitations: limitations)
     }
 
     private static func parseMailQuery(_ arguments: [String]) throws -> MailQuery {
@@ -444,6 +558,40 @@ struct MacosDataCLI {
             }
         }
         return query
+    }
+
+    private static func parseMailTextSearch(_ arguments: [String]) throws -> (text: String, query: MailQuery, limit: Int) {
+        var text: String?
+        var limit = 50
+        var queryArguments: [String] = []
+        var index = 0
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--text":
+                guard text == nil, index + 1 < arguments.count else { throw MailStoreError.invalidArgument("Mail text search accepts one --text value.") }
+                text = arguments[index + 1]
+                index += 2
+            case "--limit":
+                guard index + 1 < arguments.count, let value = Int(arguments[index + 1]) else { throw MailStoreError.invalidLimit }
+                limit = value
+                index += 2
+            default:
+                queryArguments.append(arguments[index])
+                index += 1
+            }
+        }
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw MailStoreError.invalidArgument("Mail text search requires --text <value>.")
+        }
+        guard (1...200).contains(limit) else { throw MailStoreError.invalidLimit }
+        return (text, try parseMailQuery(queryArguments), limit)
+    }
+
+    private static func parseSimpleLimit(_ arguments: [String]) throws -> Int {
+        guard arguments.count == 0 || (arguments.count == 2 && arguments[0] == "--limit"),
+              let value = arguments.isEmpty ? 50 : Int(arguments[1]),
+              (1...200).contains(value) else { throw MailStoreError.invalidLimit }
+        return value
     }
 
     private static func parseMailDate(_ value: String, option: String) throws -> Date {
@@ -505,16 +653,26 @@ struct MacosDataCLI {
 
         Usage:
           macos-data --version | -v
+          macos-data resources --format json
           macos-data contacts <command> [options]
           macos-data mail <command> [options]
+
+        Unified resources:
+          resources --format json                List Contacts and Mail resources
+                                             with selection, permission, and limitations
+                                             Calendar is reported as not implemented
 
         Mail commands:
           doctor --format json               Inspect Mail store, schema, and permissions
           accounts --format json             List privacy-safe local account scopes
           mailboxes [--account-id <id>] --format json
                                              List mailboxes and local counts
+          threads [--limit <1...200>] --format json
+                                             List stable conversation groups
           query [filters] [--limit <n>] [--cursor <cursor>] --format json
                                              Query bounded message metadata
+          search --text <text> [filters] [--limit <n>] --format json
+                                             Search cached local message bodies
           get --id <id> [--content metadata|text] --format json
                                              Read one message; metadata is default
           get --id <id> --content raw --output <file|->
@@ -522,18 +680,25 @@ struct MacosDataCLI {
           reveal --id <id> --format json     Open one message visibly in Mail.app
           attachments verify --id <id> --format json
                                              Compare SQLite and MIME attachment counts
+          attachments export --id <id> --output <directory> --format json
+                                             Export cached attachments safely
 
         Mail query filters:
           --account-id <id> --mailbox-id <id> --from <text> --to <text>
           --subject <text> --received-after <iso8601> --received-before <iso8601>
           --unread --flagged --has-attachment --limit <1...200> --cursor <cursor>
 
+        Mail text search:
+          Reads only cached EMLX text, scans at most 200 candidates, and has a
+          one-second budget. It never falls back to Mail.app or remote content.
+
         Contacts commands:
           permission                         Check/request Contacts permission
           containers                        List available Contacts containers
           container                          Show the required iCloud container
           count                              Count contacts
-          list [--format json]              List contacts
+          list [--limit <1...200>] [--cursor <cursor>] --format json
+                                             List a bounded page of contacts
           get --external-id <id> [--format json]
                                              Read one contact
           avatar verify --external-id <id> [--format json]
@@ -542,7 +707,8 @@ struct MacosDataCLI {
           avatar replace --external-id <id> --image <file> --apply
             --confirm "RECREATE CONTACT"
                                              Recreate a record with a new avatar
-          query [conditions] --format json  Search contacts (max 3 AND conditions)
+          query [conditions] [--limit <1...200>] [--cursor <cursor>] --format json
+                                             Search a bounded contact page (max 3 AND conditions)
                                              Supports --kind person|organization
           create --input <file>|--stdin --dry-run|--apply [--idempotent]
                                              Create a person or organization

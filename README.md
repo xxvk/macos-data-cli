@@ -68,6 +68,14 @@ Mail.app. `mail attachments verify` compares SQLite and cached MIME counts only;
 it never exports attachment names or payloads and treats partial EMLX as unverified.
 Raw export and attachment verification never use the metadata fallback.
 
+### Mail 0.2 safety boundary
+
+Mail 0.2 is intentionally read-only. It does not send, draft, reply, forward,
+move, archive, delete, flag, mark, or modify messages, mailboxes, accounts, or
+Mail preferences. Unsupported write-like commands must return a usage error
+before any Mail store or Mail.app access occurs. This boundary is part of the
+0.2.0 contract and may only change in a separately specified release.
+
 ## Goals
 
 - Work through the Terminal and remain easy for scripts and agents to invoke

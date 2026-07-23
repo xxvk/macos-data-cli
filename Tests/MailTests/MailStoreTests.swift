@@ -4,6 +4,27 @@ import XCTest
 @testable import MailAdapter
 
 final class MailStoreTests: XCTestCase {
+    func testThreadsGroupOnlyExplicitConversationIDs() throws {
+        let fixture = try MailSQLiteFixture()
+        try fixture.setConversationIDs([(101, 7), (102, 7), (104, 9)])
+        let result = try SQLiteMailStore(databaseURL: fixture.databaseURL).threads(limit: 10)
+
+        XCTAssertEqual(result.items.count, 2)
+        XCTAssertEqual(result.items.map(\.messageCount).sorted(), [1, 2])
+        XCTAssertTrue(result.items.allSatisfy { $0.id.hasPrefix("thr_") })
+        XCTAssertTrue(result.complete)
+    }
+
+    func testSyntheticMailboxPerformanceBenchmark() throws {
+        let fixture = try MailSQLiteFixture()
+        try fixture.addSyntheticMessages(count: 5_000)
+        let store = SQLiteMailStore(databaseURL: fixture.databaseURL)
+
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
+            _ = try? store.query(MailQuery(limit: 200))
+        }
+    }
+
     func testAccountsAreGroupedByMailboxAuthorityWithoutExposingIt() throws {
         let fixture = try MailSQLiteFixture()
         let accounts = try SQLiteMailStore(databaseURL: fixture.databaseURL).accounts()
@@ -34,6 +55,7 @@ final class MailStoreTests: XCTestCase {
 
         let first = try store.query(MailQuery(limit: 2))
         XCTAssertEqual(first.messages.count, 2)
+        XCTAssertEqual(first.items, first.messages)
         XCTAssertTrue(first.truncated)
         XCTAssertFalse(first.incomplete)
         XCTAssertNil(first.fallbackReason)
@@ -43,6 +65,7 @@ final class MailStoreTests: XCTestCase {
 
         let second = try store.query(MailQuery(limit: 2, cursor: first.nextCursor))
         XCTAssertEqual(second.messages.map(\.subject), ["Quarterly report", "Older note"])
+        XCTAssertEqual(second.items, second.messages)
         XCTAssertFalse(second.truncated)
         XCTAssertNil(second.nextCursor)
     }
@@ -54,6 +77,33 @@ final class MailStoreTests: XCTestCase {
         let result = try store.query(MailQuery(subject: "' OR 1=1 --", limit: 50))
 
         XCTAssertTrue(result.messages.isEmpty)
+    }
+
+    func testTextSearchReadsOnlyCachedEmlxBodies() throws {
+        let fixture = try MailSQLiteFixture()
+        let store = SQLiteMailStore(databaseURL: fixture.databaseURL)
+        try fixture.writeEmlx(
+            rowID: 104,
+            mailboxPath: "INBOX",
+            message: Data("Content-Type: text/plain; charset=utf-8\r\n\r\nprivate body marker\r\n".utf8)
+        )
+
+        let result = try store.searchText("BODY MARKER", resultLimit: 10)
+
+        XCTAssertEqual(result.items.map(\.subject), ["Security alert"])
+        XCTAssertEqual(result.text, "BODY MARKER")
+        XCTAssertGreaterThanOrEqual(result.scanned, 1)
+        XCTAssertTrue(result.complete)
+        XCTAssertFalse(result.limitations.contains("mail_app_text_fallback"))
+    }
+
+    func testTextSearchRejectsEmptyTerm() throws {
+        let fixture = try MailSQLiteFixture()
+        let store = SQLiteMailStore(databaseURL: fixture.databaseURL)
+
+        XCTAssertThrowsError(try store.searchText("  ")) { error in
+            XCTAssertEqual(error as? MailStoreError, .invalidArgument("Mail text search requires a non-empty --text value."))
+        }
     }
 
     func testMetadataQuerySupportsMailboxSenderFlagsAndAttachmentFilters() throws {
@@ -80,6 +130,15 @@ final class MailStoreTests: XCTestCase {
         let store = SQLiteMailStore(databaseURL: fixture.databaseURL)
 
         XCTAssertThrowsError(try store.query(MailQuery(mailboxID: "not-a-mailbox-id"))) { error in
+            XCTAssertEqual(error as? MailStoreError, .invalidOpaqueID)
+        }
+    }
+
+    func testStaleCursorFailsClosed() throws {
+        let fixture = try MailSQLiteFixture()
+        let store = SQLiteMailStore(databaseURL: fixture.databaseURL)
+
+        XCTAssertThrowsError(try store.query(MailQuery(limit: 2, cursor: "cur_AAAAAAAAAAAAAAAAAAAAAA"))) { error in
             XCTAssertEqual(error as? MailStoreError, .invalidOpaqueID)
         }
     }
@@ -241,6 +300,42 @@ final class MailStoreTests: XCTestCase {
         XCTAssertTrue(unavailable.incomplete)
         XCTAssertEqual(unavailable.limitations, ["attachment_cross_check_unavailable"])
     }
+
+    func testAttachmentExportWritesWithoutOverwriting() throws {
+        let fixture = try MailSQLiteFixture()
+        let store = SQLiteMailStore(databaseURL: fixture.databaseURL)
+        try fixture.writeEmlx(
+            rowID: 104,
+            mailboxPath: "INBOX",
+            message: Data("""
+            Content-Type: multipart/mixed; boundary="x"
+
+            --x
+            Content-Type: text/plain
+
+            body
+            --x
+            Content-Type: application/pdf
+            Content-Disposition: attachment; filename="report.pdf"
+            Content-Transfer-Encoding: base64
+
+            JVBERi0xLjQ=
+            --x--
+            """.replacingOccurrences(of: "\n", with: "\r\n").utf8)
+        )
+        let id = try XCTUnwrap(store.query(MailQuery(hasAttachment: true)).messages.first?.id)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("macos-data-attachments-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let result = try store.exportAttachments(id: id, to: directory)
+
+        XCTAssertEqual(result.files.count, 1)
+        XCTAssertEqual(result.files.first?.filename, "report.pdf")
+        XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("report.pdf")), Data("%PDF-1.4".utf8))
+        XCTAssertThrowsError(try store.exportAttachments(id: id, to: directory)) { error in
+            XCTAssertEqual(error as? MailStoreError, .outputAlreadyExists)
+        }
+    }
 }
 
 private final class StubMailAppBridge: MailAppBridging, @unchecked Sendable {
@@ -370,5 +465,21 @@ private final class MailSQLiteFixture {
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
             throw NSError(domain: "MailSQLiteFixture", code: 2)
         }
+    }
+
+    func addSyntheticMessages(count: Int) throws {
+        guard count > 0 else { return }
+        var sql = "BEGIN TRANSACTION;"
+        for offset in 0..<count {
+            let rowID = 10_000 + offset
+            let timestamp = 1_800_000_000 + offset
+            sql += "INSERT INTO messages (ROWID,global_message_id,sender,subject,date_sent,date_received,mailbox,read,flagged,deleted,size) VALUES (\(rowID),1,1,1,\(timestamp),\(timestamp),10,0,0,0,512);"
+        }
+        sql += "UPDATE mailboxes SET total_count = total_count + \(count) WHERE ROWID = 10; COMMIT;"
+        try execute(sql)
+    }
+
+    func setConversationIDs(_ values: [(Int64, Int64)]) throws {
+        try execute(values.map { "UPDATE messages SET conversation_id = \($0.1) WHERE ROWID = \($0.0);" }.joined())
     }
 }

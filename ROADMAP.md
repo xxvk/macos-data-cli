@@ -152,6 +152,130 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
 - [x] Verify phonetic fields with one explicitly authorized Japanese contact
   apply and read-back test (`xvk-test-contacts-001`)
 
+## 0.2.0 CTO release audit TODO
+
+This is the release-blocking audit for the public `0.2.0` release. Each item
+must record its scope, verification result, and remaining limitations before it
+is checked off. These are local/manual checks; they do not add CI or authorize
+automatic commit, push, or release actions.
+
+### Required: release blockers
+
+- [x] **Freeze the 0.2.0 scope**: document Mail as read-only; no send, reply,
+  move, archive, delete, flag, or account mutation. Keep CLI help, README,
+  usage docs, and CHANGELOG consistent; add negative tests for unsupported writes.
+- [ ] **Audit version consistency**: make `VERSION`, CLI `--version`,
+  `Info.plist`, CHANGELOG, Release assets, and the Tap Formula all report 0.2.0.
+  Verify source, Release, and installed binaries separately.
+- [ ] **Run the complete local test matrix**: Swift tests, CLI contract tests,
+  Mail release gate, Release build, and installed-binary smoke tests. Record
+  exit codes and do not waive failures manually.
+- [x] **Confirm the macOS 26+ baseline**: record macOS, Xcode, SDK, and Swift
+  versions; the current macOS 27.0 (`26A5388g`) / Xcode 26.6 / SDK 26.5 /
+  Swift 6.3.3 run is forward-compatibility evidence, while the recorded macOS
+  26.4 Release verification remains the formal baseline evidence.
+- [x] **Complete the Mail permission failure matrix**: stable errors and recovery
+  guidance for FDA denial, Automation denial, Mail not running, active sync, and
+  unreadable stores; verify with controlled local permission states. The local
+  doctor/metadata/release gate and GUI-session Automation smoke passed with FDA
+  and Automation available; `target_not_running` and `requires_consent` were
+  also observed as structured states.
+- [x] **Fail closed on unknown Mail schemas**: only enable runtime-recognized
+  schemas; unknown `V*` versions and missing tables must return a structured
+  `MAIL_SCHEMA_UNSUPPORTED`-class error. The eight `MailDoctorTests` cases pass,
+  covering unknown schemas, missing structures, unavailable fallback, and error
+  mapping.
+- [x] **Audit the read-only boundary**: SQLite, WAL/SHM, EMLX, and account
+  configuration must never be written, moved, deleted, or modified. Review write
+  APIs and compare file metadata/hashes before and after smoke tests. The audit
+  confirmed `SQLITE_OPEN_READONLY` plus `query_only=ON`, read-only EMLX handles,
+  and unchanged Envelope Index/WAL/SHM hashes and metadata around the local
+  metadata smoke.
+- [x] **Lock the JSON contract and exit codes**: stabilize the meaning of
+  `contractVersion`, backend/cache/completeness fields, limitations, error codes,
+  and exits; Swift and Mail fixture tests cover success, denial, unsupported
+  schema, timeout, empty/fallback results, pagination, and stale opaque IDs.
+  Local process checks confirmed success JSON on stdout, error JSON on stderr,
+  query exit 0, stale-ID exit 4, and unsupported-command exit 64.
+
+- [x] **Unify account / container / source capabilities**
+  - Goal: define a shared read-only resource description, stable opaque ID,
+    display name, type, capabilities, and permission state for Contacts iCloud
+    containers, Mail account scopes, and EventKit Calendar sources.
+  - Personal selection policy: Contacts prefers the personal iCloud container;
+    Calendar prefers the personal iCloud source; Mail prefers the `aim-tech.jp`
+    work account and does not default to iCloud Mail.
+  - Scope: unify the Core contract, capability reporting, and verifiable
+    selection policy only. Do not hard-code an Apple ID, email address, or
+    internal account identifier into the public contract, and do not pretend
+    these Apple objects are identical.
+  - Verification: each adapter can list resources and report `readable`,
+    `writable`, `selected`, and `permission`; unavailable resources return
+    structured errors; opaque IDs do not expose email addresses, account URLs,
+    or internal database paths. Missing or ambiguous preferred resources must
+    stop rather than silently switching accounts.
+  - Implemented locally: `macos-data resources --format json` lists the
+    verified Contacts containers and privacy-safe Mail account scopes. Calendar
+    is intentionally represented as the limitation
+    `calendar_adapter_not_implemented`; Mail accounts remain unselected until
+    the `aim-tech.jp` preference can be verified without exposing account data.
+
+- [x] **Cross-adapter pagination protocol**
+  - Goal: give Contacts, Mail, and Calendar consistent semantics for `limit`,
+    opaque `cursor`, `truncated`, `nextCursor`, `complete`, and result caps so
+    Agents can process pages and resume after interruption.
+  - Scope: define the Core contract first, then implement it in Mail and future
+    Contacts/Calendar commands. Cursors remain backend-specific and opaque;
+    expired cursors return a structured stale-cursor error.
+  - Verification: synthetic fixtures cover first/last page, repeated and stale
+    cursors, result caps, stable ordering, and bounded memory usage.
+  - Implemented locally: Core `PagedResult`/`Pagination` semantics, Contacts
+    `list`/`query` pages, Mail's canonical `items` field, and fail-closed stale
+    cursor validation. The legacy Mail `messages` field remains as a
+    compatibility alias; Mail.app fallback explicitly has no resumable cursor.
+  - Verification: Core, Contacts, SQLite Mail, and Mail.app fallback fixtures
+    cover first/last page, opaque cursor round-trips, invalid/stale cursors,
+    result caps, and incomplete fallback semantics.
+- [ ] **Verify the public Homebrew Cask**: install the actual 0.2.0 asset from
+  the public Tap in a clean or isolated Homebrew environment; verify URL, SHA-256,
+  archive layout, `--version`, and `--help`.
+- [x] **Document unsigned-distribution limits**: without an Apple Developer
+  Program, document Gatekeeper warnings, manual approval, SHA-256 verification,
+  and the fact that installation is not frictionless. The local Release binary
+  was confirmed ad-hoc signed and rejected by `spctl --assess`; INSTALL now
+  records the checksum-first and no-global-Gatekeeper-disable boundaries.
+
+### Optional: does not block 0.2.0
+
+- [x] Full-text mail search with explicit privacy, size, and timeout limits.
+  - Implemented as `mail search --text <text>` over cached EMLX only; capped at
+    200 candidates and one second, with structured cache limitations and no
+    Mail.app/remote fallback.
+- [x] Explicit attachment export with safe output handling, no overwrite, and
+  path-traversal protection.
+  - Implemented as `mail attachments export --id <id> --output <directory>`;
+    cached EMLX only, unsafe filenames rejected, existing files preserved, and
+    each attachment capped at 20 MiB.
+- [ ] Mail writes such as send, reply, move, archive, delete, and flagging in a
+  separate version design.
+- [ ] Additional Mail schema support, each with its own fixture and runtime gate.
+- [x] Message-thread/conversation modeling after validating stable source data.
+  - Added read-only `mail threads`; only explicit positive `conversation_id`
+    values are grouped, with opaque IDs and no subject/participant inference.
+- [x] Large-mailbox performance and memory benchmarks using synthetic data.
+  - Added a manual 5,000-record SQLite fixture benchmark using XCTest clock and
+    memory metrics. It is not CI and does not gate releases; future numbers must
+    be compared on the same hardware/toolchain.
+- [x] **Reject incremental change detection for now**: do not add snapshots,
+  change tokens, system notifications, or an extra Agent memory layer. Prefer
+  direct, bounded, repeatable current-state queries. Revisit only after a clear
+  performance or synchronization requirement and a separate architecture audit.
+- [x] **Reject Intel Mac support**: the project is officially Apple Silicon
+  (arm64)-only. Do not evaluate Intel builds, Rosetta behavior, or x86 Homebrew
+  assets unless the platform strategy is separately redesigned and audited.
+- [ ] MCP/Agent wrapper evaluation after the CLI contract remains stable; do not
+  bind the CLI to one Agent platform.
+
 ## Standard development workflow: TDD to local release
 
 Every new feature should follow this sequence. A feature is not complete merely because the code compiles:
@@ -227,7 +351,8 @@ Computer Use is allowed only for the initial creation or manual recovery of thes
 - [ ] Evaluate additional Apple public frameworks and document when a public
   framework does not expose the data needed by an adapter
 - [ ] Define a common adapter lifecycle and capability declaration
-- [ ] Add cross-adapter batch operations and change detection
+- [ ] Add cross-adapter batch operations; incremental change detection is
+  explicitly out of scope unless separately re-approved.
 - [x] Version the shared JSON contract independently from the CLI release
 
 Each adapter should define its own authorization requirements, model mapping, read/write capabilities, errors, and tests.

@@ -15,6 +15,11 @@ For Mail 0.2 planning or implementation, also read:
 6. `docs/development/mail-adapter-architecture.md` (or the Chinese summary) for
    the read-only SQLite/EMLX boundary, Apple Events fallback, permissions,
    privacy rules, and compatibility gates
+7. `docs/development/github-cli-environment.md` (or the Chinese version) before
+   diagnosing GitHub CLI, Release, tag, or Homebrew Tap connectivity/authentication
+8. `docs/development/rules.md` (or the Chinese version) for the rule that Codex
+   should complete no-password authorization/settings flows and hand off only
+   password, Apple ID, or security-confirmation steps
 
 ## Current development executable
 

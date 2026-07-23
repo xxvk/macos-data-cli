@@ -2,9 +2,27 @@
 
 `macos-data` 是一个本地 Terminal CLI。它通过 Apple 公共 Framework 访问 macOS 数据，Agent 不需要专用集成即可调用。
 
+## 统一资源查询
+
+使用一个机器可读响应查看当前可发现的 Contacts 和 Mail 资源作用域：
+
+```text
+macos-data resources --format json
+```
+
+每个资源返回 adapter 管理的 opaque `id`、`kind`、`provider`、`displayName`，以及
+`readable`、`writable`、`selected`、`permission` 能力状态。Contacts 的 selected 状态
+反映已经验证的 iCloud 容器。Mail 不会因为“存在一个账号”就擅自标记为 selected；
+偏好的 `aim-tech.jp` 工作邮箱仍需要隐私安全的显式验证。Calendar 在 0.2 尚未实现，
+会在 `data.limitations` 中返回 `calendar_adapter_not_implemented`。
+
 本机 Debug、Xcode 工具链和 Contacts 授权流程请先阅读[本机 Debug 与 Contacts 授权](development/local-debug-and-tcc_CN.md)。
 
 ## Mail（0.2）
+
+Mail 0.2 是只读 adapter：不发送、起草、回复、转发、移动、归档、删除或标记邮件，
+也不修改 mailbox、账户或 Mail 偏好设置。未支持的写入类命令会在访问 Mail 数据前
+返回 usage error。
 
 运行只读 capability 检查：
 
@@ -31,6 +49,25 @@ macos-data mail mailboxes --account-id <opaque-account-id> --format json
 
 account ID 是 adapter 派生的 opaque local scope；响应不会返回原始账号 authority 或
 完整 mailbox URL。mailbox 和 message ID 同样是 opaque 值，调用方不应解析其内部格式。
+
+读取本地 Mail schema 报告的会话分组：
+
+```text
+macos-data mail threads --limit 50 --format json
+```
+
+只有明确的正数 `conversation_id` 才会被分组。响应只返回 opaque thread ID、消息数量和
+最新接收时间，不会根据主题或参与者猜测关系。Mail.app fallback 不提供此命令。
+
+只搜索本地已缓存的邮件正文，不启动 Mail.app：
+
+```text
+macos-data mail search --text "project alpha" --limit 20 --format json
+```
+
+该命令只读取本地 EMLX 缓存，最多扫描 200 个 metadata 候选，时间预算为 1 秒。缺失、partial、
+损坏或截断的缓存会写入 `limitations`；返回无匹配不代表远程或未缓存邮件中不存在该词。该命令
+绝不会 fallback 到 Mail.app 或远程内容。
 
 V10 schema/FDA 快路径不可用时，仅当 Mail.app 已运行且 Automation 已授权，CLI 才会
 使用 metadata fallback。其 Apple Event 超时为 5 秒，硬上限为 32 个账号、200 个
@@ -103,6 +140,15 @@ verifier 只返回 SQLite/MIME count、cache state，以及 complete EMLX 是否
 附件名、路径或 payload。partial 或缺失 EMLX 始终为 `incomplete` 且不标记 `matched`，
 即使当前可见 count 恰好相等也一样。
 
+显式导出本地缓存附件：
+
+```text
+macos-data mail attachments export --id <id> --output ./attachments --format json
+```
+
+导出要求 SQLite/EMLX fast path；必要时创建输出目录，拒绝路径穿越和不安全文件名，
+不会覆盖已有文件，单个附件上限为 20 MiB。不会使用 Mail.app fallback 或远程附件。
+
 ## Contacts
 
 列出当前 Contacts 容器：
@@ -173,6 +219,21 @@ JSON 响应使用独立于 CLI 发布版本的 contract `0.1`。成功 envelope 
 macos-data contacts list --format json
 macos-data contacts get --external-id <id> --format json
 ```
+
+Contacts 有上限分页，使用统一分页 contract：
+
+```text
+macos-data contacts list --limit 50 --format json
+macos-data contacts list --limit 50 --cursor <opaque-cursor> --format json
+macos-data contacts query --kind organization --limit 50 --format json
+```
+
+分页响应包含 `items`、`limit`、`nextCursor`、`truncated`、`complete`。Contacts cursor
+由 adapter 管理且保持 opaque；Agent 必须原样传回，不应从中推导 offset。
+
+Mail query 响应现在也提供统一的 `items` 字段；已有的 `messages` 字段作为 0.2 客户端
+兼容别名保留。Mail.app fallback 始终明确标记为 incomplete，不会伪造 cursor；其
+`limitations` 会说明该 backend 为什么不能恢复分页。
 
 查询支持多个条件，条件之间使用 AND 语义；单次最多三个不同字段：
 

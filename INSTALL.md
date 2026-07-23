@@ -3,9 +3,22 @@
 `macos-data-cli` 0.2.0 can be built and installed locally from source. The
 public binary is not yet Developer ID signed or notarized.
 
+### Unsigned distribution boundary
+
+Until a Developer ID certificate and notarization are available, a Release
+binary built from this repository is ad-hoc signed only. Gatekeeper may reject
+it with “Apple could not verify macos-data”; this is expected and is separate
+from Homebrew checksum verification. Do not disable Gatekeeper globally.
+
+Before making a local trust decision, verify the downloaded asset's SHA-256
+against the published Release or Tap Formula. Removing `com.apple.quarantine`
+is an explicit local workaround only; it is not a public distribution solution
+and must not be documented as equivalent to notarization.
+
 ## Requirements
 
 - macOS 26.0 or newer
+- Apple Silicon Mac (arm64); Intel Mac is not a supported target for 0.2.0
 - Apple Contacts enabled in iCloud
 - Full Xcode compatible with Swift tools 6.2
 - Full Disk Access for the responsible process when using the Mail SQLite/EMLX

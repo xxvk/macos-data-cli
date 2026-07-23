@@ -60,6 +60,9 @@ assert_contains "$TMP_DIR/broken-json.out" '"ok"[[:space:]]*:[[:space:]]*false'
 run_expected_failure missing-input 64 "$CLI" contacts create --dry-run --format json
 run_expected_failure missing-container 64 "$CLI" contacts count --container --format json
 run_expected_failure unknown-container 2 "$CLI" contacts count --container DOES-NOT-EXIST --format json
+for unsupported_mail_command in send draft reply forward move archive delete flag; do
+  run_expected_failure "mail-$unsupported_mail_command-is-read-only" 64 "$CLI" mail "$unsupported_mail_command" --format json
+done
 run_expected_failure idempotency-conflict 2 "$CLI" contacts create --stdin --apply --idempotent --format json <<<'{"kind":"organization","externalID":"xvk-test-organizations-001","organizationName":"intentional-conflict"}'
 run_expected_failure avatar-replace-missing-confirmation 2 "$CLI" contacts avatar replace --external-id xvk-test-contacts-001 --image "$ROOT_DIR/docs/development/icon1.png" --apply --format json
 

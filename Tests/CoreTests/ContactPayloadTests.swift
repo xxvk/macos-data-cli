@@ -38,6 +38,58 @@ final class ContactPayloadTests: XCTestCase {
         XCTAssertTrue(payload.metadata.isEmpty)
     }
 
+    func testDataResourcesResultRoundTripsAndPreservesLimitations() throws {
+        let resource = DataResource(
+            id: "icloud-contacts",
+            kind: .contactsContainer,
+            provider: .iCloud,
+            displayName: "iCloud",
+            capabilities: DataResourceCapabilities(
+                readable: true,
+                writable: true,
+                selected: true,
+                permission: .available
+            )
+        )
+        let result = DataResourcesResult(
+            resources: [resource],
+            limitations: ["calendar_adapter_not_implemented"]
+        )
+
+        let decoded = try JSONDecoder().decode(
+            DataResourcesResult.self,
+            from: JSONEncoder().encode(result)
+        )
+
+        XCTAssertEqual(decoded, result)
+        XCTAssertEqual(decoded.limitations, ["calendar_adapter_not_implemented"])
+    }
+
+    func testPaginationUsesOpaqueCursorAndCompletesOnLastPage() throws {
+        let first = try Pagination.page(items: ["a", "b", "c"], limit: 2, prefix: "test_")
+        XCTAssertEqual(first.items, ["a", "b"])
+        XCTAssertTrue(first.truncated)
+        XCTAssertTrue(first.complete)
+        let cursor = try XCTUnwrap(first.nextCursor)
+        XCTAssertTrue(cursor.hasPrefix("test_"))
+        XCTAssertNotEqual(cursor, "2")
+
+        let last = try Pagination.page(items: ["a", "b", "c"], limit: 2, cursor: cursor, prefix: "test_")
+        XCTAssertEqual(last.items, ["c"])
+        XCTAssertFalse(last.truncated)
+        XCTAssertTrue(last.complete)
+        XCTAssertNil(last.nextCursor)
+    }
+
+    func testPaginationRejectsInvalidLimitAndCursor() {
+        XCTAssertThrowsError(try Pagination.page(items: ["a"], limit: 0, prefix: "test_")) { error in
+            XCTAssertEqual(error as? PaginationError, .invalidLimit)
+        }
+        XCTAssertThrowsError(try Pagination.page(items: ["a"], limit: 1, cursor: "not-a-cursor", prefix: "test_")) { error in
+            XCTAssertEqual(error as? PaginationError, .invalidCursor)
+        }
+    }
+
     func testQueryMatcherSupportsNameEmailOrganizationAndPostalCode() {
         let contact = ContactPayload(
             kind: .organization,
@@ -100,6 +152,42 @@ final class ContactPayloadTests: XCTestCase {
 
     func testJSONContractHasStableVersion() {
         XCTAssertEqual(JSONContract.version, "0.1")
+    }
+
+    func testDataResourceRoundTripsWithoutPrivateAccountIdentifiers() throws {
+        let resource = DataResource(
+            id: "mail-account-opaque-001",
+            kind: .mailAccount,
+            provider: .mail,
+            displayName: "aim-tech.jp work account",
+            capabilities: DataResourceCapabilities(
+                readable: true,
+                writable: false,
+                selected: true,
+                permission: .available
+            )
+        )
+
+        let data = try JSONEncoder().encode(resource)
+        let json = String(decoding: data, as: UTF8.self)
+        XCTAssertFalse(json.contains("@"))
+        XCTAssertFalse(json.contains("imap://"))
+        XCTAssertEqual(try JSONDecoder().decode(DataResource.self, from: data), resource)
+    }
+
+    func testPagedResultRoundTripsAndPreservesCompleteness() throws {
+        let page = PagedResult(
+            items: ["first", "second"],
+            limit: 2,
+            nextCursor: "opaque-cursor-001",
+            truncated: true,
+            complete: false
+        )
+
+        let decoded = try JSONDecoder().decode(PagedResult<String>.self, from: JSONEncoder().encode(page))
+        XCTAssertEqual(decoded, page)
+        XCTAssertTrue(decoded.truncated)
+        XCTAssertFalse(decoded.complete)
     }
 
     func testCLIReleaseVersionIsMailAdapterRelease() {

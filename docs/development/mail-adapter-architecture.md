@@ -57,14 +57,20 @@ reading or printing message content:
 These observations are a historical compatibility baseline, not an Apple API
 guarantee.
 
-The current development Mac is now:
+The previous macOS 26.4 verification host was:
 
 - macOS 26.4, build `25E241`, Apple Silicon.
 - Xcode 26.6, build `17F113`.
 - macOS SDK 26.5.
 
-On 2026-07-23, the current macOS 26.4 host was probed read-only without reading
-or printing message content:
+The current development Mac was later upgraded. On 2026-07-23, the current
+macOS 27.0 host was probed read-only without reading or printing message content:
+
+- macOS 27.0, build `26A5388g`.
+- Xcode 26.6, build `17F113`.
+- macOS SDK 26.5.
+
+The following observations were recorded on that host:
 
 - `~/Library/Mail/V10` was discovered dynamically; `Envelope Index`, `-wal`, and
   `-shm` are present.
@@ -500,6 +506,13 @@ The privacy-safe forced-fallback smoke also passed in the login user's GUI
 session: 3 account scopes, 35 top-level mailboxes, one bounded message result,
 and a targeted metadata get through its `appmsg_` selector. JSON stayed in an
 auto-deleted temporary directory and no message fields were printed.
+
+## Manual performance benchmark
+
+Run `scripts/run_mail_performance_benchmark.sh` to measure a synthetic 5,000-
+message SQLite metadata query with XCTest clock and memory metrics. The fixture
+contains no real Mail data. This is a manual diagnostic, not CI and not a
+release gate; compare results only on the same hardware and toolchain.
 
 ## Prior art and evidence
 

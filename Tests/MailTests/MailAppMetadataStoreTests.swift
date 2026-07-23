@@ -3,6 +3,20 @@ import XCTest
 @testable import MailAdapter
 
 final class MailAppMetadataStoreTests: XCTestCase {
+    func testMailResourceMapperKeepsAccountOpaqueAndReadOnly() {
+        let account = MailAccountSummary(id: "mail-account-opaque-001", kind: "imap", mailboxCount: 3, totalCount: 10, unreadCount: 2)
+
+        let resource = MailResourceMapper.map(account, selected: true, displayName: "aim-tech.jp work account")
+
+        XCTAssertEqual(resource.kind, .mailAccount)
+        XCTAssertEqual(resource.provider, .mail)
+        XCTAssertEqual(resource.id, "mail-account-opaque-001")
+        XCTAssertEqual(resource.displayName, "aim-tech.jp work account")
+        XCTAssertTrue(resource.capabilities.readable)
+        XCTAssertFalse(resource.capabilities.writable)
+        XCTAssertTrue(resource.capabilities.selected)
+    }
+
     func testFallbackListsOpaqueAccountsAndTopLevelMailboxes() throws {
         let bridge = FixtureMailAppMetadataBridge()
         let store = MailAppMetadataStore(
@@ -42,6 +56,7 @@ final class MailAppMetadataStoreTests: XCTestCase {
 
         XCTAssertEqual(result.backend, "mail_app")
         XCTAssertEqual(result.messages.count, 1)
+        XCTAssertEqual(result.items, result.messages)
         XCTAssertTrue(result.messages[0].id.hasPrefix("appmsg_"))
         XCTAssertEqual(result.messages[0].idScope, "mail_app_local")
         XCTAssertEqual(result.fallbackReason, "full_disk_access_required")

@@ -51,4 +51,39 @@ final class MailAttachmentInspectorTests: XCTestCase {
             XCTAssertEqual(error as? MailStoreError, .emlxMalformed)
         }
     }
+
+    func testExtractorDecodesAttachmentAndPreservesSafeFilename() throws {
+        let message = Data("""
+        Content-Type: multipart/mixed; boundary="x"
+
+        --x
+        Content-Type: text/plain
+
+        body
+        --x
+        Content-Type: application/octet-stream
+        Content-Disposition: attachment; filename="report.bin"
+        Content-Transfer-Encoding: base64
+
+        aGVsbG8=
+        --x--
+        """.replacingOccurrences(of: "\n", with: "\r\n").utf8)
+
+        let result = try MailAttachmentExtractor().extract(message)
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.filename, "report.bin")
+        XCTAssertEqual(result.first?.data, Data("hello".utf8))
+    }
+
+    func testExtractorPreservesFilenameForExporterValidation() throws {
+        let message = Data("""
+        Content-Type: application/octet-stream
+        Content-Disposition: attachment; filename="../secret.txt"
+
+        data
+        """.replacingOccurrences(of: "\n", with: "\r\n").utf8)
+
+        XCTAssertEqual(try MailAttachmentExtractor().extract(message).first?.filename, "../secret.txt")
+    }
 }

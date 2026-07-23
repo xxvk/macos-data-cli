@@ -93,6 +93,16 @@ public final class ContactsStore: @unchecked Sendable {
         }
     }
 
+    public func listPage(limit: Int = Pagination.defaultLimit, cursor: String? = nil) throws -> PagedResult<ContactPayload> {
+        do {
+            return try Pagination.page(items: list(), limit: limit, cursor: cursor, prefix: "ctcur_")
+        } catch PaginationError.invalidLimit {
+            throw ContactsQueryError.invalidLimit
+        } catch PaginationError.invalidCursor {
+            throw ContactsQueryError.invalidCursor
+        }
+    }
+
     public func get(externalID: String) throws -> ContactPayload {
         let matches = try list().filter { $0.externalID == externalID }
         return try ContactMatchResolver.requireExactlyOne(matches)
@@ -101,6 +111,16 @@ public final class ContactsStore: @unchecked Sendable {
     public func query(_ query: ContactQuerySet) throws -> [ContactPayload] {
         let matcher = ContactQueryMatcher()
         return try list().filter { matcher.matches($0, query: query) }
+    }
+
+    public func queryPage(_ querySet: ContactQuerySet, limit: Int = Pagination.defaultLimit, cursor: String? = nil) throws -> PagedResult<ContactPayload> {
+        do {
+            return try Pagination.page(items: query(querySet), limit: limit, cursor: cursor, prefix: "ctqcur_")
+        } catch PaginationError.invalidLimit {
+            throw ContactsQueryError.invalidLimit
+        } catch PaginationError.invalidCursor {
+            throw ContactsQueryError.invalidCursor
+        }
     }
 
     public func create(_ payload: ContactPayload) throws {

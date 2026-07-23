@@ -21,6 +21,8 @@ the `macos-data-notary` keychain profile, and GitHub CLI authentication. Set
 `MACOS_DATA_NOTARY_PROFILE` when using another profile and
 `MACOS_DATA_CASK_FILE` when the Tap checkout is available locally. The script
 reports only status and never prints credentials or notarization history.
+For GitHub CLI failures, follow [GitHub CLI Environment Know-how](github-cli-environment.md)
+before deciding that the token is invalid.
 
 - Enroll in the Apple Developer Program.
 - Create a Developer ID Application certificate.
