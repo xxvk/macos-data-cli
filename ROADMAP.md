@@ -164,12 +164,16 @@ automatic commit, push, or release actions.
 - [x] **Freeze the 0.2.0 scope**: document Mail as read-only; no send, reply,
   move, archive, delete, flag, or account mutation. Keep CLI help, README,
   usage docs, and CHANGELOG consistent; add negative tests for unsupported writes.
-- [ ] **Audit version consistency**: make `VERSION`, CLI `--version`,
-  `Info.plist`, CHANGELOG, Release assets, and the Tap Formula all report 0.2.0.
-  Verify source, Release, and installed binaries separately.
-- [ ] **Run the complete local test matrix**: Swift tests, CLI contract tests,
-  Mail release gate, Release build, and installed-binary smoke tests. Record
-  exit codes and do not waive failures manually.
+- [x] **Audit version consistency**: `VERSION`, CLI `--version`, both source
+  and app `Info.plist` files, CHANGELOG, the public `v0.2.0` Release asset,
+  and the public Tap Formula all report 0.2.0. Source Release and installed
+  binaries were verified separately; the installed Homebrew binary was
+  upgraded from 0.1.4/0.1.5 and reports 0.2.0.
+- [x] **Run the complete local test matrix**: Swift tests (87 passed), CLI
+  contract and negative-path tests, Mail release gate, Mail Automation/GUI
+  gate, independent Release build, and installed-binary smoke test all passed.
+  The unsigned binary required the documented local quarantine removal before
+  the installed smoke test could execute.
 - [x] **Confirm the macOS 26+ baseline**: record macOS, Xcode, SDK, and Swift
   versions; the current macOS 27.0 (`26A5388g`) / Xcode 26.6 / SDK 26.5 /
   Swift 6.3.3 run is forward-compatibility evidence, while the recorded macOS

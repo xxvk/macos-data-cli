@@ -183,14 +183,17 @@
   - 范围：CLI、README、`docs/usage*`、CHANGELOG 和帮助文本保持一致。
   - 验证：逐条检查命令表，确认不存在未文档化的写入路径；对未支持动作运行负向测试。
 
-- [ ] **完成版本一致性审计**
-  - 目标：`VERSION`、CLI `--version`、`Info.plist`、CHANGELOG、Release asset 和 Tap
-    Formula 全部声明 `0.2.0`。
-  - 验证：运行现有 release gate，并对源码、Release 二进制和安装后 CLI 各执行一次版本检查。
+- [x] **完成版本一致性审计**
+  - 目标：`VERSION`、CLI `--version`、`Info.plist`、CHANGELOG、公开 `v0.2.0`
+    Release asset 和 Tap Formula 全部声明 `0.2.0`。
+  - 验证：源码 Release、公开 Release asset、公开 Tap 和安装后 CLI 均已分别检查；
+    本机 Homebrew CLI 已从旧版本升级并报告 `0.2.0`。
 
-- [ ] **完成完整本机测试矩阵**
-  - 目标：验证 Swift 单元测试、CLI contract、Mail release gate、Release build 和安装后 smoke。
-  - 验证：保存每个命令的退出码和摘要；任何失败都不得以手动忽略方式标记完成。
+- [x] **完成完整本机测试矩阵**
+  - 目标：验证 Swift 单元测试、CLI contract、Mail release gate、Mail Automation/GUI gate、
+    Release build 和安装后 smoke。
+  - 验证：87 个 Swift tests、CLI contract、两个 Mail release gate、独立 Release build
+    和安装后 smoke 均通过；未忽略失败。未签名二进制执行前按已记录规则移除了本机 quarantine。
 
 - [x] **确认 macOS 26+ 支持基线**
   - 目标：以 macOS 26.x 为正式支持基线；macOS 27 beta 仅作为前置兼容性测试。
