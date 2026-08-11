@@ -111,6 +111,13 @@
 
 ### 0.3：Calendar adapter
 
+- [ ] 根据 Apple 最新命名和商标规范重新审视公开 CLI 与项目名称。如果决定采用更中性的
+  名称，应把它作为新的 canonical command，同时至少在整个 0.3.x 周期保留
+  `macos-data` 兼容别名。明确二进制、Homebrew Cask、仓库与文档、help/version 输出和
+  Agent 示例的迁移方式，并验证两个命令返回完全一致的 JSON 与退出码。CLI 改名不得顺带
+  静默修改稳定的 `x-macos-data://external-id/` 数据 contract；identifier scheme 如需迁移，
+  必须另立设计和迁移命令。已确认的过渡约束、首轮候选和可用性证据维护在
+  [`docs/development/naming-audit_CN.md`](docs/development/naming-audit_CN.md)。
 - [ ] 基于 EventKit 访问日历和事件
 - [ ] 支持日历、事件、时间、地点、参与者和备注
 - [ ] 支持事件查询、创建、更新和删除

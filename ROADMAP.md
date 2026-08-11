@@ -87,6 +87,17 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
 
 ### 0.3: Calendar adapter
 
+- [ ] Re-audit the public CLI and project name against Apple's current naming
+  and trademark guidelines. If a more neutral name is adopted, introduce it as
+  the canonical command while keeping `macos-data` as a documented compatibility
+  alias through at least the 0.3.x line. Define the transition for the executable,
+  Homebrew Cask, repository/docs, help/version output, and Agent examples; verify
+  that both command names return identical JSON and exit codes. Do not silently
+  change the stable `x-macos-data://external-id/` data contract as part of a CLI
+  rename; any identifier-scheme migration requires a separate design and command.
+  The adopted transition constraints, initial candidates, and availability
+  evidence are maintained in
+  [`docs/development/naming-audit.md`](docs/development/naming-audit.md).
 - [ ] Use EventKit to access calendars and events
 - [ ] Support calendars, events, times, locations, attendees, and notes
 - [ ] Support event query, creation, update, and deletion
