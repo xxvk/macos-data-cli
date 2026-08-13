@@ -4,7 +4,12 @@ import XCTest
 @testable import Core
 
 final class CalendarAdapterTests: XCTestCase {
-    func testIdempotencyReceiptStoresNoPrivateEventFieldsAndExpires() throws {
+    private struct PermissionStub: CalendarAccessProviding {
+        let status: CalendarAccessStatus
+        func requestFullAccess() async throws -> Bool { status == .fullAccess }
+    }
+
+    func testIdempotencyReceiptStoresNoPrivateEventFieldsAndCanBeInvalidated() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let now = Date(timeIntervalSince1970: 2_000_000_000)
@@ -19,6 +24,37 @@ final class CalendarAdapterTests: XCTestCase {
         XCTAssertFalse(text.contains("Private title"))
         XCTAssertFalse(text.contains("Private notes"))
         store.invalidate(eventID: "opaque")
+        XCTAssertNil(try store.receipt(for: input))
+    }
+
+    func testIdempotencyReceiptExpiresAndRemovesItsFile() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let createdAt = Date(timeIntervalSince1970: 2_000_000_000)
+        let input = CalendarEventInput(title: "Expires", startDate: createdAt, endDate: createdAt.addingTimeInterval(3600))
+        let writer = CalendarIdempotencyStore(directory: directory, validity: 60, now: { createdAt })
+        try writer.save(CalendarIdempotencyReceipt(eventID: "opaque", calendarID: "calendar", createdAt: createdAt), for: input)
+
+        let expired = CalendarIdempotencyStore(directory: directory, validity: 60, now: { createdAt.addingTimeInterval(61) })
+        XCTAssertNil(try expired.receipt(for: input))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).count, 0)
+    }
+
+    func testIdempotencyReceiptUsesPrivatePermissionsAndIgnoresCorruption() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let input = CalendarEventInput(title: "Permissions", startDate: now, endDate: now.addingTimeInterval(3600))
+        let store = CalendarIdempotencyStore(directory: directory, now: { now })
+        try store.save(CalendarIdempotencyReceipt(eventID: "opaque", calendarID: "calendar", createdAt: now), for: input)
+
+        let directoryMode = (try FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber)?.intValue
+        let file = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)
+        let fileMode = (try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue
+        XCTAssertEqual(directoryMode, 0o700)
+        XCTAssertEqual(fileMode, 0o600)
+
+        try Data("not-json".utf8).write(to: file)
         XCTAssertNil(try store.receipt(for: input))
     }
     func testMapperReadsAndWritesRelativeAndAbsoluteAlarms() throws {
@@ -51,6 +87,29 @@ final class CalendarAdapterTests: XCTestCase {
         try CalendarMapper().apply(patch, to: event)
 
         XCTAssertEqual(event.alarms?.count ?? 0, 0)
+    }
+
+    func testMapperReplacesRelativeAlarmWithAbsoluteAlarmThenClearsIt() throws {
+        let store = EKEventStore()
+        let event = EKEvent(eventStore: store)
+        event.title = "Alarm lifecycle"
+        event.startDate = Date(timeIntervalSince1970: 1_800_000_000)
+        event.endDate = event.startDate.addingTimeInterval(3600)
+        event.addAlarm(EKAlarm(relativeOffset: -600))
+
+        let replacement = try CalendarJSON.decode(CalendarEventPatch.self, from: Data(#"{"alarms":[{"absoluteDate":"2027-01-15T01:00:00Z"}]}"#.utf8))
+        try CalendarMapper().apply(replacement, to: event)
+        XCTAssertEqual(CalendarMapper().map(event).alarms.count, 1)
+        XCTAssertNotNil(CalendarMapper().map(event).alarms.first?.absoluteDate)
+
+        let clear = try CalendarJSON.decode(CalendarEventPatch.self, from: Data(#"{"alarms":[]}"#.utf8))
+        try CalendarMapper().apply(clear, to: event)
+        XCTAssertTrue(CalendarMapper().map(event).alarms.isEmpty)
+    }
+
+    func testMapperRejectsNonIncreasingAllDayRange() throws {
+        let input = try CalendarJSON.decode(CalendarEventInput.self, from: Data(#"{"title":"bad","allDay":true,"startDate":"2026-08-17","endDate":"2026-08-17","timeZone":"Asia/Tokyo"}"#.utf8))
+        XCTAssertThrowsError(try CalendarMapper().makeEvent(from: input, eventStore: EKEventStore()))
     }
 
     func testMapperRequiresBothDateOnlyValuesWhenChangingToAllDay() throws {
@@ -90,9 +149,26 @@ final class CalendarAdapterTests: XCTestCase {
     }
 
     func testPermissionMapperRequiresFullAccessForReads() {
+        XCTAssertEqual(CalendarPermission.map(.notDetermined), .notDetermined)
+        XCTAssertEqual(CalendarPermission.map(.restricted), .restricted)
         XCTAssertEqual(CalendarPermission.map(.fullAccess), .fullAccess)
         XCTAssertEqual(CalendarPermission.map(.writeOnly), .writeOnly)
         XCTAssertEqual(CalendarPermission.map(.denied), .denied)
+    }
+
+    func testStoreMapsEveryInsufficientPermissionToItsStableError() {
+        let cases: [(CalendarAccessStatus, CalendarError)] = [
+            (.notDetermined, .permissionRequired),
+            (.denied, .permissionDenied),
+            (.restricted, .permissionRestricted),
+            (.writeOnly, .fullAccessRequired)
+        ]
+        for (status, expected) in cases {
+            let store = CalendarStore(eventStore: EKEventStore(), permission: PermissionStub(status: status))
+            XCTAssertThrowsError(try store.sourceDescriptions()) { error in
+                XCTAssertEqual(error as? CalendarError, expected)
+            }
+        }
     }
 
     func testSourceSelectorChoosesUniqueICloudCalDAVSource() throws {

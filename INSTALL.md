@@ -1,6 +1,6 @@
 # macos-data-cli Installation
 
-`macos-data-cli` 0.2.0 can be built and installed locally from source. The
+`macos-data-cli` 0.3.0 can be built and installed locally from source. The
 public binary is not yet Developer ID signed or notarized.
 
 ### Unsigned distribution boundary
@@ -18,7 +18,7 @@ and must not be documented as equivalent to notarization.
 ## Requirements
 
 - macOS 26.0 or newer
-- Apple Silicon Mac (arm64); Intel Mac is not a supported target for 0.2.0
+- Apple Silicon Mac (arm64); Intel Mac is not a supported target for 0.3.0
 - Apple Contacts enabled in iCloud
 - Full Xcode compatible with Swift tools 6.2
 - Full Disk Access for the responsible process when using the Mail SQLite/EMLX
@@ -36,6 +36,22 @@ swift test
 swift build -c release
 sudo install -m 755 .build/release/macos-data /opt/homebrew/bin/macos-data
 ```
+
+Before committing a 0.3.0 release candidate, run the local non-writing release gate:
+
+```bash
+bash scripts/run_release_gate.sh
+```
+
+After installing the candidate locally, include the installed binary smoke:
+
+```bash
+bash scripts/run_release_gate.sh --installed-cli /opt/homebrew/bin/macos-data
+```
+
+The ordinary release gate invokes the shared CLI contracts with `--no-apply`.
+Real Contacts writes and Calendar CRUD, recurrence, and feature gates require
+separate explicit authorization and are intentionally not repeated by it.
 
 ### Local Debug and Contacts permission
 
@@ -65,9 +81,9 @@ bash scripts/run_installed_release_smoke.sh
 ```
 
 The installed-release smoke verifies that the installed version matches
-`VERSION`, help starts correctly, the Mail V10 fast path is available, and a
-bounded query uses the SQLite backend. It stores JSON in an auto-deleted
-temporary directory and prints no mail fields.
+`VERSION`, Calendar 0.3 help and stable error routing are present, the Mail V10
+fast path is available, and a bounded query uses the SQLite backend. It stores
+JSON in an auto-deleted temporary directory and prints no mail fields.
 
 The CLI requests Contacts and Mail Automation access through macOS. Contacts
 writes target only the verified iCloud Contacts container and are refused when

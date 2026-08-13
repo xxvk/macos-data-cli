@@ -28,6 +28,8 @@ rg -q 'Calendar commands:' "$TMP_DIR/help.txt"
 rg -q 'query --start <iso8601>' "$TMP_DIR/help.txt"
 rg -q 'DELETE EVENT' "$TMP_DIR/help.txt"
 rg -q 'Attendees are returned by reads but are read-only' "$TMP_DIR/help.txt"
+rg -q 'conflicts --start <iso8601>' "$TMP_DIR/help.txt"
+rg -q '\[--idempotent\]' "$TMP_DIR/help.txt"
 
 assert_failure missing-range 5 CALENDAR_INVALID_INPUT "$CLI" calendar query --format json
 assert_failure reversed-range 5 CALENDAR_INVALID_DATE_RANGE "$CLI" calendar query \
@@ -40,10 +42,18 @@ assert_failure invalid-recurrence-span 5 CALENDAR_INVALID_INPUT "$CLI" calendar 
   --id calevent_invalid --dry-run --span all --format json
 assert_failure invalid-conflicts-option 5 CALENDAR_INVALID_INPUT "$CLI" calendar conflicts \
   --start 2026-01-01T00:00:00Z --end 2026-01-02T00:00:00Z --title private --format json
+assert_failure duplicate-conflicts-range 5 CALENDAR_INVALID_INPUT "$CLI" calendar conflicts \
+  --start 2026-01-01T00:00:00Z --start 2026-01-01T01:00:00Z --end 2026-01-02T00:00:00Z --format json
 assert_failure invalid-all-day-timestamp 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
   <<<'{"title":"bad","allDay":true,"startDate":"2026-01-01T00:00:00Z","endDate":"2026-01-02T00:00:00Z"}'
+assert_failure mixed-all-day-date-formats 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
+  <<<'{"title":"bad","allDay":true,"startDate":"2026-01-01","endDate":"2026-01-02T00:00:00Z"}'
 assert_failure invalid-alarm 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
   <<<'{"title":"bad","startDate":"2026-01-01T00:00:00Z","endDate":"2026-01-01T01:00:00Z","alarms":[{}]}'
+assert_failure excessive-relative-alarm 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
+  <<<'{"title":"bad","startDate":"2026-01-01T00:00:00Z","endDate":"2026-01-01T01:00:00Z","alarms":[{"relativeMinutes":525601}]}'
+assert_failure idempotent-edit-is-unsupported 5 CALENDAR_INVALID_INPUT "$CLI" calendar edit \
+  --id calevent_invalid --stdin --dry-run --idempotent --format json <<<'{"title":"bad"}'
 
 set +e
 printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/empty.json" 2>&1

@@ -10,7 +10,7 @@ adapters when no public framework exposes the required data.
 
 ## Project status
 
-The current CLI release is 0.2.0. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.3.0. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -20,14 +20,14 @@ discovery, bounded message-metadata queries, explicit cached text/raw reads,
 Mail.app text fallback, and visual reveal are now available. The adapter uses a
 runtime-verified V10 SQLite/EMLX fast path and never writes the Mail store.
 
-Version 0.2.0 adds the Mail adapter while retaining the Contacts command surface.
+Version 0.2.0 added the Mail adapter while retaining the Contacts command surface.
 
-The `dev` branch is now implementing Calendar 0.3. EventKit full-access
+Version 0.3.0 adds Calendar through EventKit full-access
 authorization, unique iCloud CalDAV source selection, calendar/event queries,
 ISO 8601 time zones, recurrence rules, opaque occurrence IDs, and dry-run/apply
 paths for create/edit/delete are implemented. Local read and dry-run smoke tests
 pass; the explicitly authorized disposable-event apply integration also passed
-and verified final absence. These capabilities remain an unpublished 0.3 development version.
+and verified final absence. The public precompiled distribution may still lag the source tag.
 
 See the detailed roadmaps:
 
@@ -84,7 +84,7 @@ Mail preferences. Unsupported write-like commands must return a usage error
 before any Mail store or Mail.app access occurs. This boundary is part of the
 0.2.0 contract and may only change in a separately specified release.
 
-## Calendar 0.3 development commands
+## Calendar 0.3 commands
 
 ```text
 macos-data calendar permission
@@ -218,8 +218,9 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-Current development focuses on Calendar 0.3 release hardening and the CLI naming
-audit, followed by Reminders, Notes, and Photos.
+Current development focuses on Calendar 0.3 release hardening, followed by
+Reminders, Notes, and Photos. `macos-data` remains the canonical command through
+0.x; naming is reviewed again before 1.0.0.
 Mail 0.2 uses a read-only local SQLite/EMLX path with Mail.app Apple Events
 fallback and visual verification. See the
 [Mail architecture decision](docs/development/mail-adapter-architecture.md).

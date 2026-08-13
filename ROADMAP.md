@@ -1,7 +1,7 @@
 # macos-data-cli Roadmap
 
-The project is currently at the Mail adapter release baseline `0.2.0`.
-The Contacts and read-only Mail workflows are implemented and locally verified;
+The project is preparing the Calendar adapter source release `0.3.0`.
+The Contacts, read-only Mail, and Calendar workflows are implemented and locally verified;
 this roadmap distinguishes released behavior from later adapters and distribution work.
 
 The long-term goal is to provide a general macOS native data access layer for agents and scripts. Different agents should be able to use the same CLI and JSON contract without depending on Codex, Claude Code, or another specific platform.
@@ -89,17 +89,11 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
 
 Architecture: [Calendar adapter 0.3](docs/development/calendar-adapter-architecture.md).
 
-- [ ] Re-audit the public CLI and project name against Apple's current naming
-  and trademark guidelines. If a more neutral name is adopted, introduce it as
-  the canonical command while keeping `macos-data` as a documented compatibility
-  alias through at least the 0.3.x line. Define the transition for the executable,
-  Homebrew Cask, repository/docs, help/version output, and Agent examples; verify
-  that both command names return identical JSON and exit codes. Do not silently
-  change the stable `x-macos-data://external-id/` data contract as part of a CLI
-  rename; any identifier-scheme migration requires a separate design and command.
-  The adopted transition constraints, initial candidates, and availability
-  evidence are maintained in
-  [`docs/development/naming-audit.md`](docs/development/naming-audit.md).
+- [x] Complete the 0.3 naming decision: retain `macos-data` as the sole canonical
+  command for 0.3.0 and the complete 0.x line, introduce no alias, and keep
+  `xvk-data` rejected. Naming is reviewed again as a 1.0.0 release gate without
+  pre-committing to a rename. See [`ADR 0001`](docs/development/adr/0001-cli-name-until-1.0.md)
+  and the [`naming audit`](docs/development/naming-audit.md).
 - [x] Use EventKit to access calendars and events; local full-access authorization
   and the privacy-safe read smoke pass
 - [x] Support calendars, events, times, locations, attendees, and notes; attendees
@@ -110,9 +104,22 @@ Architecture: [Calendar adapter 0.3](docs/development/calendar-adapter-architect
   - The disposable-event create/read/edit/read/delete/absence gate passed against the local iCloud Calendar
   - Alarms, all-day date-only values, a privacy-minimized 60-second idempotency receipt, and conflict detection are implemented
   - A real six-occurrence gate covers immediate retry, alarms, this/future edits and deletes, and final cleanup
+  - The real feature gate covers all-day read-back, relative/absolute/cleared alarms,
+    non-equivalent idempotent retry rejection, strict overlap versus adjacent
+    boundaries, and final zero-residue cleanup
+  - Calendar hardening covers Tokyo, UTC, both DST boundaries, receipt expiry and
+    permissions, idempotency mismatch, malformed contracts, and the 200-event cap
 - [x] Represent IANA time zones and recurring events, including recurrence ends
   and ordinal weekdays, explicitly
 - [x] Include dry-run, the JSON contract, full-access checks, stable errors, and Calendar exit 5
+- [x] Align `VERSION`, CLI `--version`, both Info.plists, README, INSTALL, tests,
+  and CHANGELOG at 0.3.0; the local Release and installed Homebrew-prefix binary
+  both report 0.3.0
+- [x] Pass the default no-apply 0.3.0 release gate: 121 Swift tests, shared and
+  Calendar CLI contracts, Calendar read/dry-run smoke, Mail read-only smoke,
+  Release build, signed Debug app verification, version audit, and diff check
+- [ ] Commit the final release candidate, merge it to `main`, rerun the gate from
+  a clean `main` worktree, and create annotated tag `v0.3.0`
 
 ### 0.4: Reminders adapter
 

@@ -97,6 +97,12 @@ public struct CalendarConflictResult: Codable, Equatable, Sendable {
 }
 
 public enum CalendarConflictDetector {
+    public static let maximumEventCount = 200
+
+    public static func validateEventCount(_ count: Int) throws {
+        guard count <= maximumEventCount else { throw CalendarError.conflictScanLimitExceeded }
+    }
+
     public static func detect(_ events: [CalendarEventPayload]) -> [CalendarConflict] {
         let values = events.sorted { $0.startDate == $1.startDate ? $0.endDate < $1.endDate : $0.startDate < $1.startDate }
         var result: [CalendarConflict] = []

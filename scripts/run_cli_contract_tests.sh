@@ -5,6 +5,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+NO_APPLY=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-apply) NO_APPLY=true; shift ;;
+    *) echo "usage: $0 [--no-apply]" >&2; exit 64 ;;
+  esac
+done
 
 if [[ ! -x "$CLI" ]]; then
   echo "CLI not found or not executable: $CLI" >&2
@@ -63,7 +71,9 @@ run_expected_failure unknown-container 2 "$CLI" contacts count --container DOES-
 for unsupported_mail_command in send draft reply forward move archive delete flag; do
   run_expected_failure "mail-$unsupported_mail_command-is-read-only" 64 "$CLI" mail "$unsupported_mail_command" --format json
 done
-run_expected_failure idempotency-conflict 2 "$CLI" contacts create --stdin --apply --idempotent --format json <<<'{"kind":"organization","externalID":"xvk-test-organizations-001","organizationName":"intentional-conflict"}'
+if [[ "$NO_APPLY" != true ]]; then
+  run_expected_failure idempotency-conflict 2 "$CLI" contacts create --stdin --apply --idempotent --format json <<<'{"kind":"organization","externalID":"xvk-test-organizations-001","organizationName":"intentional-conflict"}'
+fi
 run_expected_failure avatar-replace-missing-confirmation 2 "$CLI" contacts avatar replace --external-id xvk-test-contacts-001 --image "$ROOT_DIR/docs/development/icon1.png" --apply --format json
 run_expected_failure calendar-query-missing-range 5 "$CLI" calendar query --format json
 run_expected_failure calendar-query-invalid-range 5 "$CLI" calendar query --start 2026-08-15T00:00:00Z --end 2026-08-14T00:00:00Z --format json
@@ -87,4 +97,4 @@ printf '%s' '{"kind":"person","externalID":"phonetic-contract-test-001","givenNa
 assert_contains "$TMP_DIR/phonetic.out" '"phoneticGivenName"[[:space:]]*:[[:space:]]*"あきら"'
 assert_contains "$TMP_DIR/phonetic.out" '"phoneticFamilyName"[[:space:]]*:[[:space:]]*"かみじま"'
 
-echo "CLI contract and negative-path tests passed."
+echo "CLI contract and negative-path tests passed (noApply=$NO_APPLY)."

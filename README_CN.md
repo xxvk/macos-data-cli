@@ -9,20 +9,20 @@ GUI 自动化、特定平台集成，或直接接触不稳定的内部数据格�
 
 ## 项目状态
 
-当前 CLI release 为 0.2.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.3.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
 查询、显式 cached text/raw 读取、Mail.app text fallback 和可视化 reveal 已可用。
 adapter 只启用运行时验证通过的 V10 SQLite/EMLX 快路径，且永不写入 Mail store。
 
-0.2.0 增加 Mail adapter，同时保留既有 Contacts 命令面。
+0.2.0 增加了 Mail adapter，同时保留既有 Contacts 命令面。
 
-`dev` 分支已进入 Calendar 0.3 开发：EventKit full-access 权限、唯一 iCloud CalDAV
+0.3.0 增加 Calendar：EventKit full-access 权限、唯一 iCloud CalDAV
 source 选择、日历和事件查询、ISO 8601 时区、周期规则、opaque occurrence ID，以及
 create/edit/delete 的 dry-run 和 apply 路径已经实现。只读和 dry-run 本机验证已通过；
-一次性事件的真实 apply CRUD 集成测试也已完成，并确认测试事件最终不存在。这些能力仍属于
-尚未发布的 0.3 开发版本。
+一次性事件的真实 apply CRUD 集成测试也已完成，并确认测试事件最终不存在。这些能力属于
+0.3.0 源码范围；公开预编译分发可能晚于源码 tag。
 
 详细开发计划请参阅：
 
@@ -161,7 +161,7 @@ bytes 不进入 JSON，且不会覆盖已有输出文件。这里仅 `mail revea
 `mail attachments verify` 只比较 SQLite 和缓存 MIME 的数量，不导出附件名或 payload；
 partial EMLX 始终保持 unverified。raw 导出和 attachment verify 不使用 metadata fallback。
 
-## 0.3 开发中：Calendar adapter
+## 0.3：Calendar adapter
 
 ```text
 macos-data calendar permission
@@ -207,8 +207,9 @@ Homebrew 更新、Gatekeeper、quarantine 处理和本地发布验证流程，�
 
 ## 后续方向
 
-当前开发重点是 Calendar 0.3 的发布前收尾和 CLI 命名审计，之后为
-Reminders、Notes 和 Photos。Mail 0.2 采用
+当前开发重点是 Calendar 0.3 的发布前收尾，之后为 Reminders、Notes 和 Photos。
+`macos-data` 在整个 0.x 阶段保持 canonical command，正式命名复审延后至 1.0.0 发布前。
+Mail 0.2 采用
 只读 SQLite/EMLX、Mail.app Apple Events 回退和可视化确认的混合架构。
 详见 [Mail 架构决策](docs/development/mail-adapter-architecture_CN.md)。vCard、批量操作和
 变更检测属于 Contacts 的后续工作。每个 adapter 都应独立定义权限要求、数据映射、

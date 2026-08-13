@@ -39,6 +39,19 @@ if ! head -n 1 "$TEMP_DIR/help.txt" | rg -q '^macos-data '; then
   echo "installed binary help header is invalid" >&2
   exit 1
 fi
+if ! rg -q '^Calendar commands:' "$TEMP_DIR/help.txt" || ! rg -q 'conflicts --start <iso8601>' "$TEMP_DIR/help.txt"; then
+  echo "installed binary help does not expose the Calendar 0.3 command surface" >&2
+  exit 1
+fi
+
+set +e
+"$CLI" calendar query --format json >"$TEMP_DIR/calendar-invalid.stdout" 2>"$TEMP_DIR/calendar-invalid.stderr"
+calendar_status=$?
+set -e
+if [[ "$calendar_status" -ne 5 ]] || ! /usr/bin/jq -e '.error.code == "CALENDAR_INVALID_INPUT"' "$TEMP_DIR/calendar-invalid.stderr" >/dev/null; then
+  echo "installed binary Calendar error contract is invalid" >&2
+  exit 1
+fi
 
 run_json "$TEMP_DIR/doctor.json" mail doctor --format json
 if ! /usr/bin/jq -e '.ok == true and .data.fastPathAvailable == true' "$TEMP_DIR/doctor.json" >/dev/null; then
@@ -53,4 +66,4 @@ if ! /usr/bin/jq -e '.ok == true and .data.backend == "sqlite"' "$TEMP_DIR/query
 fi
 
 message_count="$(/usr/bin/jq -r '.data.messages | length' "$TEMP_DIR/query.json")"
-echo "Installed release smoke passed: version=$installed_version backend=sqlite fastPath=true messages=$message_count"
+echo "Installed release smoke passed: version=$installed_version calendarContract=true backend=sqlite fastPath=true messages=$message_count"

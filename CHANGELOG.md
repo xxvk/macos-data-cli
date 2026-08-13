@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased — 0.3.0 development
+## 0.3.0 — 2026-08-14
 
 ### Added
+
+- Recorded ADR 0001: keep `macos-data` as the sole canonical command throughout
+  0.x, introduce no alias in 0.3.0, and review naming again before 1.0.0.
 
 - Added the EventKit Calendar adapter with full-access permission handling,
   fail-closed unique iCloud CalDAV source selection, calendar discovery, bounded
@@ -29,6 +32,19 @@
 - Added an explicitly authorized six-occurrence iCloud integration gate covering
   alarm read-back, immediate idempotent retry, detached `this` edits/deletes,
   `future` edits/deletes, and complete fixture cleanup.
+- Added Calendar hardening tests for Tokyo/UTC date-only values, both daylight-
+  saving boundaries, receipt expiry/corruption/permissions, alarm replacement,
+  idempotency matching, permission error mapping, and the 200-event conflict cap.
+  The full suite now has 121 passing tests.
+- Added an explicitly authorized disposable iCloud feature gate covering all-day
+  create/edit read-back, relative-to-absolute alarm replacement, alarm clearing,
+  non-equivalent idempotent-create rejection, strict overlap detection,
+  adjacent-boundary exclusion, and zero fixture residue.
+- Added a default no-apply 0.3.0 release gate covering version drift, 121 Swift
+  tests, shared/Calendar contracts, Calendar read/dry-run smoke, Mail read-only
+  smoke, Release build, signed Debug app verification, and diff validation.
+- Extended the installed-release smoke with Calendar help and stable-error checks;
+  the locally installed Homebrew-prefix binary reports 0.3.0 and passes.
 
 ## 0.2.0 — 2026-07-23
 

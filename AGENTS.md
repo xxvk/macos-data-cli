@@ -155,6 +155,11 @@ not assume a Homebrew or Release binary while development is in progress.
 - The recurring-event write gate is
   `run_calendar_recurrence_integration.sh --confirm "CALENDAR RECURRENCE TEST"` and
   also requires explicit current-task authorization. It must finish with zero URL fixtures.
+- The all-day/alarm/conflict write gate is
+  `run_calendar_feature_integration.sh --confirm "CALENDAR FEATURE TEST"` and
+  also requires explicit current-task authorization. It verifies date-only
+  read-back, relative/absolute/cleared alarms, strict overlap versus adjacent
+  boundaries, and zero remaining URL fixtures.
 - `run_calendar_read_smoke.sh` and `run_calendar_dry_run_smoke.sh` print aggregate
   status only and auto-delete private temporary JSON.
 
@@ -173,6 +178,7 @@ bash scripts/run_mail_attachment_smoke.sh
 bash scripts/run_mail_app_metadata_smoke.sh
 bash scripts/run_mail_automation_smoke.sh --gui-session
 bash scripts/run_mail_release_gate.sh
+bash scripts/run_release_gate.sh
 bash scripts/run_calendar_contract_tests.sh
 bash scripts/run_calendar_read_smoke.sh
 bash scripts/run_calendar_dry_run_smoke.sh
@@ -180,6 +186,9 @@ bash scripts/run_local_calendar_integration.sh
 bash scripts/run_installed_release_smoke.sh
 bash scripts/check_public_release_prerequisites.sh
 ```
+
+The ordinary `run_release_gate.sh` must call `run_cli_contract_tests.sh --no-apply`.
+Do not put any real Contacts or Calendar apply fixture in the default release gate.
 
 Use `scripts/run_mail_release_gate.sh --with-automation` only for an attended
 check: it performs a visible reveal and intentionally fails without retry when

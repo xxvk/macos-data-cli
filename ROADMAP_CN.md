@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-项目当前处于 Mail adapter 的 `0.2.0` 本机发布基线。Contacts 与只读 Mail 流程
-均已实现并通过本机验证；本路线图区分已完成能力、后续 adapter 与外部分发工作。
+项目当前正在准备 Calendar adapter 源码版本 `0.3.0`。Contacts、只读 Mail 与 Calendar
+流程均已实现并通过本机验证；本路线图区分已完成能力、后续 adapter 与外部分发工作。
 
 项目的长期目标是建立一个通用的 macOS 原生数据访问基础设施，让不同 Agent 和脚本
 通过统一的 CLI 与 JSON contract 优先使用 Apple 公共 Framework；公共 Framework
@@ -113,13 +113,10 @@
 
 架构决策：[Calendar adapter 0.3 中文说明](docs/development/calendar-adapter-architecture_CN.md)。
 
-- [ ] 根据 Apple 最新命名和商标规范重新审视公开 CLI 与项目名称。如果决定采用更中性的
-  名称，应把它作为新的 canonical command，同时至少在整个 0.3.x 周期保留
-  `macos-data` 兼容别名。明确二进制、Homebrew Cask、仓库与文档、help/version 输出和
-  Agent 示例的迁移方式，并验证两个命令返回完全一致的 JSON 与退出码。CLI 改名不得顺带
-  静默修改稳定的 `x-macos-data://external-id/` 数据 contract；identifier scheme 如需迁移，
-  必须另立设计和迁移命令。已确认的过渡约束、首轮候选和可用性证据维护在
-  [`docs/development/naming-audit_CN.md`](docs/development/naming-audit_CN.md)。
+- [x] 完成 0.3 命名决策：0.3.0 和整个 0.x 阶段继续使用 `macos-data` 作为唯一 canonical
+  command，不增加别名；`xvk-data` 已否决。正式命名复审延后为 1.0.0 release gate，且不
+  预先承诺改名。见 [`ADR 0001`](docs/development/adr/0001-cli-name-until-1.0_CN.md) 和
+  [`命名审计`](docs/development/naming-audit_CN.md)。
 - [x] 基于 EventKit 访问日历和事件；本机 full-access 授权和隐私安全只读 smoke 已通过
 - [x] 支持日历、事件、时间、地点、参与者和备注；参与者在 0.3 明确保持只读
 - [x] 支持事件查询、创建、更新和删除
@@ -128,8 +125,19 @@
   - 一次性事件 create → read-back → edit → read-back → delete → absence verification 已在本机 iCloud Calendar 通过
   - Alarm、全天 date-only、60 秒隐私最小化幂等 receipt、冲突检测已实现
   - 真实 6-occurrence gate 已覆盖幂等重试、Alarm、this/future 编辑删除和最终清理
+  - 真实 feature gate 已覆盖全天事件回读、相对/绝对/清空 Alarm、非等价幂等重试拒绝、
+    严格重叠与仅边界相接，并确认最终测试残留为 0
+  - Calendar 加固测试已覆盖东京、UTC、DST 开始和结束、receipt 过期与权限、幂等内容
+    不一致、损坏 contract 和 200 事件上限
 - [x] 支持时区和重复事件的明确表达，包括 IANA time zone、周期结束和 ordinal weekday
 - [x] 支持 dry-run、JSON contract、full-access 权限检查、稳定错误码和 Calendar exit 5
+- [x] 将 `VERSION`、CLI `--version`、两份 Info.plist、README、INSTALL、测试和 CHANGELOG
+  统一为 0.3.0；本机 Release 与安装到 Homebrew prefix 的 CLI 均报告 0.3.0
+- [x] 通过默认 no-apply 的 0.3.0 release gate：121 个 Swift tests、全局与 Calendar CLI
+  contract、Calendar read/dry-run smoke、Mail 只读 smoke、Release build、签名 Debug app、
+  版本审计和 diff check
+- [ ] 提交最终 release candidate、合并到 `main`、在干净 `main` worktree 重跑 gate，
+  然后创建 annotated tag `v0.3.0`
 
 ### 0.4：Reminders adapter
 

@@ -139,7 +139,7 @@ public final class CalendarStore: @unchecked Sendable {
         let selectedCalendars = try calendarsForRead(in: source, selector: query.calendarID)
         let predicate = eventStore.predicateForEvents(withStart: query.startDate, end: query.endDate, calendars: selectedCalendars)
         let events = eventStore.events(matching: predicate).map(mapForOutput)
-        guard events.count <= 200 else { throw CalendarError.conflictScanLimitExceeded }
+        try CalendarConflictDetector.validateEventCount(events.count)
         return CalendarConflictResult(checkedEventCount: events.count, conflicts: CalendarConflictDetector.detect(events))
     }
 

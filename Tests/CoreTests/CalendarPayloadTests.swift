@@ -25,6 +25,24 @@ final class CalendarPayloadTests: XCTestCase {
         XCTAssertEqual(object?["endDate"] as? String, "2026-11-02")
     }
 
+    func testAllDayDateOnlyRoundTripsInTokyoAndUTC() throws {
+        for zone in ["Asia/Tokyo", "UTC"] {
+            let start = try CalendarJSON.parseDateOnly("2026-08-16", timeZone: zone)
+            let end = try CalendarJSON.parseDateOnly("2026-08-18", timeZone: zone)
+            XCTAssertEqual(CalendarJSON.dateOnlyString(start, timeZone: zone), "2026-08-16")
+            XCTAssertEqual(CalendarJSON.dateOnlyString(end, timeZone: zone), "2026-08-18")
+        }
+    }
+
+    func testAllDayDateOnlyRoundTripsAcrossDSTStartAndEnd() throws {
+        for dates in [("2026-03-08", "2026-03-09"), ("2026-11-01", "2026-11-02")] {
+            let start = try CalendarJSON.parseDateOnly(dates.0, timeZone: "America/Los_Angeles")
+            let end = try CalendarJSON.parseDateOnly(dates.1, timeZone: "America/Los_Angeles")
+            XCTAssertEqual(CalendarJSON.dateOnlyString(start, timeZone: "America/Los_Angeles"), dates.0)
+            XCTAssertEqual(CalendarJSON.dateOnlyString(end, timeZone: "America/Los_Angeles"), dates.1)
+        }
+    }
+
     func testAllDayInputRejectsTimestampsAndTimedInputRejectsDateOnly() {
         XCTAssertThrowsError(try CalendarJSON.decode(CalendarEventInput.self, from: Data(#"{"title":"bad","allDay":true,"startDate":"2026-08-16T00:00:00Z","endDate":"2026-08-17T00:00:00Z"}"#.utf8)))
         XCTAssertThrowsError(try CalendarJSON.decode(CalendarEventInput.self, from: Data(#"{"title":"bad","startDate":"2026-08-16","endDate":"2026-08-17"}"#.utf8)))
@@ -41,6 +59,8 @@ final class CalendarPayloadTests: XCTestCase {
     func testAlarmRequiresExactlyOneTrigger() {
         XCTAssertThrowsError(try CalendarAlarm(relativeMinutes: nil, absoluteDate: nil).validated())
         XCTAssertThrowsError(try CalendarAlarm(relativeMinutes: -10, absoluteDate: Date()).validated())
+        XCTAssertThrowsError(try CalendarAlarm(relativeMinutes: 525_601).validated())
+        XCTAssertNoThrow(try CalendarAlarm(relativeMinutes: -525_600).validated())
     }
 
     func testConflictDetectorFindsStrictOverlapButNotAdjacentEvents() {
@@ -55,6 +75,41 @@ final class CalendarPayloadTests: XCTestCase {
         XCTAssertEqual(conflicts.count, 1)
         XCTAssertEqual(conflicts.first?.firstEventID, "a")
         XCTAssertEqual(conflicts.first?.secondEventID, "b")
+    }
+
+    func testConflictPolicyRejectsMoreThanTwoHundredCandidates() {
+        XCTAssertNoThrow(try CalendarConflictDetector.validateEventCount(200))
+        XCTAssertThrowsError(try CalendarConflictDetector.validateEventCount(201)) { error in
+            XCTAssertEqual(error as? CalendarError, .conflictScanLimitExceeded)
+        }
+    }
+
+    func testIdempotencyMatcherDistinguishesPersistedFieldsButIgnoresAlarmOrder() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let input = CalendarEventInput(
+            title: "Retry",
+            startDate: start,
+            endDate: start.addingTimeInterval(3600),
+            notes: "same",
+            alarms: [CalendarAlarm(relativeMinutes: -10), CalendarAlarm(relativeMinutes: -30)]
+        )
+        let equivalent = CalendarEventPayload(
+            title: "Retry",
+            startDate: start,
+            endDate: start.addingTimeInterval(3600),
+            notes: "same",
+            alarms: [CalendarAlarm(relativeMinutes: -30), CalendarAlarm(relativeMinutes: -10)]
+        )
+        let changed = CalendarEventPayload(
+            title: "Retry",
+            startDate: start,
+            endDate: start.addingTimeInterval(3600),
+            notes: "different",
+            alarms: equivalent.alarms
+        )
+
+        XCTAssertTrue(CalendarIdempotencyMatcher.equivalent(input, equivalent))
+        XCTAssertFalse(CalendarIdempotencyMatcher.equivalent(input, changed))
     }
     func testEventPayloadRoundTripsTimeZoneAttendeesAndRecurrence() throws {
         let start = Date(timeIntervalSince1970: 1_800_000_000)

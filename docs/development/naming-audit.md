@@ -1,18 +1,17 @@
 # CLI naming and compatibility audit
 
 Status: the second candidate, similar-name, and common package-registry audit
-was completed on 2026-08-14. The project owner explicitly rejected `xvk-data`.
-There is currently no approved or recommended canonical replacement, and no
-rename has been implemented.
+was completed on 2026-08-14. The project owner explicitly rejected `xvk-data`
+and decided to retain `macos-data` as the sole canonical command throughout 0.x.
+Naming is reviewed again as a 1.0.0 release gate. See
+[ADR 0001](adr/0001-cli-name-until-1.0.md).
 
 ## Adopted transition constraints
 
-- The 0.2.x line continues to use `macos-data`.
-- Version 0.3.x may introduce a trademark-neutral canonical command.
-- `macos-data` remains a documented compatibility alias through at least the
-  complete 0.3.x line.
-- Old and new command names must produce identical JSON, stdout/stderr routing,
-  and exit codes.
+- The complete 0.x line uses `macos-data` as its sole canonical command.
+- No new command alias or deprecation process is introduced during 0.x.
+- Naming is reviewed before the formal 1.0.0 release; review does not pre-commit
+  the project to a rename.
 - A CLI rename does not silently rename the stable
   `x-macos-data://external-id/` data contract. Any identifier-scheme change
   requires a separate design, migration command, and compatibility period.
@@ -99,18 +98,18 @@ putting `Mac` or `macOS` back into the product name. Apple's trademark list says
 it was updated on 2026-07-14; the current recheck still lists `Mac` and `macOS`
 as Apple marks and keeps compatibility wording separate from third-party product names.
 
-## Reusable 0.3 migration implementation
+## Reusable migration implementation for the 1.0.0 review
 
 After the name is approved:
 
 1. Install one approved canonical command and retain `macos-data` as a symlink
-   to the same signed binary through at least all of 0.3.x. Do not maintain two
+   to the same signed binary for an explicit compatibility period. Do not maintain two
    CLI implementations that can drift.
 2. Both invocations share one entry point and produce byte-identical JSON,
    stdout/stderr, and exit codes. Help uses the canonical name and documents the
    compatibility alias.
-3. Do not change the app bundle identifier, TCC identity, diagnostics directory,
-   reserved URL label, or `x-macos-data://external-id/` in 0.3.x. These are
+3. A rename must not silently change the app bundle identifier, TCC identity,
+   diagnostics directory, reserved URL label, or `x-macos-data://external-id/`. These are
    persistent identities or data contracts, not ordinary display names.
 4. The Homebrew Cask may initially retain its old token while installing both
    `xvk-data` and `macos-data`. Repository/Cask-token migration is a separate
@@ -118,7 +117,7 @@ After the name is approved:
 5. Add alias contract tests before changing build/install scripts. Cover
    `--version`, `--help`, successful JSON, failed JSON, and exit codes.
 
-Use this migration structure only after another name receives explicit approval;
+Use this migration structure only after the 1.0.0 review or a new ADR explicitly approves another name;
 do not default back to `xvk-data`.
 
 ## Remaining availability audit
@@ -135,6 +134,6 @@ do not default back to `xvk-data`.
   are checked, while crates.io and domains remain unconfirmed.
 - [ ] Test pronunciation, spelling, searchability, and command ergonomics with
   humans and Agents.
-- [ ] Approve one canonical name and record the decision in an ADR.
+- [x] Record the 0.x canonical command in an ADR: retain `macos-data` and review before 1.0.0.
 - [ ] Design and test alias installation, help/version output, shell completion,
   deprecation messaging, and rollback before changing the public command.

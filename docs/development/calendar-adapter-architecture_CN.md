@@ -1,7 +1,8 @@
 # Calendar adapter 0.3 架构
 
 Calendar adapter 使用 Apple 公共 EventKit，不读取 Calendar 私有数据库，也不依赖
-Calendar.app GUI 或 AppleScript。本文描述 0.3 开发分支 contract；它尚未代表已发布版本。
+Calendar.app GUI 或 AppleScript。本文定义 0.3.0 源码版本 contract；公开预编译分发状态
+另行记录。
 
 ## 权限和 source 选择
 
@@ -98,6 +99,7 @@ bash scripts/run_calendar_read_smoke.sh
 bash scripts/run_calendar_dry_run_smoke.sh
 bash scripts/run_local_calendar_integration.sh
 bash scripts/run_calendar_recurrence_integration.sh --confirm "CALENDAR RECURRENCE TEST"
+bash scripts/run_calendar_feature_integration.sh --confirm "CALENDAR FEATURE TEST"
 ```
 
 只读 smoke 只输出 source、calendar 和分页事件数量。dry-run smoke 的临时 JSON 存放在
@@ -112,3 +114,6 @@ bash scripts/run_local_calendar_integration.sh --with-writes --confirm "CALENDAR
 
 真实重复事件 gate 也已通过：6 次系列、Alarm 回读、紧邻幂等重试、`this`/`future` 编辑、
 `this`/`future` 删除和最终 URL fixture 数量为零。
+
+真实 feature gate 也已通过：全天 date-only 创建/编辑回读、相对 Alarm、替换为绝对 Alarm、
+清空 Alarm、拒绝非等价幂等重试、严格重叠、仅边界相接不冲突，以及最终 URL fixture 数量为零。

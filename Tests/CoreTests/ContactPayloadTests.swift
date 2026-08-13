@@ -190,8 +190,8 @@ final class ContactPayloadTests: XCTestCase {
         XCTAssertFalse(decoded.complete)
     }
 
-    func testCLIReleaseVersionIsMailAdapterRelease() {
-        XCTAssertEqual(CLIVersion.current, "0.2.0")
+    func testCLIReleaseVersionIsCalendarAdapterRelease() {
+        XCTAssertEqual(CLIVersion.current, "0.3.0")
     }
 
     func testCLIExitCodesAndErrorCodesAreStable() {

@@ -2,8 +2,8 @@
 
 The Calendar adapter uses Apple's public EventKit framework. It does not read
 Calendar's private database and does not use Calendar.app GUI automation or
-AppleScript. This document describes the 0.3 development contract; it is not a
-published-release claim.
+AppleScript. This document defines the 0.3.0 source-release contract. Public
+precompiled distribution status is documented separately.
 
 ## Permission and source selection
 
@@ -89,6 +89,7 @@ bash scripts/run_calendar_read_smoke.sh
 bash scripts/run_calendar_dry_run_smoke.sh
 bash scripts/run_local_calendar_integration.sh
 bash scripts/run_calendar_recurrence_integration.sh --confirm "CALENDAR RECURRENCE TEST"
+bash scripts/run_calendar_feature_integration.sh --confirm "CALENDAR FEATURE TEST"
 ```
 
 The read and dry-run smoke tests retain private JSON only in an auto-deleted
@@ -106,3 +107,10 @@ The separately confirmed recurrence gate creates six disposable occurrences,
 checks idempotent retry and alarm read-back, edits/deletes `this` and `future`
 scopes, and verifies complete cleanup. It has passed against the local iCloud
 Calendar and is never part of `swift test`.
+
+The separately confirmed feature gate creates only uniquely marked disposable
+events. It verifies all-day create/edit date-only read-back, relative alarm
+read-back, replacement by an absolute alarm, alarm clearing, one strict overlap,
+non-equivalent idempotent-create rejection, one adjacent non-overlap, and zero
+remaining fixture URLs. It has passed against
+the local iCloud Calendar and is never part of `swift test`.
