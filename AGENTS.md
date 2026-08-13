@@ -162,6 +162,9 @@ not assume a Homebrew or Release binary while development is in progress.
   boundaries, and zero remaining URL fixtures.
 - `run_calendar_read_smoke.sh` and `run_calendar_dry_run_smoke.sh` print aggregate
   status only and auto-delete private temporary JSON.
+- The default dry-run smoke must not select an arbitrary user event for edit or
+  delete preview. Those paths use separately authorized disposable-event gates;
+  a recurring occurrence may legitimately receive a new opaque ID in preview.
 
 ## Local verification
 

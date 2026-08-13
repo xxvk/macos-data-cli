@@ -43,6 +43,9 @@
 - Added a default no-apply 0.3.0 release gate covering version drift, 121 Swift
   tests, shared/Calendar contracts, Calendar read/dry-run smoke, Mail read-only
   smoke, Release build, signed Debug app verification, and diff validation.
+- Made the default Calendar dry-run smoke independent of existing user events.
+  Edit/delete preview coverage remains in disposable gates because EventKit may
+  detach a recurring occurrence and change its opaque ID while building preview.
 - Extended the installed-release smoke with Calendar help and stable-error checks;
   the locally installed Homebrew-prefix binary reports 0.3.0 and passes.
 

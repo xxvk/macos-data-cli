@@ -35,16 +35,9 @@ jq -e '.ok == true and .data.event.allDay == true and .data.event.startDate == "
 jq -e '.ok == true and (.data.checkedEventCount | type == "number") and (.data.conflicts | type == "array")' "$TMP_DIR/conflicts.json" >/dev/null
 
 "$CLI" calendar query --start "$QUERY_START" --end "$QUERY_END" --limit 1 --format json >"$TMP_DIR/query.json"
-event_id="$(jq -r '.data.items[0].id // empty' "$TMP_DIR/query.json")"
+jq -e '.ok == true and (.data.items | type == "array")' "$TMP_DIR/query.json" >/dev/null
 
-if [[ -n "$event_id" ]]; then
-  printf '%s' '{"title":"macos-data Calendar edit dry-run preview"}' >"$TMP_DIR/patch.json"
-  "$CLI" calendar edit --id "$event_id" --input "$TMP_DIR/patch.json" --dry-run --span this --format json >"$TMP_DIR/edit-preview.json"
-  jq -e '.ok == true and .data.operation == "update_preview" and .data.dryRun == true and .data.before.id == .data.after.id' "$TMP_DIR/edit-preview.json" >/dev/null
-
-  "$CLI" calendar delete --id "$event_id" --dry-run --span this --format json >"$TMP_DIR/delete-preview.json"
-  jq -e '.ok == true and .data.operation == "delete_preview" and .data.dryRun == true' "$TMP_DIR/delete-preview.json" >/dev/null
-  echo "Calendar dry-run smoke passed: create=passed edit=passed delete=passed"
-else
-  echo "Calendar dry-run smoke passed: create=passed edit=skipped delete=skipped reason=no_event_in_bounded_window"
-fi
+# Do not use an arbitrary user event as an edit/delete dry-run fixture. EventKit
+# can detach a recurring occurrence while building a preview and change its opaque
+# ID even though no save occurs. Disposable real-write gates cover those paths.
+echo "Calendar dry-run smoke passed: create=passed query=passed conflicts=passed edit=separate_disposable_gate delete=separate_disposable_gate"
