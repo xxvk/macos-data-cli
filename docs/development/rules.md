@@ -28,6 +28,22 @@ bash scripts/run_cli_contract_tests.sh
 
 This suite is local-only and does not write or delete Contacts records.
 
+Calendar 0.3 has separate process-contract, read-only, and dry-run gates:
+
+```bash
+bash scripts/run_calendar_contract_tests.sh
+bash scripts/run_calendar_read_smoke.sh
+bash scripts/run_calendar_dry_run_smoke.sh
+bash scripts/run_local_calendar_integration.sh
+```
+
+They do not save Calendar changes. A real Calendar CRUD gate requires separate
+explicit authorization and may operate only on one disposable event through
+create, read-back, edit, read-back, delete, and absence verification.
+The real gate also requires `--with-writes --confirm "CALENDAR CRUD TEST"`;
+that command-line phrase does not replace explicit user authorization for the
+current task.
+
 Only when explicitly validating real writes, run the disposable-contact path:
 
 ```bash
@@ -75,6 +91,36 @@ fixtures.
   are redacted before being written to `~/Library/Logs/macos-data-cli/diagnostics.log`.
 - Diagnostics must not include names, organizations, postal addresses, avatar
   bytes, or full JSON contact payloads.
+
+## Calendar contract (0.3)
+
+- Use only Apple's public EventKit framework; never read Calendar's private database.
+- Reads require `fullAccess`; not-determined, denied, restricted, and write-only
+  states produce distinct stable errors.
+- Default and explicit source selection must resolve to one unique iCloud CalDAV
+  source and must never silently fall back to another account.
+- Queries require ordered start/end values, a range of at most 366 days, and a
+  limit from 1 through 200.
+- Source, calendar, `calevent_`, and cursor IDs are machine-local opaque values.
+- A `calevent_` ID binds a calendar item and occurrence start so recurring-event
+  mutations do not accidentally target the first occurrence.
+- Create, edit, and delete require `--dry-run` or `--apply`; delete apply also
+  requires `--confirm "DELETE EVENT"`.
+- Recurring edit/delete requires `--span this` or `--span future`.
+- Attendees are read-only in 0.3. The adapter does not send invitations and
+  rejects non-empty attendee input.
+- Timed Calendar dates are ISO 8601; all-day events use date-only `YYYY-MM-DD`
+  with an exclusive end date. Time zones use valid IANA identifiers.
+- Each alarm uses exactly one relative or absolute trigger. `alarms: []` clears
+  alarms, and create removes inherited default alarms before applying JSON.
+- Calendar `create --idempotent` uses an opaque, privacy-minimized 60-second
+  receipt for immediate process retries. It must not persist event text.
+- Conflict scans are capped at 200 events; adjacent boundaries are not conflicts.
+- Dry-run private JSON remains in auto-deleted mode-700 temporary directories;
+  tests do not print titles, attendees, locations, URLs, or notes.
+- Real apply tests never modify existing user events and use only a disposable fixture.
+- The recurring real gate must verify `this` and `future` mutation scope and
+  remove every occurrence even when an intermediate assertion fails.
 
 ## Codex authorization and Computer Use
 

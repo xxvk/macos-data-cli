@@ -4,7 +4,7 @@
 
 ## Unified resources
 
-List the currently discoverable Contacts and Mail resource scopes in one
+List the currently discoverable Contacts, Mail, and Calendar resource scopes in one
 machine-readable response:
 
 ```text
@@ -16,8 +16,50 @@ Each resource reports an adapter-owned opaque `id`, `kind`, `provider`,
 `permission`). Contacts selection reflects the verified iCloud container.
 Mail account scopes are intentionally not selected merely because one account
 exists; the preferred `aim-tech.jp` work account still requires explicit,
-privacy-safe verification. Calendar is not implemented in 0.2 and appears in
-`data.limitations` as `calendar_adapter_not_implemented`.
+privacy-safe verification. With full access, Calendar reports EventKit sources
+and selects only the uniquely verified iCloud CalDAV source.
+
+## Calendar (0.3 development)
+
+```text
+macos-data calendar permission --format json
+macos-data calendar sources --format json
+macos-data calendar calendars --format json
+macos-data calendar query --start <iso8601> --end <iso8601> [--calendar <id|unique-title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
+macos-data calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|unique-title>] --format json
+macos-data calendar get --id <calevent-id> --format json
+macos-data calendar create --input event.json --dry-run|--apply [--idempotent] --format json
+macos-data calendar edit --id <id> --input patch.json --dry-run|--apply [--span this|future] --format json
+macos-data calendar delete --id <id> --dry-run [--span this|future] --format json
+macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+```
+
+Reads require EventKit full access; write-only access is insufficient. The
+default is the unique iCloud CalDAV source and the adapter never silently falls
+back to Local, Exchange, Google, or another account. Query ranges must be ordered
+and no longer than 366 days. Results use bounded opaque-cursor pagination.
+
+Dates are ISO 8601 and time zones are IANA identifiers. A minimal create JSON
+contains `title`, `startDate`, and `endDate`; `allDay` defaults to false.
+Attendees are returned by reads but are not writable in 0.3. Recurrence supports
+frequency, interval, weekdays, ordinal weekdays, positional fields, and one end
+condition. Recurring edit/delete requires an explicit `this` or `future` span.
+
+Alarms use an `alarms` array. Each item has exactly one of `relativeMinutes`
+(negative means before start) or `absoluteDate`; an empty array clears alarms.
+Create removes EventKit-inherited default alarms before applying JSON. All-day
+events use `YYYY-MM-DD` with an exclusive end date instead of timestamps.
+
+`--idempotent` uses a request fingerprint and a 60-second local receipt to cover
+immediate Agent retries. Receipts contain only the fingerprint, opaque event and
+calendar IDs, and a timestamp; no title, notes, or location. Edit/delete invalidates
+matching receipts. `calendar conflicts` detects strict overlaps across at most 200
+events; adjacent events are not conflicts.
+
+The returned `calevent_` ID binds the local calendar item and occurrence start.
+Treat it as opaque; moving an event can return a new ID. See the
+[Calendar architecture](development/calendar-adapter-architecture.md) for the
+full JSON and safety contract.
 
 ## Mail (0.2)
 

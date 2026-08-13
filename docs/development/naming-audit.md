@@ -1,7 +1,9 @@
 # CLI naming and compatibility audit
 
-Status: initial candidate inventory and exact-name audit completed on 2026-07-23.
-No rename has been approved.
+Status: the second candidate, similar-name, and common package-registry audit
+was completed on 2026-08-14. The project owner explicitly rejected `xvk-data`.
+There is currently no approved or recommended canonical replacement, and no
+rename has been implemented.
 
 ## Adopted transition constraints
 
@@ -74,20 +76,65 @@ The initial shortlist is therefore `xvk-data`, `system-data`, and `agent-data`.
 None is approved. Additional distinctive candidates should be generated before
 selection; exact-name availability alone is not enough.
 
+## Second-round shortlist (2026-08-14)
+
+The second round added `xvk-native`, `native-relay`, `framebridge`, `hostscope`,
+and `nativeport`, then checked Homebrew, GitHub name search, npm, PyPI, and the
+local command namespace. crates.io returned 403 to the automated status check,
+so Rust crate availability remains unconfirmed. These checks are not a formal
+trademark clearance.
+
+| Candidate | Result | Assessment |
+| --- | --- | --- |
+| `xvk-data` | No exact Homebrew, GitHub, npm, PyPI, or local-command match | **Rejected**: the project owner does not accept a maintainer namespace as the product name |
+| `xvk-native` | Same exact-name result | Alternative; `native` describes implementation less clearly than system data |
+| `native-relay` | No exact match, but many React Native and network-relay near matches | Reject: noisy search results and likely network-relay confusion |
+| `framebridge` | Multiple exact GitHub repository matches | Reject |
+| `hostscope` | Exact GitHub repository matches | Reject |
+| `nativeport` | Case-insensitive exact GitHub repository matches | Reject |
+
+`xvk-data` is removed from subsequent shortlists. Platform capability should
+still live in a subtitle, such as “a native data CLI for macOS,” rather than
+putting `Mac` or `macOS` back into the product name. Apple's trademark list says
+it was updated on 2026-07-14; the current recheck still lists `Mac` and `macOS`
+as Apple marks and keeps compatibility wording separate from third-party product names.
+
+## Reusable 0.3 migration implementation
+
+After the name is approved:
+
+1. Install one approved canonical command and retain `macos-data` as a symlink
+   to the same signed binary through at least all of 0.3.x. Do not maintain two
+   CLI implementations that can drift.
+2. Both invocations share one entry point and produce byte-identical JSON,
+   stdout/stderr, and exit codes. Help uses the canonical name and documents the
+   compatibility alias.
+3. Do not change the app bundle identifier, TCC identity, diagnostics directory,
+   reserved URL label, or `x-macos-data://external-id/` in 0.3.x. These are
+   persistent identities or data contracts, not ordinary display names.
+4. The Homebrew Cask may initially retain its old token while installing both
+   `xvk-data` and `macos-data`. Repository/Cask-token migration is a separate
+   step so command, TCC, and distribution identities do not all change at once.
+5. Add alias contract tests before changing build/install scripts. Cover
+   `--version`, `--help`, successful JSON, failed JSON, and exit codes.
+
+Use this migration structure only after another name receives explicit approval;
+do not default back to `xvk-data`.
+
 ## Remaining availability audit
 
 - [x] Check exact Homebrew Formula and Cask names.
 - [x] Check exact public GitHub repository names.
 - [x] Check the current local executable namespace.
-- [ ] Generate additional distinctive candidates that contain no Apple marks.
-- [ ] Check confusingly similar GitHub and Homebrew names, not only exact names.
+- [x] Generate additional distinctive candidates that contain no Apple marks.
+- [x] Check confusingly similar GitHub and Homebrew names, not only exact names.
 - [ ] Check relevant trademark registries and obtain legal review if the project
   grows beyond an experimental open-source tool.
 - [ ] Check repository, Homebrew Cask, common package registry, and practical
-  domain availability for the final shortlist.
+  domain availability for the final shortlist; repository, Cask, npm, and PyPI
+  are checked, while crates.io and domains remain unconfirmed.
 - [ ] Test pronunciation, spelling, searchability, and command ergonomics with
   humans and Agents.
 - [ ] Approve one canonical name and record the decision in an ADR.
 - [ ] Design and test alias installation, help/version output, shell completion,
   deprecation messaging, and rollback before changing the public command.
-

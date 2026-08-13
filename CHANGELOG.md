@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased — 0.3.0 development
+
+### Added
+
+- Added the EventKit Calendar adapter with full-access permission handling,
+  fail-closed unique iCloud CalDAV source selection, calendar discovery, bounded
+  event query, and targeted get.
+- Added ISO 8601 Calendar JSON, IANA time zones, attendees/status reads, complete
+  recurrence fields including ordinal weekdays, and opaque occurrence-aware
+  `calevent_` IDs.
+- Added create/edit/delete dry-run and apply paths. Delete apply requires
+  `DELETE EVENT`; recurring edits and deletes require an explicit `this` or
+  `future` span. Attendee writes remain unsupported.
+- Added relative and absolute EventKit alarms for read/create/edit/clear, with
+  inherited calendar defaults removed before applying an explicit create payload.
+- Added date-only `YYYY-MM-DD` input/output for floating all-day events, including
+  time-zone and daylight-saving boundary tests.
+- Added opt-in Calendar `create --idempotent` with a privacy-minimized 60-second
+  local receipt for immediate cross-process retries, plus exact visible-event
+  matching and fail-closed conflict handling.
+- Added bounded `calendar conflicts` overlap detection. Adjacent event boundaries
+  are not conflicts, and scans over 200 events fail closed.
+- Added Calendar unit tests, process-level negative contract tests, a privacy-safe
+  read smoke, and create/edit/delete dry-run smoke. The explicitly authorized
+  disposable-event real apply integration passed create/read/edit/read/delete and
+  final-absence verification against the local iCloud Calendar.
+- Added an explicitly authorized six-occurrence iCloud integration gate covering
+  alarm read-back, immediate idempotent retry, detached `this` edits/deletes,
+  `future` edits/deletes, and complete fixture cleanup.
+
 ## 0.2.0 — 2026-07-23
 
 ### Added

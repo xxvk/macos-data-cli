@@ -111,6 +111,8 @@
 
 ### 0.3：Calendar adapter
 
+架构决策：[Calendar adapter 0.3 中文说明](docs/development/calendar-adapter-architecture_CN.md)。
+
 - [ ] 根据 Apple 最新命名和商标规范重新审视公开 CLI 与项目名称。如果决定采用更中性的
   名称，应把它作为新的 canonical command，同时至少在整个 0.3.x 周期保留
   `macos-data` 兼容别名。明确二进制、Homebrew Cask、仓库与文档、help/version 输出和
@@ -118,11 +120,16 @@
   静默修改稳定的 `x-macos-data://external-id/` 数据 contract；identifier scheme 如需迁移，
   必须另立设计和迁移命令。已确认的过渡约束、首轮候选和可用性证据维护在
   [`docs/development/naming-audit_CN.md`](docs/development/naming-audit_CN.md)。
-- [ ] 基于 EventKit 访问日历和事件
-- [ ] 支持日历、事件、时间、地点、参与者和备注
-- [ ] 支持事件查询、创建、更新和删除
-- [ ] 支持时区和重复事件的明确表达
-- [ ] 支持 dry-run、JSON contract 和权限检查
+- [x] 基于 EventKit 访问日历和事件；本机 full-access 授权和隐私安全只读 smoke 已通过
+- [x] 支持日历、事件、时间、地点、参与者和备注；参与者在 0.3 明确保持只读
+- [x] 支持事件查询、创建、更新和删除
+  - 查询、get、create/edit/delete 代码路径与 dry-run 已实现
+  - `calevent_` 使用 calendar item + occurrence start 精确定位周期 occurrence
+  - 一次性事件 create → read-back → edit → read-back → delete → absence verification 已在本机 iCloud Calendar 通过
+  - Alarm、全天 date-only、60 秒隐私最小化幂等 receipt、冲突检测已实现
+  - 真实 6-occurrence gate 已覆盖幂等重试、Alarm、this/future 编辑删除和最终清理
+- [x] 支持时区和重复事件的明确表达，包括 IANA time zone、周期结束和 ordinal weekday
+- [x] 支持 dry-run、JSON contract、full-access 权限检查、稳定错误码和 Calendar exit 5
 
 ### 0.4：Reminders adapter
 

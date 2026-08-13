@@ -87,6 +87,8 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
 
 ### 0.3: Calendar adapter
 
+Architecture: [Calendar adapter 0.3](docs/development/calendar-adapter-architecture.md).
+
 - [ ] Re-audit the public CLI and project name against Apple's current naming
   and trademark guidelines. If a more neutral name is adopted, introduce it as
   the canonical command while keeping `macos-data` as a documented compatibility
@@ -98,11 +100,19 @@ Architecture decision: [Mail adapter 0.2.0](docs/development/mail-adapter-archit
   The adopted transition constraints, initial candidates, and availability
   evidence are maintained in
   [`docs/development/naming-audit.md`](docs/development/naming-audit.md).
-- [ ] Use EventKit to access calendars and events
-- [ ] Support calendars, events, times, locations, attendees, and notes
-- [ ] Support event query, creation, update, and deletion
-- [ ] Represent time zones and recurring events explicitly
-- [ ] Include dry-run, the JSON contract, and authorization checks
+- [x] Use EventKit to access calendars and events; local full-access authorization
+  and the privacy-safe read smoke pass
+- [x] Support calendars, events, times, locations, attendees, and notes; attendees
+  remain explicitly read-only in 0.3
+- [x] Support event query, creation, update, and deletion
+  - Query, get, create/edit/delete code paths and dry-runs are implemented
+  - `calevent_` binds a calendar item and occurrence start for precise recurrence selection
+  - The disposable-event create/read/edit/read/delete/absence gate passed against the local iCloud Calendar
+  - Alarms, all-day date-only values, a privacy-minimized 60-second idempotency receipt, and conflict detection are implemented
+  - A real six-occurrence gate covers immediate retry, alarms, this/future edits and deletes, and final cleanup
+- [x] Represent IANA time zones and recurring events, including recurrence ends
+  and ordinal weekdays, explicitly
+- [x] Include dry-run, the JSON contract, full-access checks, stable errors, and Calendar exit 5
 
 ### 0.4: Reminders adapter
 

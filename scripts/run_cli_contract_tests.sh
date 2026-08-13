@@ -65,6 +65,17 @@ for unsupported_mail_command in send draft reply forward move archive delete fla
 done
 run_expected_failure idempotency-conflict 2 "$CLI" contacts create --stdin --apply --idempotent --format json <<<'{"kind":"organization","externalID":"xvk-test-organizations-001","organizationName":"intentional-conflict"}'
 run_expected_failure avatar-replace-missing-confirmation 2 "$CLI" contacts avatar replace --external-id xvk-test-contacts-001 --image "$ROOT_DIR/docs/development/icon1.png" --apply --format json
+run_expected_failure calendar-query-missing-range 5 "$CLI" calendar query --format json
+run_expected_failure calendar-query-invalid-range 5 "$CLI" calendar query --start 2026-08-15T00:00:00Z --end 2026-08-14T00:00:00Z --format json
+run_expected_failure calendar-delete-missing-confirmation 5 "$CLI" calendar delete --id calevent_invalid --apply --format json
+run_expected_failure calendar-delete-invalid-span 5 "$CLI" calendar delete --id calevent_invalid --dry-run --span all --format json
+
+set +e
+printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1
+calendar_empty_code=$?
+set -e
+[[ "$calendar_empty_code" -eq 5 ]] || { cat "$TMP_DIR/calendar-empty-stdin.out" >&2; exit 1; }
+assert_contains "$TMP_DIR/calendar-empty-stdin.out" '"CALENDAR_INVALID_INPUT"'
 
 "$CLI" contacts avatar verify --external-id xvk-test-contacts-001 --format json >"$TMP_DIR/avatar-verify.out"
 assert_contains "$TMP_DIR/avatar-verify.out" '"status"[[:space:]]*:[[:space:]]*"(readback_confirmed|verification_unknown|not_available)"'

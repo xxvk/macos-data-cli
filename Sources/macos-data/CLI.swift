@@ -3,6 +3,7 @@ import Core
 import Contacts
 import ContactsAdapter
 import MailAdapter
+import CalendarAdapter
 
 @main
 struct MacosDataCLI {
@@ -20,7 +21,17 @@ struct MacosDataCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] {
+        var calendarSourceSelector: String?
+        if arguments.first == "calendar", let index = arguments.firstIndex(of: "--source") {
+            guard index + 1 < arguments.count else {
+                report(error: "--source requires iCloud or a source identifier", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.usage.rawValue)
+                Foundation.exit(CLIExitCode.usage.rawValue)
+            }
+            calendarSourceSelector = arguments[index + 1]
+            arguments.removeSubrange(index...(index + 1))
+        }
+
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] {
             printHelp()
             return
         }
@@ -33,9 +44,59 @@ struct MacosDataCLI {
         do {
             let permission = ContactsPermission()
             let store = ContactsStore(permission: permission, containerSelector: containerSelector)
+            let calendarPermission = CalendarPermission()
+            let calendarStore = CalendarStore(permission: calendarPermission, sourceSelector: calendarSourceSelector)
             switch arguments {
             case ["resources"]:
-                emitJSONSuccess(makeResourcesResult(permission: permission, store: store))
+                emitJSONSuccess(makeResourcesResult(permission: permission, store: store, calendarPermission: calendarPermission, calendarStore: calendarStore))
+            case ["calendar", "permission"]:
+                let granted = try await calendarPermission.requestFullAccess()
+                if jsonRequested { emitJSONSuccess(CalendarPermissionResult(granted: granted, access: calendarPermission.status.rawValue)) }
+                else { print(granted ? "Calendar full access granted." : "Calendar full access not granted.") }
+                if !granted { Foundation.exit(CLIExitCode.calendarFailure.rawValue) }
+            case ["calendar", "sources"]:
+                emitJSONSuccess(try calendarStore.sourceDescriptions())
+            case ["calendar", "calendars"]:
+                emitJSONSuccess(try calendarStore.calendarDescriptions())
+            case let args where args.count >= 2 && args[0] == "calendar" && args[1] == "query":
+                emitCalendarJSONSuccess(try calendarStore.query(parseCalendarQuery(Array(args.dropFirst(2)))))
+            case let args where args.count >= 2 && args[0] == "calendar" && args[1] == "conflicts":
+                emitCalendarJSONSuccess(try calendarStore.conflicts(parseCalendarConflicts(Array(args.dropFirst(2)))))
+            case let args where args.count == 4 && args[0] == "calendar" && args[1] == "get" && args[2] == "--id":
+                emitCalendarJSONSuccess(try calendarStore.get(id: args[3]))
+            case let args where args.count >= 3 && args[0] == "calendar" && args[1] == "create":
+                let request = try parseCalendarWriteArguments(Array(args.dropFirst(2)), command: "create", allowsSpan: false)
+                let input: CalendarEventInput = try decodeCalendar(request.data)
+                if request.idempotent {
+                    let result = try calendarStore.createIdempotent(input, dryRun: request.mode == "--dry-run")
+                    emitCalendarJSONSuccess(CalendarWriteResult(
+                        operation: result.created ? (request.mode == "--dry-run" ? "create_preview" : "created") : "existing",
+                        dryRun: request.mode == "--dry-run",
+                        event: result.event
+                    ))
+                } else if request.mode == "--dry-run" {
+                    emitCalendarJSONSuccess(CalendarWriteResult(operation: "create_preview", dryRun: true, event: try calendarStore.previewCreate(input)))
+                } else {
+                    emitCalendarJSONSuccess(CalendarWriteResult(operation: "created", dryRun: false, event: try calendarStore.create(input)))
+                }
+            case let args where args.count >= 5 && args[0] == "calendar" && args[1] == "edit" && args[2] == "--id":
+                let id = args[3]
+                let request = try parseCalendarWriteArguments(Array(args.dropFirst(4)), command: "edit", allowsSpan: true)
+                let patch: CalendarEventPatch = try decodeCalendar(request.data)
+                if request.mode == "--dry-run" {
+                    let before = try calendarStore.get(id: id)
+                    let after = try calendarStore.previewUpdate(id: id, patch: patch, span: request.span)
+                    emitCalendarJSONSuccess(CalendarUpdatePreview(operation: "update_preview", dryRun: true, before: before, after: after))
+                } else {
+                    emitCalendarJSONSuccess(CalendarWriteResult(operation: "updated", dryRun: false, event: try calendarStore.update(id: id, patch: patch, span: request.span)))
+                }
+            case let args where args.count >= 5 && args[0] == "calendar" && args[1] == "delete" && args[2] == "--id":
+                let request = try parseCalendarDeleteArguments(Array(args.dropFirst(4)))
+                if request.apply {
+                    emitCalendarJSONSuccess(CalendarWriteResult(operation: "deleted", dryRun: false, event: try calendarStore.delete(id: args[3], span: request.span)))
+                } else {
+                    emitCalendarJSONSuccess(CalendarWriteResult(operation: "delete_preview", dryRun: true, event: try calendarStore.previewDelete(id: args[3], span: request.span)))
+                }
             case ["mail", "doctor"]:
                 emitJSONSuccess(MailDoctor().run())
             case ["mail", "accounts"]:
@@ -233,6 +294,12 @@ struct MacosDataCLI {
         } catch let error as MailStoreError {
             report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.mailFailure.rawValue)
             Foundation.exit(CLIExitCode.mailFailure.rawValue)
+        } catch let error as CalendarError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
+            Foundation.exit(CLIExitCode.calendarFailure.rawValue)
+        } catch let error as PaginationError {
+            report(error: error == .invalidLimit ? "Calendar limit must be between 1 and 200." : "Calendar cursor is invalid or stale.", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
+            Foundation.exit(CLIExitCode.calendarFailure.rawValue)
         } catch {
             report(error: error.localizedDescription, code: CLIErrorCode.cli.rawValue, arguments: rawArguments, exitCode: CLIExitCode.genericFailure.rawValue)
             Foundation.exit(CLIExitCode.genericFailure.rawValue)
@@ -256,9 +323,19 @@ struct MacosDataCLI {
     private struct ContactAlreadyDeletedResult: Encodable { let operation = "already_deleted"; let externalID: String }
     private struct MigrationPreview: Encodable { let from: String; let to: String; let dryRun: Bool; let message: String? }
     private struct MigrationResult: Encodable { let from: String; let to: String; let contact: ContactPayload }
+    private struct CalendarWriteResult: Encodable { let operation: String; let dryRun: Bool; let event: CalendarEventPayload }
+    private struct CalendarUpdatePreview: Encodable { let operation: String; let dryRun: Bool; let before: CalendarEventPayload; let after: CalendarEventPayload }
+    private struct CalendarPermissionResult: Encodable { let granted: Bool; let access: String }
 
     private static func emitJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) { print(text) }
+    }
+
+    private static func emitCalendarJSONSuccess<T: Encodable>(_ value: T) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
         if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) { print(text) }
     }
 
@@ -313,6 +390,161 @@ struct MacosDataCLI {
             throw ContactsError.invalidInput("\(command) JSON input is empty")
         }
         return (data, mode, idempotent)
+    }
+
+    private struct CalendarWriteArguments {
+        let data: Data
+        let mode: String
+        let span: CalendarMutationSpan?
+        let idempotent: Bool
+    }
+
+    private static func parseCalendarWriteArguments(
+        _ arguments: [String],
+        command: String,
+        allowsSpan: Bool
+    ) throws -> CalendarWriteArguments {
+        var inputSource: String?
+        var mode: String?
+        var span: CalendarMutationSpan?
+        var idempotent = false
+        var index = 0
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--input":
+                guard inputSource == nil, index + 1 < arguments.count else { throw CalendarError.invalidInput("\(command) accepts exactly one JSON source") }
+                inputSource = arguments[index + 1]
+                index += 2
+            case "--stdin":
+                guard inputSource == nil else { throw CalendarError.invalidInput("\(command) accepts exactly one JSON source") }
+                inputSource = "-"
+                index += 1
+            case "--dry-run", "--apply":
+                guard mode == nil else { throw CalendarError.invalidInput("\(command) accepts exactly one of --dry-run or --apply") }
+                mode = arguments[index]
+                index += 1
+            case "--span":
+                guard allowsSpan, span == nil, index + 1 < arguments.count,
+                      let value = CalendarMutationSpan(rawValue: arguments[index + 1]) else {
+                    throw CalendarError.invalidInput("--span requires this or future")
+                }
+                span = value
+                index += 2
+            case "--idempotent":
+                guard command == "create", !idempotent else { throw CalendarError.invalidInput("--idempotent is supported only by create") }
+                idempotent = true
+                index += 1
+            default:
+                throw CalendarError.invalidInput("unsupported \(command) option: \(arguments[index])")
+            }
+        }
+        guard let inputSource, let mode else {
+            throw CalendarError.invalidInput("\(command) requires JSON input (--input <file> or --stdin) and --dry-run or --apply")
+        }
+        let data = inputSource == "-"
+            ? FileHandle.standardInput.readDataToEndOfFile()
+            : try Data(contentsOf: URL(fileURLWithPath: inputSource))
+        guard !data.isEmpty else { throw CalendarError.invalidInput("\(command) JSON input is empty") }
+        return CalendarWriteArguments(data: data, mode: mode, span: span, idempotent: idempotent)
+    }
+
+    private static func parseCalendarDeleteArguments(_ arguments: [String]) throws -> (apply: Bool, span: CalendarMutationSpan?) {
+        var apply: Bool?
+        var confirmed = false
+        var span: CalendarMutationSpan?
+        var index = 0
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--dry-run":
+                guard apply == nil else { throw CalendarError.invalidInput("delete accepts exactly one of --dry-run or --apply") }
+                apply = false
+                index += 1
+            case "--apply":
+                guard apply == nil else { throw CalendarError.invalidInput("delete accepts exactly one of --dry-run or --apply") }
+                apply = true
+                index += 1
+            case "--confirm":
+                guard index + 1 < arguments.count, arguments[index + 1] == "DELETE EVENT" else {
+                    throw CalendarError.invalidInput("delete apply requires --confirm \"DELETE EVENT\"")
+                }
+                confirmed = true
+                index += 2
+            case "--span":
+                guard span == nil, index + 1 < arguments.count, let value = CalendarMutationSpan(rawValue: arguments[index + 1]) else {
+                    throw CalendarError.invalidInput("--span requires this or future")
+                }
+                span = value
+                index += 2
+            default:
+                throw CalendarError.invalidInput("unsupported delete option: \(arguments[index])")
+            }
+        }
+        guard let apply else { throw CalendarError.invalidInput("delete requires --dry-run or --apply") }
+        guard !apply || confirmed else { throw CalendarError.invalidInput("delete apply requires --confirm \"DELETE EVENT\"") }
+        guard apply || !confirmed else { throw CalendarError.invalidInput("--confirm is valid only with --apply") }
+        return (apply, span)
+    }
+
+    private static func calendarDecoder() -> JSONDecoder {
+        CalendarJSON.decoder()
+    }
+
+    private static func decodeCalendar<T: Decodable>(_ data: Data) throws -> T {
+        do { return try calendarDecoder().decode(T.self, from: data) }
+        catch { throw CalendarError.invalidInput("JSON does not match the Calendar contract") }
+    }
+
+    private static func parseCalendarQuery(_ arguments: [String]) throws -> CalendarEventQuery {
+        var startDate: Date?
+        var endDate: Date?
+        var calendarID: String?
+        var title: String?
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--start", "--end", "--calendar", "--title", "--limit", "--cursor"].contains(option),
+                  seen.insert(option).inserted, index + 1 < arguments.count else {
+                throw CalendarError.invalidInput("calendar query accepts --start, --end, --calendar, --title, --limit, and --cursor")
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--start": startDate = try parseCalendarDate(value, option: option)
+            case "--end": endDate = try parseCalendarDate(value, option: option)
+            case "--calendar": calendarID = value
+            case "--title": title = value
+            case "--limit": guard let parsed = Int(value) else { throw CalendarError.invalidInput("--limit requires an integer") }; limit = parsed
+            case "--cursor": cursor = value
+            default: break
+            }
+            index += 2
+        }
+        guard let startDate, let endDate else { throw CalendarError.invalidInput("calendar query requires --start and --end") }
+        do { return try CalendarEventQuery(startDate: startDate, endDate: endDate, calendarID: calendarID, title: title, limit: limit, cursor: cursor) }
+        catch let error as PaginationError { throw error }
+    }
+
+    private static func parseCalendarConflicts(_ arguments: [String]) throws -> CalendarEventQuery {
+        var forwarded: [String] = []
+        var index = 0
+        while index < arguments.count {
+            guard ["--start", "--end", "--calendar"].contains(arguments[index]), index + 1 < arguments.count else {
+                throw CalendarError.invalidInput("calendar conflicts accepts --start, --end, and --calendar")
+            }
+            forwarded.append(contentsOf: [arguments[index], arguments[index + 1]])
+            index += 2
+        }
+        return try parseCalendarQuery(forwarded)
+    }
+
+    private static func parseCalendarDate(_ value: String, option: String) throws -> Date {
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
+        if let date = formatter.date(from: value) { return date }
+        throw CalendarError.invalidInput("\(option) requires ISO 8601, for example 2026-08-14T09:00:00+09:00")
     }
 
     private static func parseQuerySet(_ arguments: [String]) throws -> ContactQuerySet {
@@ -479,7 +711,9 @@ struct MacosDataCLI {
 
     private static func makeResourcesResult(
         permission: ContactsPermission,
-        store: ContactsStore
+        store: ContactsStore,
+        calendarPermission: CalendarPermission,
+        calendarStore: CalendarStore
     ) -> DataResourcesResult {
         var resources: [DataResource] = []
         var limitations: [String] = []
@@ -516,7 +750,25 @@ struct MacosDataCLI {
             limitations.append("mail_resource_discovery_unavailable")
         }
 
-        limitations.append("calendar_adapter_not_implemented")
+        switch calendarPermission.status {
+        case .fullAccess:
+            do {
+                let result = try calendarStore.sourceDescriptions()
+                resources.append(contentsOf: result.sources.map {
+                    CalendarResourceMapper.map($0, selected: $0.identifier == result.selectedSourceID, permission: .available)
+                })
+            } catch {
+                limitations.append("calendar_resource_discovery_failed")
+            }
+        case .notDetermined:
+            limitations.append("calendar_permission_not_determined")
+        case .denied:
+            limitations.append("calendar_permission_denied")
+        case .restricted:
+            limitations.append("calendar_permission_restricted")
+        case .writeOnly:
+            limitations.append("calendar_full_access_required")
+        }
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
 
@@ -656,11 +908,42 @@ struct MacosDataCLI {
           macos-data resources --format json
           macos-data contacts <command> [options]
           macos-data mail <command> [options]
+          macos-data calendar <command> [options]
 
         Unified resources:
-          resources --format json                List Contacts and Mail resources
+          resources --format json                List Contacts, Mail, and Calendar resources
                                              with selection, permission, and limitations
-                                             Calendar is reported as not implemented
+
+        Calendar commands:
+          permission                         Request full Calendar access
+          sources --format json              List EventKit sources and selected iCloud source
+          calendars --format json            List calendars in the selected iCloud source
+          query --start <iso8601> --end <iso8601>
+            [--calendar <id|title>] [--title <text>]
+            [--limit <1...200>] [--cursor <cursor>] --format json
+                                             Query a bounded event page
+          conflicts --start <iso8601> --end <iso8601> [--calendar <id|title>]
+                                             Detect strict event-time overlaps (max 200 events)
+          get --id <event-id> --format json  Read one event
+          create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+                                             Create an event in an iCloud calendar
+          edit --id <event-id> --input <file>|--stdin --dry-run|--apply
+            [--span this|future] --format json
+                                             Update one event or future recurrence instances
+          delete --id <event-id> --dry-run [--span this|future] --format json
+          delete --id <event-id> --apply --confirm "DELETE EVENT"
+            [--span this|future] --format json
+                                             Delete one event or future recurrence instances
+
+        Calendar selection and data:
+          Add --source iCloud or --source <source-identifier> to a Calendar
+          command. The default is the unique verified iCloud CalDAV source.
+          Query accepts --calendar <identifier|title>. Create accepts calendarID
+          in JSON; without it, the writable iCloud default calendar is used.
+          Dates use ISO 8601. timeZone uses an IANA identifier such as Asia/Tokyo.
+          All-day create/edit uses YYYY-MM-DD with an exclusive end date.
+          alarms accepts relativeMinutes or absoluteDate; [] clears all alarms.
+          Attendees are returned by reads but are read-only in 0.3.
 
         Mail commands:
           doctor --format json               Inspect Mail store, schema, and permissions
@@ -736,7 +1019,7 @@ struct MacosDataCLI {
         JSON contract:
           Version: 0.1 (independent from the CLI release version)
           Exit codes: 0 success, 1 unexpected CLI error, 2 Contacts error,
-            3 ambiguous/not-found query error, 4 Mail error,
+            3 ambiguous/not-found query error, 4 Mail error, 5 Calendar error,
             64 usage or invalid query
           Success: {"ok": true, "contractVersion": "0.1", "data": ...}
           Failure: {"ok": false, "contractVersion": "0.1", "error": {"code": ..., "message": ...}}
@@ -746,7 +1029,9 @@ struct MacosDataCLI {
           Mail.app metadata fallback is limited to 25 message candidates,
             always incomplete, and has no cursor; raw remains cache-only.
           Contacts writes target only the verified iCloud container.
+          Calendar reads and writes target only the verified iCloud source.
           Writes require --dry-run or explicit --apply.
+          Recurring event edit/delete requires --span this or --span future.
           Avatar input is limited to 10 MB; output is <= 1024 px and 200 KB.
           metadata remains in JSON and is not written to Apple Contacts.
         """)

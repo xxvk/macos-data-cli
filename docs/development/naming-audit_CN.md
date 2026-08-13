@@ -1,6 +1,7 @@
 # CLI 命名与兼容性审计
 
-状态：已于 2026-07-23 完成首轮候选清单和精确同名检查；尚未批准改名。
+状态：已于 2026-08-14 完成第二轮候选、近似名称和常见 package registry 审计；
+项目所有者已明确否决 `xvk-data`。当前没有获批准或推荐的 canonical 新名称，也尚未实施改名。
 
 ## 已确定的过渡约束
 
@@ -63,16 +64,53 @@ Apple 品牌命名先例。
 首轮 shortlist 因此是 `xvk-data`、`system-data` 和 `agent-data`，但都尚未批准。最终选择前
 还应生成更多不含 Apple 商标、识别性更强的候选；精确同名可用不等于名称适合采用。
 
+## 第二轮 shortlist（2026-08-14）
+
+第二轮加入 `xvk-native`、`native-relay`、`framebridge`、`hostscope` 和 `nativeport`，并检查
+Homebrew、GitHub 名称搜索、npm、PyPI 和本机命令空间。crates.io 对自动状态检查返回 403，
+因此 Rust crate 名称仍记为未确认；这些检查也不等同于正式商标检索。
+
+| 候选命令 | 结果 | 判断 |
+| --- | --- | --- |
+| `xvk-data` | Homebrew/GitHub/npm/PyPI/本机均未发现完全同名 | **已否决**：项目所有者不接受维护者 namespace 作为产品名称 |
+| `xvk-native` | 同上 | 备选；`native` 容易被理解为编程实现，而不是系统数据 |
+| `native-relay` | 无完全同名，但 GitHub/Web 上有大量 React Native、网络 relay 近似结果 | 淘汰：搜索噪声大，容易被误解为网络中继 |
+| `framebridge` | GitHub 有多个完全同名项目 | 淘汰 |
+| `hostscope` | GitHub 有完全同名项目 | 淘汰 |
+| `nativeport` | GitHub 有大小写不同的完全同名项目 | 淘汰 |
+
+`xvk-data` 不再进入后续 shortlist。后续候选仍应由副标题表达平台能力，例如
+“a native data CLI for macOS”，而不是重新把 `Mac` 或 `macOS` 放回产品名。Apple 商标列表
+页面标注其内容更新至 2026-07-14，本次复核仍将 `Mac` 和 `macOS` 列为 Apple 商标，并仍
+要求兼容性词汇不构成第三方产品名的一部分。
+
+## 可复用的 0.3 迁移实现
+
+在名称获得批准后：
+
+1. 安装一个获批准的 canonical 命令，并把 `macos-data` 作为指向同一签名二进制的兼容
+   symlink 保留到至少整个 0.3.x；不要维护两份可能漂移的 CLI 实现。
+2. 两种调用方式必须共享同一入口并返回逐字节一致的 JSON、stdout/stderr 和退出码；help
+   统一显示 canonical 名称，同时明确列出兼容别名。
+3. 0.3.x 暂不改变 app bundle identifier、TCC 身份、诊断目录、reserved URL label 或
+   `x-macos-data://external-id/`。这些是持久化身份或数据 contract，不是普通展示名称。
+4. Homebrew Cask 可先保留旧 token，并同时安装 `xvk-data` 与 `macos-data`；Cask/repository
+   token 的公开迁移另做一步，避免命令、TCC 和发布渠道同时变化。
+5. 先写 alias contract tests，再修改构建和安装脚本；测试必须覆盖 `--version`、`--help`、
+   成功 JSON、失败 JSON 和退出码。
+
+该迁移结构只在新的名称获明确批准后执行；不得再默认采用 `xvk-data`。
+
 ## 剩余可用性审计
 
 - [x] 检查 Homebrew Formula 和 Cask 精确同名。
 - [x] 检查公开 GitHub repository 精确同名。
 - [x] 检查当前本机可执行命令空间。
-- [ ] 生成更多不含 Apple 商标且具有识别性的候选。
-- [ ] 检查 GitHub 和 Homebrew 近似名称，而不只检查精确同名。
+- [x] 生成更多不含 Apple 商标且具有识别性的候选。
+- [x] 检查 GitHub 和 Homebrew 近似名称，而不只检查精确同名。
 - [ ] 检查相关商标数据库；如果项目超出兴趣型开源工具阶段，再获得正式法律意见。
-- [ ] 对最终 shortlist 检查 repository、Homebrew Cask、常见 package registry 和实用域名。
+- [ ] 对最终 shortlist 检查 repository、Homebrew Cask、常见 package registry 和实用域名；
+  repository、Cask、npm、PyPI 已检查，crates.io 和域名仍未确认。
 - [ ] 由人和 Agent 验证发音、拼写、搜索性和命令输入体验。
 - [ ] 批准一个 canonical name，并通过 ADR 记录决定。
 - [ ] 在公开改名前设计并测试别名安装、help/version、shell completion、弃用提示和回滚。
-

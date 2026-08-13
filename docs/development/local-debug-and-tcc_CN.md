@@ -1,4 +1,4 @@
-# 本机 Debug 与 Contacts / Mail 授权
+# 本机 Debug 与 Contacts / Mail / Calendar 授权
 
 ## 工具链
 
@@ -126,3 +126,23 @@ bash scripts/run_mail_automation_smoke.sh --gui-session
 脚本只输出 capability/backend 状态，不输出主题、地址或正文。可选的
 `--with-text-fallback` 会在最多 200 条 metadata 中寻找一条 `metadata_only` 消息并
 显式读取一次正文；只有确认可以读取一封真实邮件时才使用。
+
+## Calendar full access
+
+Debug app 的两个 Info.plist 都必须包含 `NSCalendarsFullAccessUsageDescription`。重新签名
+后，用 app bundle 内的 executable 请求 full access：
+
+```bash
+.build/debug/macos-data.app/Contents/MacOS/macos-data calendar permission --format json
+```
+
+返回 `fullAccess` 后，使用隐私安全 smoke；不要直接打印真实事件 JSON：
+
+```bash
+bash scripts/run_calendar_read_smoke.sh
+bash scripts/run_calendar_dry_run_smoke.sh
+```
+
+第一个脚本只输出 source、calendar 和分页事件数量；第二个脚本验证 create/edit/delete
+preview，不调用 EventKit save/remove。重新替换 ad-hoc 签名 app 后，macOS 可能重新评估
+TCC 身份；应再次检查 permission，不要通过复制数据库或绕过 TCC 解决。

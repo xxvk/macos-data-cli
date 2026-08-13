@@ -19,6 +19,13 @@ CLI release version.
 | Mail.app event timeout | `MAIL_APP_TIMEOUT` | 4 |
 | Mail.app message not found | `MAIL_APP_MESSAGE_NOT_FOUND` | 4 |
 | Mail.app timeout circuit open | `MAIL_APP_CIRCUIT_OPEN` | 4 |
+| Calendar adapter error | `CALENDAR_ERROR` or `CALENDAR_*` | 5 |
+| Calendar full access missing | `CALENDAR_PERMISSION_REQUIRED` / `CALENDAR_FULL_ACCESS_REQUIRED` | 5 |
+| Calendar iCloud source missing or ambiguous | `CALENDAR_ICLOUD_SOURCE_NOT_FOUND` / `CALENDAR_SOURCE_AMBIGUOUS` | 5 |
+| Calendar/event not found | `CALENDAR_NOT_FOUND` / `CALENDAR_EVENT_NOT_FOUND` | 5 |
+| Invalid Calendar JSON, range, or recurrence span | `CALENDAR_INVALID_INPUT` / `CALENDAR_INVALID_DATE_RANGE` / `CALENDAR_RECURRING_SPAN_REQUIRED` | 5 |
+| Calendar idempotency mismatch | `CALENDAR_IDEMPOTENCY_CONFLICT` | 5 |
+| Calendar conflict scan too broad | `CALENDAR_CONFLICT_SCAN_LIMIT_EXCEEDED` | 5 |
 | Usage or invalid query | JSON `error.code = INVALID_QUERY` | 64 |
 
 Errors are written to stderr. Successful JSON responses are written to stdout.
@@ -30,3 +37,10 @@ Mail.app fallback `appmsg_`/`ambx_` IDs are backend-specific opaque values. A
 fallback query always returns `incomplete: true`, `nextCursor: null`, and
 limitations describing the bounded candidate set. A no-match fallback response
 must not be interpreted as a complete mailbox search.
+
+Calendar success responses use the same contract `0.1` envelope. Timed Date
+values use ISO 8601; all-day start/end values use `YYYY-MM-DD`. Calendar query returns the unified `items`, `limit`,
+`nextCursor`, `truncated`, and `complete` fields. `calevent_`, source, calendar,
+and cursor IDs are machine-local opaque values and must not be parsed. A moved
+event's returned ID replaces the old ID. Recurring edit/delete requires an
+explicit `--span this` or `--span future`.

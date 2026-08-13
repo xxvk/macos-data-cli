@@ -20,6 +20,10 @@ let package = Package(
             name: "MailAdapter",
             targets: ["MailAdapter"]
         ),
+        .library(
+            name: "CalendarAdapter",
+            targets: ["CalendarAdapter"]
+        ),
         .executable(
             name: "macos-data",
             targets: ["macos-data"]
@@ -51,9 +55,17 @@ let package = Package(
                 .linkedLibrary("sqlite3")
             ]
         ),
+        .target(
+            name: "CalendarAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Calendar",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .executableTarget(
             name: "macos-data",
-            dependencies: ["Core", "ContactsAdapter", "MailAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -88,6 +100,13 @@ let package = Package(
         .testTarget(
             name: "MailTests",
             dependencies: ["MailAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "CalendarTests",
+            dependencies: ["CalendarAdapter"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

@@ -4,7 +4,7 @@
 
 ## 统一资源查询
 
-使用一个机器可读响应查看当前可发现的 Contacts 和 Mail 资源作用域：
+使用一个机器可读响应查看当前可发现的 Contacts、Mail 和 Calendar 资源作用域：
 
 ```text
 macos-data resources --format json
@@ -13,10 +13,108 @@ macos-data resources --format json
 每个资源返回 adapter 管理的 opaque `id`、`kind`、`provider`、`displayName`，以及
 `readable`、`writable`、`selected`、`permission` 能力状态。Contacts 的 selected 状态
 反映已经验证的 iCloud 容器。Mail 不会因为“存在一个账号”就擅自标记为 selected；
-偏好的 `aim-tech.jp` 工作邮箱仍需要隐私安全的显式验证。Calendar 在 0.2 尚未实现，
-会在 `data.limitations` 中返回 `calendar_adapter_not_implemented`。
+偏好的 `aim-tech.jp` 工作邮箱仍需要隐私安全的显式验证。Calendar 在获得 full access 后
+返回 EventKit source；selected 只会标记唯一验证通过的 iCloud CalDAV source。
 
 本机 Debug、Xcode 工具链和 Contacts 授权流程请先阅读[本机 Debug 与 Contacts 授权](development/local-debug-and-tcc_CN.md)。
+
+## Calendar（0.3 开发中）
+
+请求读取和写入所需的 EventKit full access：
+
+```text
+macos-data calendar permission --format json
+```
+
+`writeOnly` 不能读取日历，因此不会被 CLI 当作成功。列出 source 和选中 iCloud source
+内的日历：
+
+```text
+macos-data calendar sources --format json
+macos-data calendar calendars --format json
+```
+
+默认必须找到唯一的 iCloud CalDAV source。可以添加 `--source iCloud` 或准确 identifier，
+但不能用它切换到 Local、Exchange、Google 或其他账户。
+
+按明确时间窗查询事件：
+
+```text
+macos-data calendar query \
+  --start 2026-08-01T00:00:00+09:00 \
+  --end 2026-09-01T00:00:00+09:00 \
+  --limit 50 --format json
+macos-data calendar query --start <iso8601> --end <iso8601> \
+  --calendar <id|unique-title> --title <text> --format json
+macos-data calendar conflicts --start <iso8601> --end <iso8601> \
+  [--calendar <id|unique-title>] --format json
+```
+
+查询范围必须满足 start < end，最长 366 天；默认 limit 50、最大 200，并使用统一的
+opaque cursor 分页。结果包含标题、开始/结束、all-day、IANA `timeZone`、地点、备注、
+URL、参与者状态、availability、event status 和周期规则。
+
+使用 query 返回的 `calevent_` opaque ID读取事件：
+
+```text
+macos-data calendar get --id <calevent-id> --format json
+```
+
+该 ID 同时定位周期系列和 occurrence start；不得解析。移动事件后应使用返回的新 ID。
+
+创建前先 dry-run：
+
+```json
+{
+  "title": "Planning",
+  "startDate": "2026-08-16T09:00:00+09:00",
+  "endDate": "2026-08-16T10:00:00+09:00",
+  "timeZone": "Asia/Tokyo"
+}
+```
+
+```text
+macos-data calendar create --input event.json --dry-run --format json
+macos-data calendar create --input event.json --apply --format json
+macos-data calendar create --input event.json --apply --idempotent --format json
+macos-data calendar edit --id <id> --input patch.json --dry-run --format json
+macos-data calendar edit --id <id> --input patch.json --apply --format json
+```
+
+存在多个可写 iCloud 日历且系统默认日历不属于所选 source 时，在 create JSON 中明确
+提供 `calendarID`。参与者只读；输入非空 `attendees` 会报错，不会假装已发送邀请。
+
+Alarm 使用 `alarms` 数组。每项必须且只能提供 `relativeMinutes` 或 `absoluteDate`；负数表示
+事件开始前，例如 `-10`。编辑时传 `"alarms": []` 会清空全部提醒。创建逻辑会先移除
+EventKit 从目标日历继承的默认 alarm，再严格应用 JSON。
+
+全天事件必须使用 date-only 和 exclusive end date：
+
+```json
+{"title":"Holiday","allDay":true,"startDate":"2026-11-01","endDate":"2026-11-02"}
+```
+
+`--idempotent` 使用请求指纹和 60 秒的本机 receipt 避免 Agent 紧邻重试产生重复事件。
+receipt 只保存指纹、opaque event/calendar ID 和时间戳，不保存事件标题、备注或地点；正常
+edit/delete 会使相关 receipt 失效。`calendar conflicts` 检测严格时间重叠，最多扫描 200 个
+事件；事件首尾相接不算冲突，超过上限会要求缩小范围或指定日历。
+
+周期规则支持 daily/weekly/monthly/yearly、interval、weekday、ordinal weekday、月/年
+位置，以及 endDate 或 occurrenceCount。周期事件 edit/delete 必须添加：
+
+```text
+--span this
+--span future
+```
+
+删除先预览，再使用独立确认短语：
+
+```text
+macos-data calendar delete --id <id> --dry-run --span this --format json
+macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" --span this --format json
+```
+
+详细边界参阅 [Calendar adapter 架构](development/calendar-adapter-architecture_CN.md)。
 
 ## Mail（0.2）
 

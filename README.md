@@ -22,6 +22,13 @@ runtime-verified V10 SQLite/EMLX fast path and never writes the Mail store.
 
 Version 0.2.0 adds the Mail adapter while retaining the Contacts command surface.
 
+The `dev` branch is now implementing Calendar 0.3. EventKit full-access
+authorization, unique iCloud CalDAV source selection, calendar/event queries,
+ISO 8601 time zones, recurrence rules, opaque occurrence IDs, and dry-run/apply
+paths for create/edit/delete are implemented. Local read and dry-run smoke tests
+pass; the explicitly authorized disposable-event apply integration also passed
+and verified final absence. These capabilities remain an unpublished 0.3 development version.
+
 See the detailed roadmaps:
 
 - [中文路线图](ROADMAP_CN.md)
@@ -35,6 +42,7 @@ User documentation:
 - [Agent integration guide](AGENTS.md)
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
+- [Calendar 0.3 architecture](docs/development/calendar-adapter-architecture.md)
 
 ## Mail 0.2 commands
 
@@ -75,6 +83,29 @@ move, archive, delete, flag, mark, or modify messages, mailboxes, accounts, or
 Mail preferences. Unsupported write-like commands must return a usage error
 before any Mail store or Mail.app access occurs. This boundary is part of the
 0.2.0 contract and may only change in a separately specified release.
+
+## Calendar 0.3 development commands
+
+```text
+macos-data calendar permission
+macos-data calendar sources --format json
+macos-data calendar calendars --format json
+macos-data calendar query --start <iso8601> --end <iso8601> --format json
+macos-data calendar conflicts --start <iso8601> --end <iso8601> --format json
+macos-data calendar get --id <opaque-event-id> --format json
+macos-data calendar create --input event.json --dry-run|--apply [--idempotent] --format json
+macos-data calendar edit --id <id> --input patch.json --dry-run|--apply [--span this|future] --format json
+macos-data calendar delete --id <id> --dry-run [--span this|future] --format json
+macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+```
+
+The adapter defaults only to the uniquely verified iCloud CalDAV source and
+does not fall back to Local, Exchange, or another account. Event, source,
+calendar, and cursor IDs are local opaque values. Recurring edit/delete requires
+an explicit `this` or `future` span. Attendees are readable but not writable in
+0.3. Timed events use ISO 8601 timestamps; all-day events use `YYYY-MM-DD` start
+and exclusive end dates. Relative/absolute alarms can be read, written, replaced,
+or cleared. See the [Calendar architecture](docs/development/calendar-adapter-architecture.md).
 
 ## Goals
 
@@ -187,7 +218,8 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-The next adapter is Calendar in 0.3, followed by Reminders, Notes, and Photos.
+Current development focuses on Calendar 0.3 release hardening and the CLI naming
+audit, followed by Reminders, Notes, and Photos.
 Mail 0.2 uses a read-only local SQLite/EMLX path with Mail.app Apple Events
 fallback and visual verification. See the
 [Mail architecture decision](docs/development/mail-adapter-architecture.md).

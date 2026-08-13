@@ -21,6 +21,12 @@ For Mail 0.2 planning or implementation, also read:
    should complete no-password authorization/settings flows and hand off only
    password, Apple ID, or security-confirmation steps
 
+For Calendar 0.3 planning, implementation, or invocation, also read:
+
+9. `docs/development/calendar-adapter-architecture.md` (or the Chinese version)
+   for EventKit permissions, iCloud source selection, recurrence scope, opaque
+   occurrence IDs, JSON fields, and the local smoke-test boundary
+
 ## Current development executable
 
 During local development, use the Debug app workflow described in
@@ -116,6 +122,42 @@ not assume a Homebrew or Release binary while development is in progress.
   only for development verification. It stores JSON in an auto-deleted private
   temp directory and prints aggregate counts only.
 
+## Non-negotiable Calendar rules
+
+- Calendar reads require EventKit full access. Write-only access is not readable.
+- Default and explicit Calendar operations accept only the uniquely verified
+  iCloud CalDAV source; never fall back to Local, Exchange, Google, or another source.
+- Treat source IDs, calendar IDs, `calevent_` IDs, and cursors as local opaque values.
+  A `calevent_` ID binds a calendar item and occurrence start so recurring events
+  do not silently resolve to the first occurrence.
+- Calendar query requires an explicit bounded date range: start before end and at
+  most 366 days. Default limit is 50 and maximum is 200.
+- Calendar create/edit/delete requires `--dry-run` or `--apply`. Delete apply also
+  requires `--confirm "DELETE EVENT"`.
+- Recurring edit/delete requires `--span this` or `--span future`; never infer a
+  series scope.
+- Attendees are readable but read-only in 0.3. Do not claim invitations can be sent.
+- All-day event JSON uses `YYYY-MM-DD` and an exclusive end date. Timed events use
+  ISO 8601 timestamps with offsets. Do not interchange the two forms.
+- Alarm writes use exactly one of `relativeMinutes` or `absoluteDate`; `alarms: []`
+  clears reminders. Create must remove EventKit-inherited default alarms first.
+- `create --idempotent` uses a privacy-minimized 60-second local receipt because
+  separate EventKit processes are not immediately consistent. Receipts must never
+  store event titles, notes, locations, attendees, or other event content.
+- `calendar conflicts` scans at most 200 events and treats adjacent boundaries as
+  non-conflicting. Narrow the range when the hard cap is exceeded.
+- Do not use an existing user event as an apply fixture. Real CRUD verification
+  must create and clean up one disposable event after explicit authorization.
+- The only documented real-write gate is
+  `run_local_calendar_integration.sh --with-writes --confirm "CALENDAR CRUD TEST"`.
+  The confirmation argument does not replace the user's explicit authorization
+  to run it in the current task.
+- The recurring-event write gate is
+  `run_calendar_recurrence_integration.sh --confirm "CALENDAR RECURRENCE TEST"` and
+  also requires explicit current-task authorization. It must finish with zero URL fixtures.
+- `run_calendar_read_smoke.sh` and `run_calendar_dry_run_smoke.sh` print aggregate
+  status only and auto-delete private temporary JSON.
+
 ## Local verification
 
 These checks are local-only and do not require CI:
@@ -131,6 +173,10 @@ bash scripts/run_mail_attachment_smoke.sh
 bash scripts/run_mail_app_metadata_smoke.sh
 bash scripts/run_mail_automation_smoke.sh --gui-session
 bash scripts/run_mail_release_gate.sh
+bash scripts/run_calendar_contract_tests.sh
+bash scripts/run_calendar_read_smoke.sh
+bash scripts/run_calendar_dry_run_smoke.sh
+bash scripts/run_local_calendar_integration.sh
 bash scripts/run_installed_release_smoke.sh
 bash scripts/check_public_release_prerequisites.sh
 ```

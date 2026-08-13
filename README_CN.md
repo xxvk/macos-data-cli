@@ -18,6 +18,12 @@ adapter 只启用运行时验证通过的 V10 SQLite/EMLX 快路径，且永不�
 
 0.2.0 增加 Mail adapter，同时保留既有 Contacts 命令面。
 
+`dev` 分支已进入 Calendar 0.3 开发：EventKit full-access 权限、唯一 iCloud CalDAV
+source 选择、日历和事件查询、ISO 8601 时区、周期规则、opaque occurrence ID，以及
+create/edit/delete 的 dry-run 和 apply 路径已经实现。只读和 dry-run 本机验证已通过；
+一次性事件的真实 apply CRUD 集成测试也已完成，并确认测试事件最终不存在。这些能力仍属于
+尚未发布的 0.3 开发版本。
+
 详细开发计划请参阅：
 
 - [中文路线图](ROADMAP_CN.md)
@@ -32,6 +38,7 @@ adapter 只启用运行时验证通过的 V10 SQLite/EMLX 快路径，且永不�
 - [本机 Debug 与 Contacts 授权](docs/development/local-debug-and-tcc_CN.md)
 - [变更记录](CHANGELOG.md)
 - [发布签名与 notarization TODO](docs/development/distribution-signing.md)
+- [Calendar 0.3 架构](docs/development/calendar-adapter-architecture_CN.md)
 
 ## 核心目标
 
@@ -154,6 +161,28 @@ bytes 不进入 JSON，且不会覆盖已有输出文件。这里仅 `mail revea
 `mail attachments verify` 只比较 SQLite 和缓存 MIME 的数量，不导出附件名或 payload；
 partial EMLX 始终保持 unverified。raw 导出和 attachment verify 不使用 metadata fallback。
 
+## 0.3 开发中：Calendar adapter
+
+```text
+macos-data calendar permission
+macos-data calendar sources --format json
+macos-data calendar calendars --format json
+macos-data calendar query --start <iso8601> --end <iso8601> --format json
+macos-data calendar conflicts --start <iso8601> --end <iso8601> --format json
+macos-data calendar get --id <opaque-event-id> --format json
+macos-data calendar create --input event.json --dry-run|--apply [--idempotent] --format json
+macos-data calendar edit --id <id> --input patch.json --dry-run|--apply [--span this|future] --format json
+macos-data calendar delete --id <id> --dry-run [--span this|future] --format json
+macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+```
+
+默认只使用唯一验证通过的 iCloud CalDAV source，不会回退到 Local、Exchange 或其他
+账户。事件 ID、source ID、calendar ID 和 cursor 都是本机 opaque 值。周期事件 edit/delete
+必须显式指定 `this` 或 `future`；参与者支持读取，但 0.3 暂不支持写入或发送邀请。
+普通事件使用 ISO 8601 timestamp；全天事件使用 `YYYY-MM-DD` 的开始日期和不包含在事件内的
+结束日期。相对/绝对 alarm 支持查询、写入、替换和以 `alarms: []` 清空。
+完整 JSON 和安全规则参阅 [Calendar 0.3 架构](docs/development/calendar-adapter-architecture_CN.md)。
+
 ## 设计边界
 
 - 不复制 Apple SDK 或重新分发 Apple 二进制
@@ -178,7 +207,8 @@ Homebrew 更新、Gatekeeper、quarantine 处理和本地发布验证流程，�
 
 ## 后续方向
 
-下一步是 0.3 Calendar adapter，之后为 Reminders、Notes 和 Photos。Mail 0.2 采用
+当前开发重点是 Calendar 0.3 的发布前收尾和 CLI 命名审计，之后为
+Reminders、Notes 和 Photos。Mail 0.2 采用
 只读 SQLite/EMLX、Mail.app Apple Events 回退和可视化确认的混合架构。
 详见 [Mail 架构决策](docs/development/mail-adapter-architecture_CN.md)。vCard、批量操作和
 变更检测属于 Contacts 的后续工作。每个 adapter 都应独立定义权限要求、数据映射、

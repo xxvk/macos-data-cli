@@ -28,6 +28,20 @@ bash scripts/run_cli_contract_tests.sh
 
 该测试仅在本机运行，不会写入或删除 Contacts 记录。
 
+Calendar 0.3 使用独立的进程 contract、只读和 dry-run gate：
+
+```bash
+bash scripts/run_calendar_contract_tests.sh
+bash scripts/run_calendar_read_smoke.sh
+bash scripts/run_calendar_dry_run_smoke.sh
+bash scripts/run_local_calendar_integration.sh
+```
+
+这些流程不保存 Calendar 修改。真实 Calendar CRUD 必须另行明确授权，并且只允许
+create → read-back → edit → read-back → delete → absence verification 的一次性事件流程。
+真实 gate 还必须提供 `--with-writes --confirm "CALENDAR CRUD TEST"`；命令行确认短语
+不能取代当前任务中用户对真实写入的明确授权。
+
 只有在明确验证真实写入时，才执行一次性联系人流程：
 
 ```bash
@@ -64,6 +78,31 @@ bash scripts/run_local_contacts_integration.sh --with-writes
   和底层异常文本在写入 `~/Library/Logs/macos-data-cli/diagnostics.log`
   前必须脱敏。
 - 诊断日志不得包含姓名、组织、邮政地址、头像二进制数据或完整联系人 JSON。
+
+## Calendar contract（0.3）
+
+- 只使用 Apple 公共 EventKit，不读取 Calendar 私有数据库。
+- 读取必须具有 `fullAccess`；`notDetermined`、`denied`、`restricted` 和 `writeOnly`
+  使用不同的稳定错误。
+- 默认和显式 source 都必须解析为唯一 iCloud CalDAV source；禁止静默回退到其他账户。
+- query 必须提供 start/end，start < end，范围最多 366 天，limit 为 1...200。
+- source、calendar、`calevent_` 和 cursor ID 都是本机 opaque 值。
+- `calevent_` ID 绑定 calendar item 与 occurrence start，确保周期事件不会误定位到第一个 occurrence。
+- create/edit/delete 必须显式选择 `--dry-run` 或 `--apply`；delete apply 额外要求
+  `--confirm "DELETE EVENT"`。
+- 周期事件 edit/delete 必须显式选择 `--span this` 或 `--span future`。
+- 参与者字段只读。0.3 不发送邀请，也不接受非空 attendees 写入。
+- 普通事件日期使用 ISO 8601；全天事件使用 date-only `YYYY-MM-DD`，且 endDate 不包含在
+  事件内。timeZone 使用有效 IANA identifier。
+- 每个 alarm 只能有一个相对或绝对触发条件；`alarms: []` 清空提醒，create 必须先移除
+  目标日历继承的默认 alarm，再应用 JSON。
+- Calendar `create --idempotent` 使用 60 秒、opaque、隐私最小化的 receipt 处理紧邻进程
+  重试；receipt 不得保存事件文本。
+- 冲突扫描最多处理 200 个事件；仅边界相接不算冲突。
+- dry-run 临时数据必须位于权限 700 的自动删除目录，不在日志或测试输出中打印事件标题、
+  参与者、地点、URL 或备注。
+- 真实 apply 测试不得修改现有用户事件，只能使用完成后删除的一次性 fixture。
+- 真实周期 gate 必须验证 `this` 和 `future` 范围，并在中途断言失败时也清理全部 occurrence。
 
 ## Codex 授权与 Computer Use
 
