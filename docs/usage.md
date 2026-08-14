@@ -30,9 +30,9 @@ Notes reports one read-only `notesLibrary` scope. Its permission reflects the
 responsible process's Notes.app Automation state and does not imply access to a
 private Notes database.
 
-## Shortcuts (0.7.1)
+## Shortcuts (0.7.0–0.7.2)
 
-Version 0.7.1 uses the system `shortcuts` CLI and public `Shortcuts Events`
+The base 0.7.0 adapter uses the system `shortcuts` CLI and public `Shortcuts Events`
 scripting dictionary. Names are display-only and every selection uses an opaque
 ID. The public interface exposes action count, not the action graph or parameters.
 `Shortcuts Events` is an on-demand helper and may be absent while idle. Read and
@@ -78,8 +78,8 @@ macos-data shortcuts run --id <opaque-shortcut-id> \
   --apply --confirm "RUN SHORTCUT" --format json
 ```
 
-Version 0.7.1 still cannot read or edit arbitrary existing action graphs. It has
-guarded Cherri managed-source validation, build, create, update, and local
+Version 0.7.1 added guarded Cherri managed-source validation, build, create,
+update, and local
 registry lifecycle commands:
 
 ```bash
@@ -105,8 +105,89 @@ the source allowlist, exact confirmations, and replace/retain-old behavior. The
 macOS 27 Beta 5 live gate passed with exact black-box output and zero residue;
 public observed action counts remained `0`, so they are reported separately
 from compiled counts and cannot prove the action graph. Experimental editing of arbitrary existing shortcuts
-remains planned for 0.7.2. No version may mutate Shortcuts SQLite or CloudKit
-data directly.
+starts with read-only local acquisition classification and planning:
+
+```bash
+macos-data shortcuts edit inspect --input ./candidate.shortcut --format json
+macos-data shortcuts edit inspect --input ./candidate.cherri --format json
+macos-data shortcuts edit plan --input ./candidate.shortcut --patch ./plan.json --format json
+# or: ... --stdin --format json
+macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+  --expected-editor-name-sha256 <sha256> --dry-run --format json
+macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+  --expected-editor-name-sha256 <sha256> --apply \
+  --confirm "EDIT SHORTCUT COPY" --format json
+macos-data shortcuts edit ui-inspect --format json
+```
+
+The input must be one non-symlink local regular file no larger than 10 MiB.
+URI syntax, including iCloud share links, is rejected before any file read. The
+command has no network request, redirect, clipboard-read, download, or import path.
+Results contain only SHA-256, byte count, format, bounded counts, risk flags,
+capability, and stable reason codes. They never contain path, Shortcut name,
+source, action identifiers, parameters, or embedded values. A valid `.cherri`
+uses `managed_source_route`; a narrowly allowlisted unsigned artifact may be a
+`semantic_edit_candidate`. Opaque/signed files, unknown actions, nested magic
+variables or attachments, suspected secrets, device-bound references, and
+unbounded structures return `manual_migration_required`. A plan reports
+`canApplySemanticEdit=true` only when every operation is `replace_text`, when
+every operation is append-only `insert_text` and the graph already contains a
+Text action, or when every operation is `delete_action` and at least one action
+remains, or when every operation is a bounded `move_action`. This is copy-first
+capability, not permission to edit the original. No version may
+mutate Shortcuts SQLite, CloudKit, or private-framework data directly.
+
+An edit-plan document is strict JSON. It requires the exact lower-case
+`expectedInputSHA256` returned by inspect and 1...64 sequential operations:
+
+```json
+{
+  "expectedInputSHA256": "<64-lowercase-hex>",
+  "operations": [
+    {"operation":"insert_text","index":1,"value":"new text"},
+    {"operation":"replace_text","index":0,"value":"replacement"},
+    {"operation":"move_action","fromIndex":1,"toIndex":0},
+    {"operation":"delete_action","index":1}
+  ]
+}
+```
+
+Indexes refer only to visible non-output actions and each operation observes the
+graph produced by the preceding operation. Text values are capped at 64 KiB;
+the whole patch is capped at 256 KiB. The result contains value byte counts and
+SHA-256 only, never the values themselves. Replacement currently targets text
+actions only, deletion cannot empty the graph, and a move must change index.
+Equal adjacent semantic actions are rejected because the reordered state cannot
+be proven. The terminal output action is never editable. This command is not a dry-run alias for a hidden write:
+there is no `--apply` path and no Accessibility or Apple Event is sent.
+
+`edit copy --dry-run` validates the same artifact and patch but never constructs
+the system AX bridge. Apply additionally requires the SHA-256 of the exact
+visible Shortcut editor name (UTF-8 bytes, no newline) and the confirmation
+phrase above. It duplicates the editor, verifies a graph-identical copy, changes
+only calibrated Text fields, and reads back after every operation. Append-only
+insert invokes exact `duplicateAction:` on an existing Text action and changes
+only the appended value; its index must equal the current action count. Delete
+presses only the exact resolver-bound Close button and waits for the expected
+smaller graph. All-move plans invoke only exact reorder menu identifiers and
+read back complete visual order after each adjacent step. A graph without Text,
+middle insertion, same-index/equal-neighbor moves, and mixed-operation plans
+remain unsupported. Pending or unknown outcomes
+must not be retried automatically.
+
+`ui-inspect` is a separate read-only Accessibility capability probe. It never
+requests consent, launches or activates Shortcuts.app, and has no click, key,
+set-value, or other AX action path. The tree is capped at 2,000 nodes and depth
+32. A candidate requires semantic editor marker plus toolbar/group/scroll-area
+hierarchy; generic roles alone are rejected. Results expose only permission,
+target/bounds status and counts—never window titles, labels, identifiers, or
+other UI values. Multiple candidates return `ambiguous`; every status keeps
+`canApplySemanticEdit` false.
+
+`inspect`, `plan`, and `ui-inspect` remain read-only. The public mutation surface
+is limited to the guarded `edit copy` replace-text, append-only insert, and
+bounded all-delete routes
+described above.
 
 ## Notes (0.6 read-only development slice)
 

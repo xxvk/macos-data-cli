@@ -36,6 +36,14 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
     case authorUpdateConfirmationRequired
     case authorUpdateUnverifiable
     case authorForgetConfirmationRequired
+    case acquisitionInputInvalid
+    case acquisitionInputTooLarge
+    case editPlanInvalid
+    case editSourceConflict
+    case editCapabilityUnsupported
+    case editConfirmationRequired
+    case editEditorConflict
+    case editRecoveryFailed
 
     public var machineCode: String {
         switch self {
@@ -76,6 +84,14 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
         case .authorUpdateConfirmationRequired: "SHORTCUTS_AUTHOR_UPDATE_CONFIRMATION_REQUIRED"
         case .authorUpdateUnverifiable: "SHORTCUTS_AUTHOR_UPDATE_UNVERIFIABLE"
         case .authorForgetConfirmationRequired: "SHORTCUTS_AUTHOR_FORGET_CONFIRMATION_REQUIRED"
+        case .acquisitionInputInvalid: "SHORTCUTS_ACQUISITION_INPUT_INVALID"
+        case .acquisitionInputTooLarge: "SHORTCUTS_ACQUISITION_INPUT_TOO_LARGE"
+        case .editPlanInvalid: "SHORTCUTS_EDIT_PLAN_INVALID"
+        case .editSourceConflict: "SHORTCUTS_EDIT_SOURCE_CONFLICT"
+        case .editCapabilityUnsupported: "SHORTCUTS_EDIT_CAPABILITY_UNSUPPORTED"
+        case .editConfirmationRequired: "SHORTCUTS_EDIT_CONFIRMATION_REQUIRED"
+        case .editEditorConflict: "SHORTCUTS_EDIT_EDITOR_CONFLICT"
+        case .editRecoveryFailed: "SHORTCUTS_EDIT_RECOVERY_FAILED"
         }
     }
 
@@ -155,6 +171,22 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
             "The replacement cannot be distinguished safely through public Shortcuts metadata. Use retain-old or change the action count before applying."
         case .authorForgetConfirmationRequired:
             "Removing a managed registry entry requires --confirm \"FORGET MANAGED SHORTCUT\". This does not delete the Shortcut itself."
+        case .acquisitionInputInvalid:
+            "Shortcut acquisition requires one readable, non-symlink local .cherri or .shortcut regular file."
+        case .acquisitionInputTooLarge:
+            "Shortcut acquisition input exceeds the 10 MiB local inspection limit."
+        case .editPlanInvalid:
+            "The Shortcut edit plan is invalid, unbounded, or incompatible with the current semantic action graph."
+        case .editSourceConflict:
+            "The expected input SHA-256 does not match the inspected Shortcut artifact. Refresh the input and do not apply a stale plan."
+        case .editCapabilityUnsupported:
+            "This Shortcut artifact is not eligible for semantic editing. Use the reported manual migration route."
+        case .editConfirmationRequired:
+            "Applying a semantic Shortcut edit requires --confirm \"EDIT SHORTCUT COPY\"."
+        case .editEditorConflict:
+            "The visible Shortcut editor is ambiguous, unbounded, or no longer matches the reviewed edit plan. Refresh state and do not mutate it."
+        case .editRecoveryFailed:
+            "A distinct recovery copy preserving the original semantic action graph could not be confirmed. No edit was started."
         }
     }
 }

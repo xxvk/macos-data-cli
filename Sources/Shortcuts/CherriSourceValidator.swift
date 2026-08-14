@@ -55,6 +55,8 @@ public struct CherriSourceValidator: Sendable {
             #"(?i)\b(?:embedFile|base64File|rawAction)\s*\("#,
             #"(?mi)^\s*action\s+['\"]"#,
             #"(?i)\b(?:api[_-]?key|api[_-]?token|apikey|apitoken|access[_-]?token|accesstoken|secret|password|authorization|bearer)\b\s*="#,
+            #"(?i)(?:api[_-]?key|api[_-]?token|access[_-]?token|password|secret)=[^&\s\"']+"#,
+            #"(?i)\bbearer\s+[a-z0-9._-]{12,}"#,
         ]
         guard !forbiddenPatterns.contains(where: { matches($0, in: source) }) else {
             throw ShortcutsError.authorSourceForbidden

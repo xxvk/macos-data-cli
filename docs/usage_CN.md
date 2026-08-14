@@ -22,9 +22,9 @@ Photos 始终报告一个 `photosLibrary` scope；未授权时不可读，limite
 Notes 始终报告一个只读 `notesLibrary` scope；permission 表示负责执行进程对 Notes.app 的
 Automation 状态，不代表可以访问 Notes 私有数据库。
 
-## Shortcuts（0.7.1）
+## Shortcuts（0.7.0–0.7.2）
 
-0.7.1 使用系统 `shortcuts` CLI 和公开的 `Shortcuts Events` scripting dictionary。
+0.7.0 基础 adapter 使用系统 `shortcuts` CLI 和公开的 `Shortcuts Events` scripting dictionary。
 名称只用于显示，所有选择均使用 opaque ID。公开接口只提供 action count，不提供动作图或参数。
 `Shortcuts Events` 是按需运行的 helper，空闲时可能不存在。读写命令会在发送有界 Apple Event 前
 自动启动它，但不会激活 Shortcuts UI；真实启动或连接失败仍返回结构化错误。单独执行 permission
@@ -62,7 +62,7 @@ macos-data shortcuts run --id <opaque-shortcut-id> \
   --apply --confirm "RUN SHORTCUT" --format json
 ```
 
-0.7.1 仍不支持读取或编辑任意已有 action graph；它已加入受保护的 Cherri 受管理源码
+0.7.1 加入受保护的 Cherri 受管理源码
 validate、build、create、update 与本机 registry 生命周期命令：
 
 ```bash
@@ -84,7 +84,74 @@ macos-data shortcuts managed list --format json
 语义见 [`shortcuts-authoring_CN.md`](development/shortcuts-authoring_CN.md)。macOS 27 Beta 5 真实 gate
 已通过准确黑盒输出和零残留；公开 observed action count 仍为 `0`，因此必须与编译 count 分开返回，
 且不能单独证明动作图。
-任意现有 Shortcut 的实验性编辑仍属于 0.7.2。任何版本都不得直接修改 Shortcuts SQLite/CloudKit 数据。
+任意现有 Shortcut 的 0.7.2 实验性编辑先从只读本地分类与计划开始：
+
+```bash
+macos-data shortcuts edit inspect --input ./candidate.shortcut --format json
+macos-data shortcuts edit inspect --input ./candidate.cherri --format json
+macos-data shortcuts edit plan --input ./candidate.shortcut --patch ./plan.json --format json
+# 或：... --stdin --format json
+macos-data shortcuts edit ui-inspect --format json
+```
+
+输入必须是单个不超过 10 MiB、非 symlink 的本地 regular file。包括 iCloud share link 在内的 URI 会在
+任何文件读取前拒绝；命令没有网络请求、redirect、clipboard read、下载或 import 路径。结果只包含 SHA-256、字节数、格式、
+有限 count、风险 flag、capability 与稳定 reason code；不返回路径、Shortcut 名称、源码、action
+identifier、参数或嵌入值。有效 `.cherri` 返回 `managed_source_route`；严格 allowlist 内的 unsigned
+artifact 可返回 `semantic_edit_candidate`。opaque/signed 文件、未知 action、magic variable/附件等
+嵌套结构、疑似 secret、device-bound reference 或无界结构均返回 `manual_migration_required`。
+只有 plan 全部由 `replace_text` 组成、全部为“当前 graph 已有 Text 且 index 等于当前 action count”的
+末尾 `insert_text`、全部为“删除后至少保留一个 action”的 `delete_action`，或全部为有界 `move_action` 时，
+`canApplySemanticEdit` 才为 true；它只表示 copy-first 能力，不代表允许修改原件。
+任何版本都不得直接修改 Shortcuts SQLite、CloudKit 或 private framework 数据。
+
+edit plan 使用 strict JSON，必须提供 inspect 返回的准确小写 `expectedInputSHA256`，并包含 1...64 个
+顺序执行的操作：
+
+```json
+{
+  "expectedInputSHA256": "<64位小写hex>",
+  "operations": [
+    {"operation":"insert_text","index":1,"value":"new text"},
+    {"operation":"replace_text","index":0,"value":"replacement"},
+    {"operation":"move_action","fromIndex":1,"toIndex":0},
+    {"operation":"delete_action","index":1}
+  ]
+}
+```
+
+index 只指向非 output 的 visible action；每个操作都基于前一个操作产生的 shadow graph。单个文本
+上限 64 KiB，整个 patch 上限 256 KiB。结果只返回文本字节数与 SHA-256，不回显文本。当前 replace
+只接受 text action，delete 不得把 graph 清空，move 必须改变 index；相邻 action 语义状态相同则因无法
+证明顺序变化而拒绝。terminal output action 永远不可编辑。该命令并非隐藏
+写入的 dry-run：它根本没有 `--apply`，也不会发送 Accessibility event 或 Apple Event。
+
+replace-text、受限末尾 insert-text，或删除后至少保留一个 action 的有界全 delete plan 可执行：
+
+```text
+macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+  --expected-editor-name-sha256 <sha256> --dry-run --format json
+macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+  --expected-editor-name-sha256 <sha256> --apply \
+  --confirm "EDIT SHORTCUT COPY" --format json
+```
+
+dry-run 不构造 system AX bridge。apply 还要求准确可见 Shortcut editor 名称的 SHA-256（UTF-8、无换行），
+先复制并证明副本 graph 与原件相同，再只执行已校准的 semantic mutation，且每一步回读。末尾 insert 通过准确
+`duplicateAction:` 复制已有 Text action，再只设置新追加 action 的 value；index 必须等于当前 action count。
+delete 只按 resolver 绑定的 Close button，并等待准确缩小后的 graph。全 move plan 只调用准确 reorder menu
+identifier，并在每个相邻步骤后回读完整视觉顺序。无 Text graph、中间 insert、同索引/相同相邻 action move
+与混合 operation plan 继续禁用；pending/unknown
+outcome 禁止自动重试。
+
+`ui-inspect` 是独立的只读 Accessibility 能力探针。它不请求授权、不启动或激活 Shortcuts.app，且没有
+click、按键、set-value 或任何其他 AX action 路径。UI tree 上限 2,000 节点、深度 32；候选必须同时
+满足 semantic editor marker 与 toolbar/group/scroll-area hierarchy，只有 generic role 时拒绝误判。
+结果只返回权限、目标/边界状态和 count，不返回 window title、label、identifier 或其他 UI value。
+多个候选返回 `ambiguous`；任何状态下 `canApplySemanticEdit` 都是 false。
+
+`inspect`、`plan`、`ui-inspect` 仍全部只读。公开 mutation surface 仅限上述受保护的
+`edit copy` replace-text、末尾 insert-text、有界全 delete 与有界全 move 路径。
 
 ## Notes（0.6 只读开发切片）
 

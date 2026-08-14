@@ -451,23 +451,121 @@ Cherri 作为可选外部编译器调用，不复制其 GPL-2.0 源码；Apple �
 版本边界：目标是修改不是由 macos-data 创建的现有 shortcut。Apple 当前没有公开动作图 CRUD API，
 因此本版本只能在明确 `experimental`、显式授权和 fail-closed 条件下实现，不承诺跨系统版本稳定。
 
-- [ ] 先完成现有 shortcut 的安全采集与能力分级
-  - 优先使用用户显式提供的本地 unsigned `.shortcut` 或 Cherri source；iCloud share link 可能上传内容，
-    必须单独确认并提示隐私风险
+- [x] 完成现有 Shortcut 的本地安全采集与能力分级
+  - `shortcuts edit inspect --input <local.cherri|local.shortcut>` 仅读取用户显式提供的单个本地
+    non-symlink regular file，通过 `O_NOFOLLOW` 防止跟随链接，输入上限 10 MiB，只返回 SHA-256、
+    字节/count metadata、风险 flag 与稳定 capability/reason enum
   - signed file 无法可靠反编译、未知 action、device-bound reference、secret 或未支持结构必须拒绝或要求
     用户在 Shortcuts.app 中手工迁移，不访问 SQLite/CloudKit/private framework
-- [ ] 设计语义 Accessibility 编辑 backend
+  - 12 个定向测试与 process-level no-apply CLI contract 已覆盖有限 unsigned input、opaque input、
+    Cherri route、脱敏、symlink、大小、未知 action、secret、device-bound reference，以及 magic variable/
+    附件等嵌套结构；classification 本身不授权 semantic apply
+- [x] 增加脱敏的 action-level edit-plan contract
+  - `shortcuts edit plan` 要求准确 input SHA-256 与 strict JSON，在内存 shadow graph 中验证最多 64 个
+    顺序执行的 insert-text、replace-text、delete-action、move-action
+  - 8 个定向测试及 process-level contract 覆盖严格字段、并发冲突、边界、action 类型安全、脱敏和输入
+    零修改；不存在可到达的 apply、Apple Event、Accessibility event 或 artifact 输出
+- [x] 单独评估 iCloud share-link acquisition，并在 0.7.2 保持禁用
+  - Apple 文档说明，创建 iCloud link 会把 Shortcut 副本交给 Apple 验证并通过 iCloud 提供链接；接收
+    链接仍是可见 Get Shortcut/import 流程，不是公开 headless graph API
+  - 0.7.2 只接受显式本地 `.cherri`/`.shortcut` path，不请求或下载 share link，不跟随 redirect、不读取
+    clipboard，也不触发 import
+  - reader 现在强制 `isFileURL`；红绿测试证明即使 HTTPS URL 的 path 映射真实本地 fixture，也会在读取前
+    拒绝。CLI 同时拒绝 URI syntax，且错误输出不回显输入 link
+  - 只有未来具备独立 opt-in command、action-time 隐私确认、有界下载、redirect/domain policy 与单独
+    visible-import contract 后，才重新考虑
+- [x] 增加有界、只读的语义 Accessibility discovery
   - 仅按 AX role、identifier、label 和结构定位控件，禁止屏幕坐标、图像匹配和无界点击
-  - 每个 edit plan 先输出动作级 diff；apply 需要准确确认，逐步验证编辑器状态，任何歧义立即停止
-- [ ] 支持受限的原地修改
-  - 初始 allowlist 仅覆盖已验证 action 的新增、删除、移动和参数替换；控制流、magic variable、第三方 action
+  - `shortcuts edit ui-inspect` 不弹授权、不启动或激活 Shortcuts.app，遍历上限 2,000 节点/深度 32，
+    只返回 count；generic、ambiguous 或 unbounded tree 全部 fail closed
+  - 8 个 synthetic test 与 no-apply CLI contract 证明零 action API、permission/target 状态、歧义、边界、
+    semantic marker 要求及 label/title/identifier 脱敏；discovery 本身不授权 semantic apply
+- [x] 使用 disposable macOS 27 Beta 5 fixture 验证只读 AX discovery
+  - 首次真实运行因 Shortcuts 27 使用 `editor.shortcutname` 作为 editor marker 而安全返回 no-candidate；
+    先用红灯测试固化兼容性缺口，再把这一准确 normalized marker 加入 allowlist
+  - 校准后在 2 个窗口/373 节点中只返回 1 个有界 editor candidate，JSON 不包含 label、title、identifier
+    或 action text；语义 UI 删除后，唯一名称搜索为 No Results，CLI 在 1 窗口/139 节点中返回 0 candidate
+- [x] 在 macOS 27 Beta 5 校准准确 Text/Comment semantic element
+  - 第二个仅限本地的 fixture 确认唯一 `editor.shortcutname` field、外层 action canvas、直接
+    Text/Comment title、Close button、嵌套 scroll area，以及每个支持 action 唯一可写 text area
+  - 纯 semantic resolver 忽略独立的 action-library scroll area，对所有私有 value 取 hash，并在未知
+    action、field 结构异常、candidate 歧义或遍历越界时 fail closed；4 个定向测试覆盖该 graph
+  - 只读 menu 检查记录 `duplicateShortcut:`、`duplicateAction:`、`rearrangeItemUp:`、
+    `rearrangeItemDown:`、`insertCommentAction:`，仅作为当前版本证据；没有调用 action，cleanup 后 library
+    数量恢复且准确名称为零匹配
+- [x] 设计受保护的语义 Accessibility mutation
+  - 纯 coordinator 消费已实现的 action-level edit plan，在读取 editor 前要求准确
+    `EDIT SHORTCUT COPY` 确认，并在创建 recovery object 前预演整份 operation sequence
+  - mutation 采用 copy-first：恢复候选必须具有不同的 hashed identity，并与原对象的初始 semantic graph
+    完全一致；每一步都准确回读，错误或不一致返回 `outcome_unknown`、保留原对象并禁止自动重试
+  - strict patch parse 现在同时产生 public plan 与不可 Codable、debug 强制脱敏的内存 execution plan；
+    coordinator 在读取 AX 状态前核对每个 private text 的字节数与 SHA-256，仅有 summary 永远不能执行。
+    edit-plan 与 coordinator 当前分别有 10 和 11 个定向测试
+  - plan-bound guarded bridge 只暴露 inspect、duplicate、insert/replace text、delete、move session 方法；
+    强制 recovery-first 与准确 sequence，拒绝 altered/extra operation，session mutation error 后永久 poisoned，
+    并由 5 个定向测试覆盖
+  - 当前仍没有通用 AX action API；公开 apply 仅限下面单独 gate 的 replace-text copy 路径
+- [x] 通过首次具体 copy-first `replace_text` gate
+  - system session 只允许准确 `duplicateShortcut:` 与 Text-area value replacement；insert/delete/move 固定
+    禁用。5 个定向测试覆盖该 session 和经过确认的 existing-copy recovery
+  - 有界 driver 只读取 toolbar name 与 action canvas，只选择唯一 main/focused editor，并设置 5 秒 AX deadline
+  - macOS 27 Beta 5 fixture 证明副本 identity、graph 相同、replacement hash 回读、Comment 不变和原件不变；
+    两窗口 fail-closed 后只恢复已验证副本，没有再次 duplicate
+  - 两个 fixture 在单独永久删除确认后清理；library 从 4 恢复到 2，准确名称搜索为 No Results
+  - fixture harness 仅限 debug，不属于公开 recovery interface
+- [x] 通过受保护 CLI contract 开放已证明的 copy-first `replace_text`
+  - `shortcuts edit copy` 要求一个本地 artifact、一个 strict patch、准确可见 editor 名称 SHA-256，且
+    dry-run/apply 必须二选一
+  - dry-run 在构造 system AX bridge 前返回；apply 必须在构造 bridge 前准确确认
+    `EDIT SHORTCUT COPY`
+  - 该 gate 最初只开放全为 replace-text 的 plan；下方末尾 insert gate 随后扩展同一 contract。其他
+    insert/delete/move 在 mutation 前返回稳定 unsupported-capability error
+  - 6 个 service test 与 process-level CLI contract 覆盖 preview 隔离、确认、hash/mode 校验、unsupported
+    operation 拒绝与输出脱敏；本次接线没有额外创建真实 fixture
+- [x] 证明并开放 verified copy 上的末尾 `insert_text`
+  - 唯一开放的 insert index 是当前 action count，且 graph 必须已有 resolver 批准的 Text action；中间插入
+    或无 Text graph 插入均在 mutation 前 fail closed
+  - 有界 driver 只聚焦该已知 Text field，并调用 Edit menu 的准确 `duplicateAction:` identifier；确认只有一个
+    duplicate 追加到末尾后，只修改新增 value，再回读完整 semantic graph
+  - macOS 27 Beta 5 fixture 证明 Text + Comment 只在副本中变成 Text + Comment + Text，原件保持不变；结果为
+    `readback_confirmed`，3 个 action 全部验证，JSON 不含 private value
+  - delete gate、stale-read-back recovery 与 mixed-family guard 使 ShortcutsTests 达到 105/105；定向覆盖包括
+    12 acquisition、13 edit-plan、11 coordinator、7 service、5 guarded-bridge、4 resolver 与 9 system-session tests
+  - 取得单独确认后，两个 fixture 均通过 Shortcuts UI 删除；All Shortcuts 从 4 恢复为 2，两个准确名称
+    搜索均返回 No Results
+- [x] 使用 disposable fixture 证明并开放 copy-first `delete_action`
+  - synthetic 实现为每个支持 action 精确解析唯一 `Close` AXButton，拒绝会清空 graph 的删除，只按绑定 path
+    执行 press，并由 coordinator 回读完整删除后 graph
+  - plan、public dry-run 与 guarded apply 已接线并保持脱敏；apply 只接受删除后至少保留一个 action 的全 delete plan
+  - debug-only `copy-delete` harness 已准备，可验证 Text + Comment 只在副本中变为 Text，原件保持不变
+  - [x] 经授权的 macOS 27 Beta 5 Text + Comment fixture 已证明：只有副本丢失 Comment，副本回读为一个
+    未变化的 Text action，原件回读仍为原始 Text + Comment graph
+  - [x] 首次删除后回读暴露真实 stale-graph 时间窗。命令 fail closed 且未重试；只读 existing-copy recovery
+    确认 mutation，新增 red/green test 要求 delete 等待准确缩小后的 graph 稳定
+  - [x] 两个 fixture 对象已从 All Shortcuts 移除；数量从 4 恢复为 2，准确名称搜索为 No Results
+  - [x] 第二个 disposable fixture 在单次命令中通过修正后的不中断 gate，随后原件验证也通过
+  - [x] 取得明确永久删除确认后，第二次 gate 的两个对象均已删除；All Shortcuts 从 4 恢复为 2，准确名称
+    搜索为 No Results
+- [x] 通过经过验证的副本支持受限的现有对象修改
+  - [x] 使用一次性 Text + Comment fixture 证明 copy-first `move_action`：复制后通过准确的
+    `rearrangeItemUp:` 将 Comment 从 index 1 移到 index 0，回读 Comment + Text，再独立确认原件仍为
+    Text + Comment。真实 gate 暴露普通 `AXChildren` 顺序滞后；现以闭集验证的
+    `AXChildrenInNavigationOrder` 和左上角坐标 Y 顺序回读完整视觉 graph。副本与未变原件均通过 hash-bound
+    回读，public 全 move apply 已开放
+  - [x] 取得单独 action-time 确认后永久删除 move 原件与恢复副本；All Shortcuts 从 4 恢复为 2，两个准确
+    名称搜索均返回 No Results
+  - 后续 allowlist 覆盖已验证 action 的删除、移动、更多位置插入和参数替换；控制流、magic variable、第三方 action
     和 device-bound reference 必须分别通过 fixture 后才能启用
   - 使用 shortcut ID、expected action count 和可获取的 metadata 作为并发保护；因公开接口无法读取完整动作图，
     不得宣称具备完整事务或无损 round trip
-- [ ] 完成版本化 UI fixture 与恢复 gate
-  - 每个支持的 macOS/Shortcuts 版本保存语义 UI fixture 和失败样本；真实测试只操作 disposable shortcut
-  - apply 前复制/导出可恢复候选，修改后验证 action count 和黑盒运行结果；无法证明结果时返回
-    `outcome_unknown`、保留原对象并禁止自动重试
+  - 重新评估“原地修改”表述：已批准的 coordinator 只编辑经过验证的副本并保留原对象；除非以后能证明
+    rollback，否则继续禁止直接修改原对象
+- [x] 完成 0.7.2 surface 在 macOS 27 Beta 5 上的 UI fixture 与恢复 gate
+  - disposable fixture 已证明 copy-first replace-text、末尾 insert、有界 delete 与有界全 move，并保持原件不变
+  - 每次 apply 都创建或恢复不同 identity 的已验证副本，回读完整受支持 semantic graph；无法证明结果时返回
+    `outcome_unknown` 且禁止自动重试
+  - 所有 disposable fixture 均在取得单独 action-time 确认后永久删除，准确名称搜索为 No Results
+- [ ] 未来声明支持新的 macOS/Shortcuts 版本前，重新运行该版本的 semantic fixture gate；0.7.2 不承诺跨版本稳定
 
 ## 每个版本的横向完成条件
 

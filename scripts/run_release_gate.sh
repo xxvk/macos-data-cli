@@ -24,8 +24,8 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
-[[ "$EXPECTED_VERSION" == "0.7.1" ]] || {
-  echo "0.7.1 release gate requires VERSION=0.7.1; observed=$EXPECTED_VERSION" >&2
+[[ "$EXPECTED_VERSION" == "0.7.2" ]] || {
+  echo "0.7.2 release gate requires VERSION=0.7.2; observed=$EXPECTED_VERSION" >&2
   exit 1
 }
 
