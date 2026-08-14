@@ -30,9 +30,9 @@ Notes reports one read-only `notesLibrary` scope. Its permission reflects the
 responsible process's Notes.app Automation state and does not imply access to a
 private Notes database.
 
-## Shortcuts (0.7.0 development slice)
+## Shortcuts (0.7.1)
 
-Version 0.7.0 uses only the system `shortcuts` CLI and public `Shortcuts Events`
+Version 0.7.1 uses the system `shortcuts` CLI and public `Shortcuts Events`
 scripting dictionary. Names are display-only and every selection uses an opaque
 ID. The public interface exposes action count, not the action graph or parameters.
 `Shortcuts Events` is an on-demand helper and may be absent while idle. Read and
@@ -78,9 +78,35 @@ macos-data shortcuts run --id <opaque-shortcut-id> \
   --apply --confirm "RUN SHORTCUT" --format json
 ```
 
-Version 0.7.0 cannot read or edit action graphs. Cherri managed-source authoring
-is planned for 0.7.1, and experimental editing of arbitrary existing shortcuts
-for 0.7.2. No version may mutate Shortcuts SQLite or CloudKit data directly.
+Version 0.7.1 still cannot read or edit arbitrary existing action graphs. It has
+guarded Cherri managed-source validation, build, create, update, and local
+registry lifecycle commands:
+
+```bash
+macos-data shortcuts author validate --source ./managed.cherri --format json
+macos-data shortcuts author build --source ./managed.cherri \
+  --output ./managed.shortcut --signing-mode people-who-know-me --format json
+macos-data shortcuts create --source ./managed.cherri --idempotent --dry-run --format json
+macos-data shortcuts create --source ./managed.cherri --idempotent --apply \
+  --confirm "CREATE MANAGED SHORTCUT" --format json
+macos-data shortcuts update --id <managed-opaque-id> --source ./managed-v2.cherri \
+  --expected-source-sha256 <sha256> --strategy replace --dry-run --format json
+macos-data shortcuts managed list --format json
+```
+
+These commands require optional Cherri 2.3.x, never use remote signing, refuse
+output overwrite, and return hashes/byte counts rather than source or action
+parameters. Validate/build never import or run an artifact. Create/update are
+preview by default; apply opens a visible Shortcuts.app import and writes the
+private registry only after metadata read-back. Update is managed-ID-only and
+requires the current source hash. Pending/unknown outcomes prohibit automatic
+retry. See [`shortcuts-authoring.md`](development/shortcuts-authoring.md) for
+the source allowlist, exact confirmations, and replace/retain-old behavior. The
+macOS 27 Beta 5 live gate passed with exact black-box output and zero residue;
+public observed action counts remained `0`, so they are reported separately
+from compiled counts and cannot prove the action graph. Experimental editing of arbitrary existing shortcuts
+remains planned for 0.7.2. No version may mutate Shortcuts SQLite or CloudKit
+data directly.
 
 ## Notes (0.6 read-only development slice)
 

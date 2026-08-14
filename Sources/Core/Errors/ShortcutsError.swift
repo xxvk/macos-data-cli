@@ -16,6 +16,26 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
     case outputTooLarge
     case runFailed
     case runOutcomeUnknown
+    case authorSourceInvalid
+    case authorSourceTooLarge
+    case authorSourceForbidden
+    case cherriUnavailable
+    case cherriUnsupported
+    case authorCompilationFailed
+    case authorArtifactInvalid
+    case authorSigningFailed
+    case authorOutputExists
+    case authorTimedOut
+    case authorRegistryInvalid
+    case authorManagedOnly
+    case authorSourceConflict
+    case authorNameConflict
+    case authorImportFailed
+    case authorImportOutcomeUnknown
+    case authorCreateConfirmationRequired
+    case authorUpdateConfirmationRequired
+    case authorUpdateUnverifiable
+    case authorForgetConfirmationRequired
 
     public var machineCode: String {
         switch self {
@@ -36,6 +56,26 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
         case .outputTooLarge: "SHORTCUTS_OUTPUT_TOO_LARGE"
         case .runFailed: "SHORTCUTS_RUN_FAILED"
         case .runOutcomeUnknown: "SHORTCUTS_RUN_OUTCOME_UNKNOWN"
+        case .authorSourceInvalid: "SHORTCUTS_AUTHOR_SOURCE_INVALID"
+        case .authorSourceTooLarge: "SHORTCUTS_AUTHOR_SOURCE_TOO_LARGE"
+        case .authorSourceForbidden: "SHORTCUTS_AUTHOR_SOURCE_FORBIDDEN"
+        case .cherriUnavailable: "SHORTCUTS_CHERRI_UNAVAILABLE"
+        case .cherriUnsupported: "SHORTCUTS_CHERRI_UNSUPPORTED"
+        case .authorCompilationFailed: "SHORTCUTS_AUTHOR_COMPILATION_FAILED"
+        case .authorArtifactInvalid: "SHORTCUTS_AUTHOR_ARTIFACT_INVALID"
+        case .authorSigningFailed: "SHORTCUTS_AUTHOR_SIGNING_FAILED"
+        case .authorOutputExists: "SHORTCUTS_AUTHOR_OUTPUT_EXISTS"
+        case .authorTimedOut: "SHORTCUTS_AUTHOR_TIMEOUT"
+        case .authorRegistryInvalid: "SHORTCUTS_AUTHOR_REGISTRY_INVALID"
+        case .authorManagedOnly: "SHORTCUTS_AUTHOR_MANAGED_ONLY"
+        case .authorSourceConflict: "SHORTCUTS_AUTHOR_SOURCE_CONFLICT"
+        case .authorNameConflict: "SHORTCUTS_AUTHOR_NAME_CONFLICT"
+        case .authorImportFailed: "SHORTCUTS_AUTHOR_IMPORT_FAILED"
+        case .authorImportOutcomeUnknown: "SHORTCUTS_AUTHOR_IMPORT_OUTCOME_UNKNOWN"
+        case .authorCreateConfirmationRequired: "SHORTCUTS_AUTHOR_CREATE_CONFIRMATION_REQUIRED"
+        case .authorUpdateConfirmationRequired: "SHORTCUTS_AUTHOR_UPDATE_CONFIRMATION_REQUIRED"
+        case .authorUpdateUnverifiable: "SHORTCUTS_AUTHOR_UPDATE_UNVERIFIABLE"
+        case .authorForgetConfirmationRequired: "SHORTCUTS_AUTHOR_FORGET_CONFIRMATION_REQUIRED"
         }
     }
 
@@ -75,6 +115,46 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
             "The system shortcuts CLI reported that the shortcut failed."
         case .runOutcomeUnknown:
             "The shortcut exceeded its deadline. Its side effects may have occurred. Do not retry automatically; inspect the target state first."
+        case .authorSourceInvalid:
+            "The Cherri source must be a readable UTF-8 .cherri file with exactly one bounded #define name declaration."
+        case .authorSourceTooLarge:
+            "Cherri source exceeds the 256 KiB authoring limit."
+        case .authorSourceForbidden:
+            "Cherri source uses a forbidden include, package, reference, embedded file, raw action, custom action definition, or apparent inline secret."
+        case .cherriUnavailable:
+            "Cherri is not installed. Install the optional official compiler with Homebrew before using Shortcuts authoring."
+        case .cherriUnsupported:
+            "The installed Cherri version is outside the explicitly gated 2.3.x compatibility range."
+        case .authorCompilationFailed:
+            "Cherri rejected the source. Compiler output is intentionally not echoed because it may contain source data; run Cherri directly for local diagnosis."
+        case .authorArtifactInvalid:
+            "Cherri produced an invalid or unbounded unsigned Shortcut artifact."
+        case .authorSigningFailed:
+            "The system shortcuts signer rejected the generated artifact. This macOS/Shortcuts/Cherri combination is not authoring-compatible; no import was attempted."
+        case .authorOutputExists:
+            "The requested build output already exists; automatic overwrite is refused."
+        case .authorTimedOut:
+            "The bounded Cherri or system signing process exceeded its deadline and was stopped."
+        case .authorRegistryInvalid:
+            "The private managed-Shortcuts registry is missing, corrupt, or contains invalid opaque metadata."
+        case .authorManagedOnly:
+            "This operation is allowed only for a shortcut already tracked by the private macos-data registry."
+        case .authorSourceConflict:
+            "The expected source SHA-256 does not match the managed registry. Refresh state and do not overwrite silently."
+        case .authorNameConflict:
+            "A shortcut with the managed source name already exists. Create refuses ambiguous replacement; use guarded managed update instead."
+        case .authorImportFailed:
+            "Shortcuts.app could not open the signed artifact for visible import. No successful import was confirmed."
+        case .authorImportOutcomeUnknown:
+            "The visible import was opened but its result could not be confirmed. Do not retry automatically; list Shortcuts and inspect the pending receipt first."
+        case .authorCreateConfirmationRequired:
+            "Applying managed Shortcut creation requires --confirm \"CREATE MANAGED SHORTCUT\"."
+        case .authorUpdateConfirmationRequired:
+            "Applying managed Shortcut update requires --confirm \"UPDATE MANAGED SHORTCUT\" and an explicit replace or retain-old strategy."
+        case .authorUpdateUnverifiable:
+            "The replacement cannot be distinguished safely through public Shortcuts metadata. Use retain-old or change the action count before applying."
+        case .authorForgetConfirmationRequired:
+            "Removing a managed registry entry requires --confirm \"FORGET MANAGED SHORTCUT\". This does not delete the Shortcut itself."
         }
     }
 }

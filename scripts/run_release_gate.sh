@@ -24,15 +24,15 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
-[[ "$EXPECTED_VERSION" == "0.7.0" ]] || {
-  echo "0.7.0 release gate requires VERSION=0.7.0; observed=$EXPECTED_VERSION" >&2
+[[ "$EXPECTED_VERSION" == "0.7.1" ]] || {
+  echo "0.7.1 release gate requires VERSION=0.7.1; observed=$EXPECTED_VERSION" >&2
   exit 1
 }
 
 plutil -lint Sources/macos-data/Info.plist scripts/macos-data-app-Info.plist scripts/macos-data.entitlements >/dev/null
-rg -q '^## 0\.7\.0 — ' CHANGELOG.md
-rg -q 'current source release is 0\.7\.0' README.md
-rg -q '当前源码版本为 0\.7\.0' README_CN.md
+rg -q '^## 0\.7\.1 — ' CHANGELOG.md
+rg -q 'current source release is 0\.7\.1' README.md
+rg -q '当前源码版本为 0\.7\.1' README_CN.md
 
 bash scripts/run_swift_tests.sh --quiet
 swift build -c release
@@ -78,6 +78,7 @@ PHOTOS_ENTITLEMENT="$(
 }
 
 MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_cli_contract_tests.sh --no-apply
+MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_shortcuts_authoring_smoke.sh
 MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_calendar_contract_tests.sh
 CALENDAR_PREFLIGHT="$DEBUG_APP_TEMP_ROOT/calendar-sources.json"
 set +e

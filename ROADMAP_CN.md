@@ -418,23 +418,33 @@ Release/debug app 编译并通过全部 222 个 Swift tests。标准测试使用
 Cherri 作为可选外部编译器调用，不复制其 GPL-2.0 源码；Apple 未公开的 Shortcut 文件格式必须明确
 标记为 experimental，并为每个受支持 macOS/Shortcuts 版本设置兼容性 gate。
 
-- [ ] 实现 `shortcuts author validate` 与 `shortcuts author build`
+- [x] 实现 `shortcuts author validate` 与 `shortcuts author build`
   - validate 检查 Cherri 可用性、源码大小、允许的 include/package、敏感值规则和目标 action 定义
   - build 在私有临时目录生成 `.shortcut`，使用系统 `shortcuts sign`，返回 source/compiled SHA-256、
     action count 和签名模式，不输出源码、参数或 secret
-- [ ] 实现受保护的 `shortcuts create`
+  - Cherri 2.3.0 validate/build 与系统签名已在 macOS 27 Beta 5 通过；非导入 gate 还验证
+    `0600`、拒绝覆盖和结果脱敏。只复制源码字节可避免继承 `com.apple.provenance` 导致签名器拒绝
+- [x] 实现受保护的 `shortcuts create`
   - 默认 dry-run；apply 需要准确确认短语，并通过 Shortcuts.app 完成可见导入
   - 使用短期 idempotency receipt；导入后按 opaque ID、名称、action count 和显式 smoke input/output 回读
-- [ ] 实现受保护的 `shortcuts update`
+  - runtime、receipt、确认、dry-run、脱敏、registry、可见导入和准确黑盒 sentinel 输出均已通过
+- [x] 实现受保护的 `shortcuts update`
   - 只接受 registry 中已有的 managed shortcut，要求 expected source hash，禁止把任意用户 shortcut
     静默纳入管理
   - Apple 没有公开原地动作图替换 API，因此首版采用“编译候选版本 -> 导入 -> 验证 -> 明确确认替换/保留旧版”；
     失败时保留旧版，禁止先删后装
-- [ ] 建立私有本机 registry 和完整 gate
+  - managed-only 并发保护、retain-old 打包、禁止自动重试和 registry identity 原子替换已通过；
+    macOS 27 Beta 5 出现 public/compiled count 不一致时，replace 保持 fail closed
+- [x] 建立私有本机 registry 和完整 gate
   - registry 只保存 opaque shortcut ID、source/compiled hash、action count、版本和时间；权限为目录 `0700`、
     文件 `0600`、原子写入，不保存动作参数、源码、Token 或其他 secret
+  - registry 实现及 `0700`/`0600`、原子写入、字段校验、脱敏、managed-list 和只清 registry 的 forget
+    测试已完成
   - disposable fixture 覆盖 validate、build、sign、import、运行、源码修改、再次导入、回读和清理；
     macOS/Shortcuts 大版本变化时必须重新执行
+  - macOS 27 Beta 5 + Cherri 2.3.0 gate 已通过 create、准确 sentinel 运行、retain-old update、
+    第二次准确运行、语义化 UI 清理和 fixture/registry 零残留。两个可运行导入的 Shortcuts Events
+    count 都是 `0`，因此编译 count 与 observed count 保持独立字段
 
 ### 0.7.2：任意现有 Shortcut 的实验性编辑
 

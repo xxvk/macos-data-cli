@@ -73,6 +73,12 @@ assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read commands and guarded 
 assert_contains "$TMP_DIR/shortcuts-help.out" 'Shortcuts 0\.7 commands'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'MOVE SHORTCUT'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'RUN SHORTCUT'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'author validate'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'author build'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'never uses HubSign'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'CREATE MANAGED SHORTCUT'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'UPDATE MANAGED SHORTCUT'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'FORGET MANAGED SHORTCUT'
 
 "$CLI" --help >"$TMP_DIR/global-help.out"
 assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error, 9 Shortcuts error'
@@ -166,6 +172,25 @@ run_expected_failure shortcuts-run-wrong-confirmation 9 "$CLI" shortcuts run --i
 run_expected_failure shortcuts-run-invalid-timeout 9 "$CLI" shortcuts run --id shortcut_invalid --timeout 0 --apply --confirm "RUN SHORTCUT" --format json
 run_expected_failure shortcuts-move-missing-confirmation 9 "$CLI" shortcuts move --id shortcut_invalid --destination-folder-id shortcutfolder_invalid --apply --format json
 run_expected_failure shortcuts-move-conflicting-mode 9 "$CLI" shortcuts move --id shortcut_invalid --destination-folder-id shortcutfolder_invalid --dry-run --apply --format json
+run_expected_failure shortcuts-author-validate-missing-source 9 "$CLI" shortcuts author validate --format json
+run_expected_failure shortcuts-author-validate-wrong-extension 9 "$CLI" shortcuts author validate --source "$TMP_DIR/source.txt" --format json
+run_expected_failure shortcuts-author-build-missing-output 9 "$CLI" shortcuts author build --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json
+run_expected_failure shortcuts-author-build-invalid-signing-mode 9 "$CLI" shortcuts author build --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --output "$TMP_DIR/out.shortcut" --signing-mode remote --format json
+run_expected_failure shortcuts-create-missing-source 9 "$CLI" shortcuts create --dry-run --format json
+run_expected_failure shortcuts-create-conflicting-mode 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --dry-run --apply --format json
+run_expected_failure shortcuts-create-apply-missing-confirmation 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --apply --format json
+run_expected_failure shortcuts-create-apply-wrong-confirmation 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --apply --confirm "CREATE SHORTCUT" --format json
+run_expected_failure shortcuts-create-dry-run-rejects-confirmation 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --dry-run --confirm "CREATE MANAGED SHORTCUT" --format json
+run_expected_failure shortcuts-update-missing-strategy 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --dry-run --format json
+run_expected_failure shortcuts-update-conflicting-mode 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy retain-old --dry-run --apply --format json
+run_expected_failure shortcuts-update-apply-missing-confirmation 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy retain-old --apply --format json
+run_expected_failure shortcuts-update-wrong-confirmation 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy replace --apply --confirm "UPDATE SHORTCUT" --format json
+run_expected_failure shortcuts-update-unmanaged 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy retain-old --dry-run --format json
+assert_contains "$TMP_DIR/shortcuts-update-unmanaged.out" 'SHORTCUTS_AUTHOR_MANAGED_ONLY'
+"$CLI" shortcuts managed list --format json >"$TMP_DIR/shortcuts-managed-list.out"
+assert_contains "$TMP_DIR/shortcuts-managed-list.out" '"ok"[[:space:]]*:[[:space:]]*true'
+run_expected_failure shortcuts-managed-forget-missing-confirmation 9 "$CLI" shortcuts managed forget --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --apply --format json
+run_expected_failure shortcuts-managed-forget-unmanaged 9 "$CLI" shortcuts managed forget --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --dry-run --format json
 
 set +e
 printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1

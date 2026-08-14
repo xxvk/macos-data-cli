@@ -38,6 +38,30 @@ For Photos 0.5 planning or implementation, also read:
     before changing PhotoKit permissions, metadata, album, export, or mutation
     behavior
 
+For Shortcuts 0.7.1 authoring, also read:
+
+12. `docs/development/shortcuts-authoring.md` or the Chinese version before
+    compiling, signing, importing, registering, or updating a Shortcut
+
+Shortcuts authoring rules:
+
+- Cherri 2.3.x remains an optional external process; never bundle its GPL source
+  or fall back to HubSign/remote signing.
+- Create/update default to preview and may manage only `.cherri` SSOT records in
+  the private registry. Never adopt an arbitrary existing Shortcut by name.
+- Pending/unknown imports prohibit automatic retry. Inspect Shortcuts.app,
+  metadata, receipts, and registry state first.
+- Treat compiled `actionCount` and public `observedActionCount` separately.
+  macOS 27 Beta 5 returned `0` for working Cherri imports; use an explicitly
+  safe black-box run as graph proof, and reject same-name replace when counts
+  do not establish a distinguishable transition.
+- `managed forget` removes registry/receipt state only; it never deletes a
+  Shortcut.
+- `scripts/run_shortcuts_authoring_integration.sh` performs visible writes and
+  requires explicit current-task authorization in addition to its exact outer
+  confirmation. Cleanup is semantic UI deletion of the unique fixture followed
+  by zero-residue read-back.
+
 ## Current development executable
 
 During local development, use the Debug app workflow described in
@@ -337,6 +361,7 @@ bash scripts/run_photos_metadata_smoke.sh
 bash scripts/run_photos_export_smoke.sh
 bash scripts/run_notes_write_integration.sh
 bash scripts/run_notes_folder_integration.sh
+bash scripts/run_shortcuts_authoring_smoke.sh
 # Add --apply only for an explicitly authorized disposable signed-app gate.
 bash scripts/run_local_calendar_integration.sh
 bash scripts/run_installed_release_smoke.sh

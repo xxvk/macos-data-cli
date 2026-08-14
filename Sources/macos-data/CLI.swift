@@ -68,6 +68,8 @@ struct MacosDataCLI {
             let notesStore = NotesStore(permission: notesPermission)
             let shortcutsPermission = ShortcutsPermissionService()
             let shortcutsStore = ShortcutsStore(permission: shortcutsPermission)
+            let shortcutsAuthoring = CherriAuthoringBridge()
+            let shortcutsAuthoringService = ShortcutsAuthoringService(builder: shortcutsAuthoring)
             switch arguments {
             case ["resources"]:
                 emitJSONSuccess(makeResourcesResult(
@@ -88,6 +90,23 @@ struct MacosDataCLI {
                 let result = shortcutsPermission.check(requestConsent: true)
                 emitJSONSuccess(result)
                 if !result.readable { Foundation.exit(CLIExitCode.shortcutsFailure.rawValue) }
+            case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "author" && args[2] == "validate":
+                let request = try parseShortcutAuthorArguments(Array(args.dropFirst(3)), build: false)
+                emitJSONSuccess(try shortcutsAuthoring.validate(sourceURL: request.sourceURL))
+            case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "author" && args[2] == "build":
+                let request = try parseShortcutAuthorArguments(Array(args.dropFirst(3)), build: true)
+                emitJSONSuccess(try shortcutsAuthoring.build(sourceURL: request.sourceURL, outputURL: request.outputURL!, signingMode: request.signingMode))
+            case let args where args.count >= 2 && args[0] == "shortcuts" && args[1] == "create":
+                let request = try parseShortcutCreateArguments(Array(args.dropFirst(2)))
+                emitJSONSuccess(try shortcutsAuthoringService.create(sourceURL: request.sourceURL, signingMode: request.signingMode, apply: request.apply, idempotent: request.idempotent))
+            case let args where args.count >= 2 && args[0] == "shortcuts" && args[1] == "update":
+                let request = try parseShortcutUpdateArguments(Array(args.dropFirst(2)))
+                emitJSONSuccess(try shortcutsAuthoringService.update(id: request.id, sourceURL: request.sourceURL, expectedSourceSHA256: request.expectedSourceSHA256, strategy: request.strategy, signingMode: request.signingMode, apply: request.apply))
+            case ["shortcuts", "managed", "list"]:
+                emitJSONSuccess(try shortcutsAuthoringService.managedRecords())
+            case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "managed" && args[2] == "forget":
+                let request = try parseShortcutManagedForgetArguments(Array(args.dropFirst(3)))
+                emitJSONSuccess(try shortcutsAuthoringService.forgetManaged(id: request.id, apply: request.apply))
             case let args where args.count >= 2 && args[0] == "shortcuts" && args[1] == "list":
                 let request = try parseShortcutsPageArguments(Array(args.dropFirst(2)), allowsFolder: true)
                 emitJSONSuccess(try shortcutsStore.list(limit: request.limit, cursor: request.cursor, folderID: request.folderID))
@@ -1829,6 +1848,164 @@ struct MacosDataCLI {
         let timeoutSeconds: Int
     }
 
+    private struct ShortcutAuthorArguments {
+        let sourceURL: URL
+        let outputURL: URL?
+        let signingMode: ShortcutSigningMode
+    }
+
+    private struct ShortcutCreateArguments {
+        let sourceURL: URL
+        let signingMode: ShortcutSigningMode
+        let apply: Bool
+        let idempotent: Bool
+    }
+
+    private static func parseShortcutCreateArguments(_ arguments: [String]) throws -> ShortcutCreateArguments {
+        var sourceURL: URL?
+        var signingMode = ShortcutSigningMode.peopleWhoKnowMe
+        var apply = false
+        var dryRun = false
+        var idempotent = false
+        var confirmation: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--source", "--signing-mode", "--dry-run", "--apply", "--idempotent", "--confirm"].contains(option),
+                  seen.insert(option).inserted else { throw ShortcutsError.authorSourceInvalid }
+            switch option {
+            case "--dry-run": dryRun = true; index += 1
+            case "--apply": apply = true; index += 1
+            case "--idempotent": idempotent = true; index += 1
+            default:
+                guard index + 1 < arguments.count else { throw ShortcutsError.authorSourceInvalid }
+                let value = arguments[index + 1]
+                if option == "--source" { sourceURL = URL(fileURLWithPath: value) }
+                else if option == "--signing-mode" {
+                    guard let parsed = ShortcutSigningMode(rawValue: value) else { throw ShortcutsError.authorSourceInvalid }
+                    signingMode = parsed
+                } else { confirmation = value }
+                index += 2
+            }
+        }
+        guard let sourceURL, sourceURL.pathExtension.lowercased() == "cherri", !(apply && dryRun) else {
+            throw ShortcutsError.authorSourceInvalid
+        }
+        if apply {
+            guard confirmation == "CREATE MANAGED SHORTCUT" else { throw ShortcutsError.authorCreateConfirmationRequired }
+        } else if confirmation != nil {
+            throw ShortcutsError.authorSourceInvalid
+        }
+        return ShortcutCreateArguments(sourceURL: sourceURL, signingMode: signingMode, apply: apply, idempotent: idempotent)
+    }
+
+    private struct ShortcutUpdateArguments {
+        let id: String
+        let sourceURL: URL
+        let expectedSourceSHA256: String
+        let strategy: ShortcutUpdateStrategy
+        let signingMode: ShortcutSigningMode
+        let apply: Bool
+    }
+
+    private static func parseShortcutUpdateArguments(_ arguments: [String]) throws -> ShortcutUpdateArguments {
+        var id: String?
+        var sourceURL: URL?
+        var expectedSourceSHA256: String?
+        var strategy: ShortcutUpdateStrategy?
+        var signingMode = ShortcutSigningMode.peopleWhoKnowMe
+        var apply = false
+        var dryRun = false
+        var confirmation: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--id", "--source", "--expected-source-sha256", "--strategy", "--signing-mode", "--dry-run", "--apply", "--confirm"].contains(option), seen.insert(option).inserted else {
+                throw ShortcutsError.authorSourceInvalid
+            }
+            if option == "--dry-run" { dryRun = true; index += 1; continue }
+            if option == "--apply" { apply = true; index += 1; continue }
+            guard index + 1 < arguments.count else { throw ShortcutsError.authorSourceInvalid }
+            let value = arguments[index + 1]
+            switch option {
+            case "--id": id = value
+            case "--source": sourceURL = URL(fileURLWithPath: value)
+            case "--expected-source-sha256": expectedSourceSHA256 = value
+            case "--strategy": strategy = ShortcutUpdateStrategy(rawValue: value)
+            case "--signing-mode": signingMode = ShortcutSigningMode(rawValue: value) ?? signingMode
+            case "--confirm": confirmation = value
+            default: break
+            }
+            if option == "--strategy" && strategy == nil { throw ShortcutsError.authorSourceInvalid }
+            if option == "--signing-mode" && ShortcutSigningMode(rawValue: value) == nil { throw ShortcutsError.authorSourceInvalid }
+            index += 2
+        }
+        guard let id, ShortcutsOpaqueID.isShortcut(id), let sourceURL, sourceURL.pathExtension.lowercased() == "cherri",
+              let expectedSourceSHA256, expectedSourceSHA256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+              let strategy, !(apply && dryRun) else { throw ShortcutsError.authorSourceInvalid }
+        if apply {
+            guard confirmation == "UPDATE MANAGED SHORTCUT" else { throw ShortcutsError.authorUpdateConfirmationRequired }
+        } else if confirmation != nil { throw ShortcutsError.authorSourceInvalid }
+        return ShortcutUpdateArguments(id: id, sourceURL: sourceURL, expectedSourceSHA256: expectedSourceSHA256, strategy: strategy, signingMode: signingMode, apply: apply)
+    }
+
+    private struct ShortcutManagedForgetArguments { let id: String; let apply: Bool }
+
+    private static func parseShortcutManagedForgetArguments(_ arguments: [String]) throws -> ShortcutManagedForgetArguments {
+        var id: String?
+        var apply = false
+        var dryRun = false
+        var confirmation: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--id", "--dry-run", "--apply", "--confirm"].contains(option), seen.insert(option).inserted else {
+                throw ShortcutsError.authorSourceInvalid
+            }
+            if option == "--dry-run" { dryRun = true; index += 1; continue }
+            if option == "--apply" { apply = true; index += 1; continue }
+            guard index + 1 < arguments.count else { throw ShortcutsError.authorSourceInvalid }
+            if option == "--id" { id = arguments[index + 1] } else { confirmation = arguments[index + 1] }
+            index += 2
+        }
+        guard let id, ShortcutsOpaqueID.isShortcut(id), !(apply && dryRun) else { throw ShortcutsError.authorSourceInvalid }
+        if apply {
+            guard confirmation == "FORGET MANAGED SHORTCUT" else { throw ShortcutsError.authorForgetConfirmationRequired }
+        } else if confirmation != nil { throw ShortcutsError.authorSourceInvalid }
+        return ShortcutManagedForgetArguments(id: id, apply: apply)
+    }
+
+    private static func parseShortcutAuthorArguments(_ arguments: [String], build: Bool) throws -> ShortcutAuthorArguments {
+        var sourceURL: URL?
+        var outputURL: URL?
+        var signingMode = ShortcutSigningMode.peopleWhoKnowMe
+        var seen = Set<String>()
+        var index = 0
+        let allowed = build ? ["--source", "--output", "--signing-mode"] : ["--source"]
+        while index < arguments.count {
+            let option = arguments[index]
+            guard allowed.contains(option), seen.insert(option).inserted, index + 1 < arguments.count else {
+                throw ShortcutsError.authorSourceInvalid
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--source": sourceURL = URL(fileURLWithPath: value)
+            case "--output": outputURL = URL(fileURLWithPath: value)
+            case "--signing-mode":
+                guard let parsed = ShortcutSigningMode(rawValue: value) else { throw ShortcutsError.authorSourceInvalid }
+                signingMode = parsed
+            default: break
+            }
+            index += 2
+        }
+        guard let sourceURL, sourceURL.pathExtension.lowercased() == "cherri",
+              !build || outputURL != nil else { throw ShortcutsError.authorSourceInvalid }
+        return ShortcutAuthorArguments(sourceURL: sourceURL, outputURL: outputURL, signingMode: signingMode)
+    }
+
     private static func parseShortcutRunArguments(_ arguments: [String]) throws -> ShortcutRunArguments {
         var id: String?
         var inputPaths: [URL] = []
@@ -1934,12 +2111,45 @@ struct MacosDataCLI {
           move --id <opaque-id> --destination-folder-id <opaque-id>
             --apply --confirm "MOVE SHORTCUT" --format json
                                              Move and immediately verify folder identity
+          author validate --source <file.cherri> --format json
+                                             Validate bounded managed Cherri source and
+                                             compile an unsigned artifact privately
+          author build --source <file.cherri> --output <file.shortcut>
+            [--signing-mode people-who-know-me|anyone] --format json
+                                             Build and sign without importing; refuses
+                                             overwrite and never echoes source content
+          create --source <file.cherri> [--signing-mode people-who-know-me|anyone]
+            [--dry-run] [--idempotent] --format json
+                                             Build a private preview; dry-run is default
+          create --source <file.cherri> [--signing-mode people-who-know-me|anyone]
+            --apply [--idempotent] --confirm "CREATE MANAGED SHORTCUT" --format json
+                                             Open a visible Shortcuts.app import and
+                                             register only unique read-back confirmation
+          update --id <managed-opaque-id> --source <file.cherri>
+            --expected-source-sha256 <sha256> --strategy replace|retain-old
+            [--dry-run] [--signing-mode people-who-know-me|anyone] --format json
+                                             Preview only a registry-managed update
+          update --id <managed-opaque-id> --source <file.cherri>
+            --expected-source-sha256 <sha256> --strategy replace|retain-old
+            --apply --confirm "UPDATE MANAGED SHORTCUT" --format json
+                                             Import and verify before atomically moving
+                                             registry identity; never deletes old first
+          managed list --format json        List private managed identities and hashes
+          managed forget --id <managed-opaque-id> [--dry-run] --format json
+                                             Preview registry-only removal
+          managed forget --id <managed-opaque-id> --apply
+            --confirm "FORGET MANAGED SHORTCUT" --format json
+                                             Remove registry/receipt only; never deletes
+                                             the Shortcut from Shortcuts.app
 
         Shortcuts boundary:
           Uses only the system shortcuts CLI and public Shortcuts Events
           scripting dictionary. Names are display values, never identity.
           Metadata includes action count but never claims to expose the action
           graph or parameters. Private Shortcuts databases are never accessed.
+          Authoring is experimental, requires optional Cherri 2.3.x, forbids
+          packages/references/file embedding/raw actions/inline secrets, and
+          never uses HubSign or another remote signing service.
 
         Calendar commands:
           permission                         Request full Calendar access

@@ -40,7 +40,7 @@ macos-data mail doctor --format json
 
 ## 项目状态
 
-当前源码版本为 0.7.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.7.1。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -84,6 +84,11 @@ scripting dictionary，实现 permission、有限 list/get/folders、受保护 r
 synthetic TDD 与一次性真实 gate 已通过：准确文本输出、move preview、move apply/read-back、恢复及
 fixture 零残留均已验证。adapter 会在冷启动命令中启动按需运行的 Shortcuts Events helper，并从
 系统 CLI 的 stdout 捕获 plaintext 输出；它不读取动作图，也不访问 Shortcuts 私有数据库。
+开发树现已加入 0.7.1 受管理源码 validate/build/create/update、私有 registry/receipt 和
+managed-forget 代码。create/update 除非提供准确确认短语，否则只 preview；任意已有 Shortcut
+不能被静默接管。macOS 27 Beta 5 + Cherri 2.3.0 的一次性 create/run/retain-old update/run/cleanup
+gate 已通过，fixture/registry 零残留。两个可正常运行的导入对象公开 action count 都是 `0`，因此
+编译 count 与 observed count 分开返回；两者不一致时同名 replace fail closed。
 
 详细开发计划请参阅：
 
@@ -103,6 +108,7 @@ fixture 零残留均已验证。adapter 会在冷启动命令中启动按需运�
 - [Photos 0.5 架构](docs/development/photos-adapter-architecture_CN.md)
 - [Notes 0.6 可行性决策](docs/development/notes-adapter-feasibility_CN.md)
 - [Shortcuts 命令与安全边界](docs/usage_CN.md#shortcuts070-开发切片)
+- [Shortcuts 0.7.1 authoring 边界](docs/development/shortcuts-authoring_CN.md)
 
 ## 核心目标
 

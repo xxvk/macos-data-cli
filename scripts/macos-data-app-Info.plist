@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.7.0</string>
+	<string>0.7.1</string>
 	<key>CFBundleVersion</key>
-	<string>0.7.0</string>
+	<string>0.7.1</string>
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSContactsUsageDescription</key>
@@ -29,6 +29,6 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>macos-data needs Photos access to query photo and album metadata and to export only explicitly requested assets.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>macos-data uses Apple Events only for explicitly requested Mail.app and Notes.app operations.</string>
+	<string>macos-data uses Apple Events only for explicitly requested Mail.app, Notes.app, and Shortcuts operations.</string>
 </dict>
 </plist>

@@ -44,7 +44,7 @@ operations require an additional confirmation phrase. See the full
 
 ## Project status
 
-The current source release is 0.7.0. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.7.1. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -104,6 +104,14 @@ preview, move apply/read-back, restoration, and zero fixture residue were all
 verified. The adapter also starts the on-demand Shortcuts Events helper for cold
 commands and captures plaintext output from the system CLI's stdout. It neither
 reads action graphs nor accesses the private Shortcuts database.
+The development tree now includes guarded 0.7.1 managed-source validate, build,
+create, update, private registry/receipt, and managed-forget code. Create/update
+remain preview-only unless their exact confirmation is supplied, and arbitrary
+existing shortcuts cannot be adopted. The disposable create/run/retain-old
+update/run/cleanup gate passed on macOS 27 Beta 5 with Cherri 2.3.0 and left
+zero fixture/registry residue. Public action counts were `0` for both working
+imports, so compiled and observed counts are separate and same-name replace
+fails closed when they differ.
 
 See the detailed roadmaps:
 
@@ -116,6 +124,7 @@ User documentation:
 - [Development Rules](docs/development/rules.md)
 - [Installation](INSTALL.md)
 - [Agent integration guide](AGENTS.md)
+- [Shortcuts 0.7.1 authoring boundary](docs/development/shortcuts-authoring.md)
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
 - [Calendar 0.3 architecture](docs/development/calendar-adapter-architecture.md)

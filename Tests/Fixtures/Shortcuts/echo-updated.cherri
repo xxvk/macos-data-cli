@@ -1,0 +1,10 @@
+#define name Macos Data 071 Fixture
+#define color blue
+#define glyph shortcuts
+#define inputs text
+#define outputs text
+#include 'actions/text'
+
+const first = text(ShortcutInput)
+const second = text(first)
+output(second)

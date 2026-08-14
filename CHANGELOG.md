@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.7.1 — 2026-08-14
+
+### Added
+
+- Added guarded Cherri 2.3.x managed-source validation, local compilation,
+  system signing, visible create, and managed update. Cherri remains an optional
+  external GPL-2.0 process and is not bundled; HubSign and remote signing are
+  prohibited.
+- Added strict UTF-8/source-size/include/secret policy, bounded artifact parsing,
+  SHA-256-only result metadata, exact apply confirmations, 60-second private
+  idempotency receipts, and a mode-`0700`/`0600` atomic managed registry.
+- Added `shortcuts managed list` and non-deleting `managed forget`, plus 22
+  authoring tests, no-apply CLI contracts, a non-importing Cherri gate, and a
+  disposable signed-app lifecycle gate.
+
+### Fixed
+
+- Copy Cherri source bytes rather than iCloud file metadata so inherited
+  `com.apple.provenance` cannot make the system signer reject an otherwise valid
+  artifact.
+- Compile `retain-old` candidates with a distinct internal name while preserving
+  the original `.cherri` source hash as the managed SSOT and atomically moving
+  registry identity only after visible read-back.
+- Report compiled `actionCount` separately from public `observedActionCount`.
+  On macOS 27 Beta 5, Shortcuts Events reported `0` for both working Cherri
+  imports; exact black-box sentinel runs proved both graphs, and cleanup restored
+  the original two Shortcuts with fixture and registry residue both zero.
+- Force-kill a Cherri or signer child process if it ignores termination after
+  the authoring deadline, and surface a missing private registry when a completed
+  idempotency receipt still confirms the visible Shortcut.
+
+### Limitations
+
+- Same-name `replace` fails closed when public and compiled action counts differ,
+  because Apple exposes no other stable public action-graph replacement token.
+  Use the separately named `retain-old` strategy and verify it with an explicitly
+  safe black-box run.
+- Version 0.7.1 manages only `.cherri` SSOT records created by macos-data. It
+  cannot adopt or edit arbitrary existing Shortcuts; that remains experimental
+  0.7.2 work.
+
 ## 0.7.0 — 2026-08-14
 
 ### Added

@@ -517,30 +517,45 @@ as an optional external compiler without copying its GPL-2.0 source. Clearly
 label the undocumented Apple Shortcut file format as experimental and gate each
 supported macOS/Shortcuts version independently.
 
-- [ ] Implement `shortcuts author validate` and `shortcuts author build`
+- [x] Implement `shortcuts author validate` and `shortcuts author build`
   - Validate Cherri availability, source size, allowed includes/packages,
     sensitive-value rules, and target action definitions
   - Build in a private temporary directory, sign through the system
     `shortcuts sign`, and return source/compiled SHA-256, action count, and
     signing mode without emitting source, parameters, or secrets
-- [ ] Implement guarded `shortcuts create`
+  - Cherri 2.3.0 validate/build and system signing passed on macOS 27 Beta 5;
+    the non-importing gate also verifies mode `0600`, no overwrite, and result
+    redaction. Byte-only source copying avoids inherited `com.apple.provenance`
+    that otherwise causes the system signer to reject the generated artifact
+- [x] Implement guarded `shortcuts create`
   - Default to dry-run. Apply requires an exact confirmation phrase and performs
     a visible import through Shortcuts.app
   - Use a short-lived idempotency receipt and verify the imported opaque ID,
     name, action count, and explicit smoke input/output
-- [ ] Implement guarded `shortcuts update`
+  - Runtime, receipt, confirmation, dry-run, redaction, registry integration,
+    visible import, and exact black-box sentinel output passed
+- [x] Implement guarded `shortcuts update`
   - Accept only a managed shortcut already present in the registry and require
     an expected source hash. Never silently adopt an arbitrary user shortcut
   - Because Apple exposes no in-place action-graph replacement API, initially
     compile, import, and verify a candidate before explicit replace/retain-old
     confirmation. Never delete the old version first
-- [ ] Add a private local registry and complete live gate
+  - Managed-only concurrency, retain-old packaging, no-auto-retry, and atomic
+    registry identity replacement passed. Replace fails closed when public and
+    compiled counts differ, as observed on macOS 27 Beta 5
+- [x] Add a private local registry and complete live gate
   - Store only opaque shortcut ID, source/compiled hashes, action count, version,
     and timestamps. Use directory mode `0700`, file mode `0600`, and atomic
     writes; never retain action parameters, source, tokens, or other secrets
+  - The registry implementation and its `0700`/`0600`, atomic-write, validation,
+    redaction, managed-list, and non-deleting forget tests are complete
   - A disposable fixture must cover validate, build, sign, import, run, source
     modification, re-import, read-back, and cleanup. Re-run the gate after each
     major macOS/Shortcuts update
+  - The macOS 27 Beta 5 / Cherri 2.3.0 gate passed with create, exact sentinel
+    run, retain-old update, second exact run, semantic UI cleanup, and zero
+    fixture/registry residue. Shortcuts Events reported `0` actions for both
+    working imports, so compiled and observed counts remain separate fields
 
 ### 0.7.2: Experimental editing of arbitrary existing shortcuts
 
