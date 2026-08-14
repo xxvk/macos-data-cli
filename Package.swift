@@ -40,6 +40,10 @@ let package = Package(
             name: "ShortcutsAdapter",
             targets: ["ShortcutsAdapter"]
         ),
+        .library(
+            name: "SafariAdapter",
+            targets: ["SafariAdapter"]
+        ),
         .executable(
             name: "macos-data",
             targets: ["macos-data"]
@@ -111,9 +115,17 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        .target(
+            name: "SafariAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Safari",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .executableTarget(
             name: "macos-data",
-            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter", "ShortcutsAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter", "ShortcutsAdapter", "SafariAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -183,6 +195,13 @@ let package = Package(
         .testTarget(
             name: "ShortcutsTests",
             dependencies: ["ShortcutsAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "SafariTests",
+            dependencies: ["SafariAdapter", "Core"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

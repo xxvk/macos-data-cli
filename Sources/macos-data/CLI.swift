@@ -8,6 +8,7 @@ import RemindersAdapter
 import PhotosAdapter
 import NotesAdapter
 @_spi(ShortcutsFixtureGate) import ShortcutsAdapter
+import SafariAdapter
 
 @main
 struct MacosDataCLI {
@@ -45,7 +46,7 @@ struct MacosDataCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] || arguments == ["notes", "--help"] || arguments == ["shortcuts", "--help"] {
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] || arguments == ["notes", "--help"] || arguments == ["shortcuts", "--help"] || arguments == ["safari", "--help"] {
             printHelp()
             return
         }
@@ -74,6 +75,8 @@ struct MacosDataCLI {
             let shortcutsEditPlan = ShortcutEditPlanService()
             let shortcutsSemanticEdit = ShortcutSemanticEditService()
             let shortcutsAccessibilityDiscovery = ShortcutAccessibilityDiscoveryService()
+            let safariPermission = SafariPermissionService()
+            let safariStore = SafariStore()
             switch arguments {
             case ["resources"]:
                 emitJSONSuccess(makeResourcesResult(
@@ -86,8 +89,28 @@ struct MacosDataCLI {
                     photosPermission: photosPermission,
                     notesPermission: notesPermission,
                     notesStore: notesStore,
-                    shortcutsPermission: shortcutsPermission
+                    shortcutsPermission: shortcutsPermission,
+                    safariPermission: safariPermission
                 ))
+            case ["safari", "permission"]:
+                emitSafariJSONSuccess(safariPermission.check(requestConsent: false))
+            case ["safari", "permission", "--request"]:
+                let result = safariPermission.check(requestConsent: true)
+                emitSafariJSONSuccess(result)
+                if result.automation != .available { Foundation.exit(CLIExitCode.safariFailure.rawValue) }
+            case let args where args.count >= 3 && args[0] == "safari" && args[1] == "bookmarks" && ["list", "query"].contains(args[2]):
+                let request = try parseSafariBookmarkPageArguments(Array(args.dropFirst(3)))
+                emitSafariJSONSuccess(try safariStore.bookmarks(query: request.query, limit: request.limit, cursor: request.cursor))
+            case let args where args.count == 5 && args[0] == "safari" && args[1] == "bookmarks" && args[2] == "get" && args[3] == "--id":
+                emitSafariJSONSuccess(try safariStore.bookmark(id: args[4]))
+            case let args where args.count >= 3 && args[0] == "safari" && args[1] == "reading-list" && ["list", "query"].contains(args[2]):
+                let request = try parseSafariReadingListPageArguments(Array(args.dropFirst(3)))
+                emitSafariJSONSuccess(try safariStore.readingList(query: request.query, limit: request.limit, cursor: request.cursor))
+            case let args where args.count == 5 && args[0] == "safari" && args[1] == "reading-list" && args[2] == "get" && args[3] == "--id":
+                emitSafariJSONSuccess(try safariStore.readingListItem(id: args[4]))
+            case let args where args.count >= 3 && args[0] == "safari" && args[1] == "reading-list" && args[2] == "add":
+                let request = try parseSafariReadingListAddArguments(Array(args.dropFirst(3)))
+                emitSafariJSONSuccess(try safariStore.addReadingList(SafariReadingListAddInput.decode(request.data), apply: request.apply))
             case ["shortcuts", "permission"]:
                 emitJSONSuccess(shortcutsPermission.check(requestConsent: false))
             case ["shortcuts", "permission", "--request"]:
@@ -678,6 +701,9 @@ struct MacosDataCLI {
         } catch let error as ShortcutsError {
             report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.shortcutsFailure.rawValue)
             Foundation.exit(CLIExitCode.shortcutsFailure.rawValue)
+        } catch let error as SafariError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.safariFailure.rawValue)
+            Foundation.exit(CLIExitCode.safariFailure.rawValue)
         } catch let error as PaginationError {
             if rawArguments.first == "reminders" {
                 report(error: error == .invalidLimit ? "Reminder limit must be between 1 and 200." : "Reminder cursor is invalid or stale.", code: CLIErrorCode.reminders.rawValue, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
@@ -691,6 +717,9 @@ struct MacosDataCLI {
             } else if rawArguments.first == "shortcuts" {
                 report(error: error == .invalidLimit ? "Shortcuts limit must be between 1 and 200." : "Shortcuts cursor is invalid or stale.", code: CLIErrorCode.shortcuts.rawValue, arguments: rawArguments, exitCode: CLIExitCode.shortcutsFailure.rawValue)
                 Foundation.exit(CLIExitCode.shortcutsFailure.rawValue)
+            } else if rawArguments.first == "safari" {
+                report(error: error == .invalidLimit ? "Safari limit must be between 1 and 200." : "Safari cursor is invalid or stale.", code: CLIErrorCode.safari.rawValue, arguments: rawArguments, exitCode: CLIExitCode.safariFailure.rawValue)
+                Foundation.exit(CLIExitCode.safariFailure.rawValue)
             } else {
                 report(error: error == .invalidLimit ? "Calendar limit must be between 1 and 200." : "Calendar cursor is invalid or stale.", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
                 Foundation.exit(CLIExitCode.calendarFailure.rawValue)
@@ -758,6 +787,9 @@ struct MacosDataCLI {
 
     private struct NotesWriteAccountArguments { let accountID: String?; let apply: Bool }
     private struct NotesMutationArguments { let id: String?; let data: Data; let apply: Bool; let idempotent: Bool }
+    private struct SafariBookmarkPageArguments { let query: SafariBookmarkQuery; let limit: Int; let cursor: String? }
+    private struct SafariReadingListPageArguments { let query: SafariReadingListQuery; let limit: Int; let cursor: String? }
+    private struct SafariReadingListAddArguments { let data: Data; let apply: Bool }
 
     private static func emitJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -774,6 +806,15 @@ struct MacosDataCLI {
     }
 
     private static func emitNotesJSONSuccess<T: Encodable>(_ value: T) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) {
+            print(text)
+        }
+    }
+
+    private static func emitSafariJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -1693,7 +1734,8 @@ struct MacosDataCLI {
         photosPermission: PhotosPermission,
         notesPermission: NotesPermissionService,
         notesStore: NotesStore,
-        shortcutsPermission: ShortcutsPermissionService
+        shortcutsPermission: ShortcutsPermissionService,
+        safariPermission: SafariPermissionService
     ) -> DataResourcesResult {
         var resources: [DataResource] = []
         var limitations: [String] = []
@@ -1810,6 +1852,18 @@ struct MacosDataCLI {
         case .targetUnavailable: limitations.append("shortcuts_events_unavailable")
         case .unknown: limitations.append("shortcuts_automation_unknown")
         }
+        let safariResult = safariPermission.check(requestConsent: false)
+        resources.append(SafariResourceMapper.map(permission: safariResult))
+        if !safariResult.bookmarksReadable { limitations.append("safari_bookmarks_full_disk_access_required") }
+        switch safariResult.automation {
+        case .available: break
+        case .requiresConsent: limitations.append("safari_automation_requires_consent")
+        case .denied: limitations.append("safari_automation_denied")
+        case .targetNotRunning: limitations.append("safari_not_running")
+        case .targetUnavailable: limitations.append("safari_unavailable")
+        case .unknown: limitations.append("safari_automation_unknown")
+        }
+        limitations.append("safari_bookmark_mutation_deferred_to_guarded_0_8_1_plist_gate")
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
 
@@ -2324,6 +2378,101 @@ struct MacosDataCLI {
         return ShortcutMoveArguments(id: id, destinationFolderID: destinationFolderID, apply: apply)
     }
 
+    private static func parseSafariBookmarkPageArguments(_ arguments: [String]) throws -> SafariBookmarkPageArguments {
+        var query = SafariBookmarkQuery()
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--text", "--url", "--folder-id", "--limit", "--cursor"].contains(option),
+                  seen.insert(option).inserted, index + 1 < arguments.count else { throw SafariError.invalidInput }
+            let value = arguments[index + 1]
+            switch option {
+            case "--text": guard !value.isEmpty && value.count <= 500 else { throw SafariError.invalidInput }; query.text = value
+            case "--url": guard validSafariHTTPURL(value) else { throw SafariError.invalidInput }; query.url = value
+            case "--folder-id": query.folderID = value
+            case "--limit": guard let parsed = Int(value) else { throw SafariError.invalidInput }; limit = parsed
+            case "--cursor": cursor = value
+            default: break
+            }
+            index += 2
+        }
+        return .init(query: query, limit: limit, cursor: cursor)
+    }
+
+    private static func parseSafariReadingListPageArguments(_ arguments: [String]) throws -> SafariReadingListPageArguments {
+        var query = SafariReadingListQuery()
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--text", "--url", "--read", "--limit", "--cursor"].contains(option),
+                  seen.insert(option).inserted, index + 1 < arguments.count else { throw SafariError.invalidInput }
+            let value = arguments[index + 1]
+            switch option {
+            case "--text": guard !value.isEmpty && value.count <= 500 else { throw SafariError.invalidInput }; query.text = value
+            case "--url": guard validSafariHTTPURL(value) else { throw SafariError.invalidInput }; query.url = value
+            case "--read":
+                guard let parsed = ["true": true, "false": false][value] else { throw SafariError.invalidInput }
+                query.read = parsed
+            case "--limit": guard let parsed = Int(value) else { throw SafariError.invalidInput }; limit = parsed
+            case "--cursor": cursor = value
+            default: break
+            }
+            index += 2
+        }
+        return .init(query: query, limit: limit, cursor: cursor)
+    }
+
+    private static func parseSafariReadingListAddArguments(_ arguments: [String]) throws -> SafariReadingListAddArguments {
+        var inputURL: URL?
+        var useStdin = false
+        var apply = false
+        var dryRun = false
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--input", "--stdin", "--dry-run", "--apply"].contains(option), seen.insert(option).inserted else {
+                throw SafariError.invalidInput
+            }
+            switch option {
+            case "--stdin": useStdin = true; index += 1
+            case "--dry-run": dryRun = true; index += 1
+            case "--apply": apply = true; index += 1
+            case "--input":
+                guard index + 1 < arguments.count else { throw SafariError.invalidInput }
+                inputURL = URL(fileURLWithPath: arguments[index + 1])
+                index += 2
+            default: throw SafariError.invalidInput
+            }
+        }
+        guard useStdin != (inputURL != nil), apply != dryRun else { throw SafariError.invalidInput }
+        let data: Data
+        if useStdin {
+            data = FileHandle.standardInput.readDataToEndOfFile()
+        } else if let inputURL {
+            guard let values = try? inputURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
+                  values.isRegularFile == true, values.isSymbolicLink != true,
+                  (values.fileSize ?? SafariReadingListAddInput.maximumInputBytes + 1) <= SafariReadingListAddInput.maximumInputBytes,
+                  let value = try? Data(contentsOf: inputURL) else { throw SafariError.invalidInput }
+            data = value
+        } else { throw SafariError.invalidInput }
+        guard !data.isEmpty, data.count <= SafariReadingListAddInput.maximumInputBytes else { throw SafariError.invalidInput }
+        return .init(data: data, apply: apply)
+    }
+
+    private static func validSafariHTTPURL(_ value: String) -> Bool {
+        guard value.utf8.count <= 4_096, let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              url.host != nil, url.user == nil, url.password == nil else { return false }
+        return true
+    }
+
     private static func printHelp() {
         print("""
         macos-data \(CLIVersion.current) — local macOS data CLI for agents and developers
@@ -2338,10 +2487,40 @@ struct MacosDataCLI {
           macos-data photos <command> [options]
           macos-data notes <command> [options]
           macos-data shortcuts <command> [options]
+          macos-data safari <command> [options]
 
         Unified resources:
-          resources --format json                List Contacts, Mail, Calendar, Reminders, Photos, and Notes resources
+          resources --format json                List Contacts, Mail, Calendar, Reminders, Photos, Notes, Shortcuts, and Safari resources
                                              with selection, permission, and limitations
+
+        Safari 0.8 commands:
+          permission --format json           Report Bookmarks.plist readability and Safari Automation status
+          permission --request --format json Explicitly request Safari Automation consent
+          bookmarks list [--folder-id <opaque-id>] [--limit <1...200>]
+            [--cursor <cursor>] --format json List folders and bookmarks; Reading List is excluded
+          bookmarks query [--text <text>] [--url <http-url>]
+            [--folder-id <opaque-id>] [--limit <1...200>]
+            [--cursor <cursor>] --format json Query bookmark metadata with AND filters
+          bookmarks get --id <opaque-id> --format json
+                                             Read one bookmark or folder
+          reading-list list [--read true|false] [--limit <1...200>]
+            [--cursor <cursor>] --format json List Reading List metadata
+          reading-list query [--text <text>] [--url <http-url>]
+            [--read true|false] [--limit <1...200>]
+            [--cursor <cursor>] --format json Query Reading List with AND filters
+          reading-list get --id <opaque-id> --format json
+                                             Read one Reading List item
+          reading-list add --input <file>|--stdin --dry-run|--apply --format json
+                                             Add through Safari's official Apple Event;
+                                             strict JSON: url, optional title/previewText
+
+        Safari 0.8 boundary:
+          Reads parse ~/Library/Safari/Bookmarks.plist as a bounded, read-only
+          snapshot and may require Full Disk Access. Reading List add is the
+          only mutation and uses Safari Automation with five-second timeout and
+          immediate read-back. Pending/unknown outcomes must not be retried.
+          Bookmark plist mutation is not part of 0.8.0; 0.8.1 will test it only
+          with Safari exited, backup, disposable fixtures, and iCloud read-back.
 
         Shortcuts 0.7 commands:
           permission --format json           Report Shortcuts Events Automation status without prompting
@@ -2666,6 +2845,7 @@ struct MacosDataCLI {
           Exit codes: 0 success, 1 unexpected CLI error, 2 Contacts error,
             3 ambiguous/not-found query error, 4 Mail error, 5 Calendar error,
             6 Reminders error, 7 Photos error, 8 Notes error, 9 Shortcuts error,
+            10 Safari error,
             64 usage or invalid query
           Success: {"ok": true, "contractVersion": "0.1", "data": ...}
           Failure: {"ok": false, "contractVersion": "0.1", "error": {"code": ..., "message": ...}}

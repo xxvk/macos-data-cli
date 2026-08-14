@@ -26,6 +26,7 @@ CLI release version.
 | Invalid Calendar JSON, range, or recurrence span | `CALENDAR_INVALID_INPUT` / `CALENDAR_INVALID_DATE_RANGE` / `CALENDAR_RECURRING_SPAN_REQUIRED` | 5 |
 | Calendar idempotency mismatch | `CALENDAR_IDEMPOTENCY_CONFLICT` | 5 |
 | Calendar conflict scan too broad | `CALENDAR_CONFLICT_SCAN_LIMIT_EXCEEDED` | 5 |
+| Safari adapter, permission, schema, or mutation error | `SAFARI_*` | 10 |
 | Usage or invalid query | JSON `error.code = INVALID_QUERY` | 64 |
 
 Errors are written to stderr. Successful JSON responses are written to stdout.
@@ -44,3 +45,9 @@ values use ISO 8601; all-day start/end values use `YYYY-MM-DD`. Calendar query r
 and cursor IDs are machine-local opaque values and must not be parsed. A moved
 event's returned ID replaces the old ID. Recurring edit/delete requires an
 explicit `--span this` or `--span future`.
+
+Safari bookmark and Reading List IDs are machine-local opaque values. Query
+cursors bind the complete `Bookmarks.plist` fingerprint and return a stale
+cursor error after any snapshot change. Reading List add never echoes URL,
+title, or preview. Pending and unknown outcomes include `nextAction` and must
+not be retried automatically.

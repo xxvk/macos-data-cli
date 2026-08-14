@@ -44,7 +44,7 @@ operations require an additional confirmation phrase. See the full
 
 ## Project status
 
-The current source release is 0.7.2. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.8.0. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -150,6 +150,15 @@ Text insertion, and bounded action deletion, including hash read-back, unchanged
 remaining actions, and unchanged originals. Arbitrary-position insert and move
 remain unavailable. All gate fixtures were explicitly deleted with zero residue.
 
+Safari 0.8.0 adds bounded,
+read-only bookmark and Reading List discovery from Safari's property-list
+snapshot, opaque IDs, strict queries, stale-cursor detection, permission status,
+and an official Safari Automation path for guarded Reading List creation. It
+does not directly mutate `Bookmarks.plist`. The separate 0.8.1 feasibility gate
+will test direct plist mutation only with Safari fully exited, disposable data,
+atomic backup/restore, local read-back, and creation/deletion confirmation on a
+second iCloud device before any public mutation contract is considered.
+
 See the detailed roadmaps:
 
 - [中文路线图](ROADMAP_CN.md)
@@ -163,6 +172,7 @@ User documentation:
 - [Agent integration guide](AGENTS.md)
 - [Shortcuts 0.7.1 authoring boundary](docs/development/shortcuts-authoring.md)
 - [Shortcuts 0.7.2 existing-editing boundary](docs/development/shortcuts-existing-editing.md)
+- [Safari 0.8 architecture and direct-plist feasibility gate](docs/development/safari-adapter-architecture.md)
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
 - [Calendar 0.3 architecture](docs/development/calendar-adapter-architecture.md)

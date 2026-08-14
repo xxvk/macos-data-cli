@@ -40,7 +40,7 @@ macos-data mail doctor --format json
 
 ## 项目状态
 
-当前源码版本为 0.7.2。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.8.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -114,6 +114,12 @@ macOS 27 Beta 5 disposable gate 已校准准确的 `editor.shortcutname` marker�
 append-only Text insertion、有界 action delete 与有界全 move，包括 hash 回读、完整视觉顺序、剩余 action
 不变和原件不变。任意位置 insert 与混合 operation 仍不可用；全部 gate fixture 均已明确确认删除并验证零残留。
 
+Safari 0.8.0 adapter 从 Safari property-list snapshot 有界、严格只读地发现
+bookmark 与 Reading List，提供 opaque ID、严格查询、stale cursor 检测和权限状态，并通过 Safari
+官方 Automation 接口受保护地创建 Reading List 项。0.8.0 绝不直接修改 `Bookmarks.plist`。
+独立的 0.8.1 可行性 gate 才会验证直接 plist 写入；在形成任何公开 mutation contract 前，必须满足
+Safari 完全退出、一次性数据、原子 backup/restore、本机回读，以及第二台 iCloud 设备确认创建和删除。
+
 详细开发计划请参阅：
 
 - [中文路线图](ROADMAP_CN.md)
@@ -134,6 +140,7 @@ append-only Text insertion、有界 action delete 与有界全 move，包括 has
 - [Shortcuts 命令与安全边界](docs/usage_CN.md#shortcuts070-开发切片)
 - [Shortcuts 0.7.1 authoring 边界](docs/development/shortcuts-authoring_CN.md)
 - [Shortcuts 0.7.2 现有 Shortcut 编辑边界](docs/development/shortcuts-existing-editing_CN.md)
+- [Safari 0.8 架构与 direct-plist 可行性 gate](docs/development/safari-adapter-architecture_CN.md)
 
 ## 核心目标
 

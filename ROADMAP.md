@@ -740,6 +740,98 @@ cross-version stability.
 - [ ] Re-run the version-specific semantic fixture gate before claiming support
   for a future macOS/Shortcuts version; 0.7.2 makes no cross-version guarantee
 
+### 0.8.0: Safari bookmarks and Reading List
+
+Architecture: [Safari adapter 0.8](docs/development/safari-adapter-architecture.md).
+
+- [x] Audit Safari 27 public interfaces and live storage without modifying data
+  - Safari's scripting dictionary exposes Reading List addition but no bookmark
+    CRUD or Reading List read/update/delete commands
+  - The live canonical store is `~/Library/Safari/Bookmarks.plist`; Bookmarks
+    and Reading List are not stored canonically in the inspected Safari SQLite files
+- [x] Implement bounded, read-only bookmark and Reading List snapshots
+  - Foundation property-list parsing supports binary/XML input, 32 MiB, 50,000
+    nodes, and depth 64, with fail-closed schema validation
+  - Raw UUIDs are hash-derived opaque IDs; proxy and Reading List nodes do not
+    leak into ordinary bookmarks; titles, URLs, previews, UUIDs, and paths never
+    enter diagnostics
+  - Query uses AND filters, maximum 200 pages, and cursors bound to both filters
+    and exact plist SHA-256 so changed Safari state makes cursors stale
+- [x] Add `safari permission`, bookmark list/query/get, and Reading List
+  list/query/get commands with exit 10 and the shared JSON contract
+- [x] Implement guarded Reading List add
+  - Strict stdin/file JSON, HTTP/HTTPS-only URL, bounded title/preview, explicit
+    dry-run/apply, normalized-URL no-op, five-second Safari Apple Event, immediate
+    plist read-back, and pending/unknown no-auto-retry states
+  - AppleScript syntax passed a compile-only local check; no real item was added
+- [x] Pass synthetic TDD, no-apply CLI contracts, and privacy-minimized live
+  list/get plus add dry-run smoke on Safari 27; temporary private JSON was removed
+- [x] Request the stable Debug app's Safari Automation permission and run one
+  explicitly authorized disposable Reading List add/read-back/UI-cleanup gate
+  - The Apple Event returned `save_accepted_readback_pending`, so the CLI did
+    not retry. A subsequent exact-URL query found one opaque Reading List item
+  - After separate action-time confirmation, Safari UI removed only the exact
+    filtered fixture; both UI search and exact-URL CLI query returned zero matches
+- [x] Run the complete Swift suite, Release/no-apply gates, and documentation audit
+- [x] Update source version metadata from 0.7.2 to 0.8.0 after all local gates;
+  commit/push/tag/release still require separate authorization
+
+### 0.8.1: Direct Bookmarks.plist mutation feasibility
+
+- [ ] First prove lossless parser/serializer round trips on synthetic and copied
+  fixtures, preserving unknown values, ordering, mode, owner, and xattrs
+- [ ] Implement an attended quiescence/backup gate: Safari must be exited, no
+  Safari process may hold the plist, the file must be stable twice, and a private
+  mode-0600 recovery copy plus privacy-safe metadata must exist before mutation
+- [ ] Atomically add exactly one disposable folder/bookmark, then verify it in
+  Safari UI and through the 0.8 parser without touching any existing subtree
+- [ ] Require user confirmation that creation reaches a second iCloud device;
+  same-Mac restart alone is not synchronization proof
+- [ ] Remove only the disposable fixture through a Safari-owned route and prove
+  deletion on both devices, with no duplicates, resurrection, missing old nodes,
+  schema drift, or sync errors
+- [ ] Record a go/no-go decision. Any unprovable remote state or data anomaly
+  fails direct mutation and prohibits automatic retry or public exposure
+
+### 0.8.2: Guarded Safari mutation, conditional on 0.8.1
+
+- [ ] If and only if 0.8.1 proves local and cross-device safety, design bookmark
+  create/update/move/delete and Reading List update/delete with backups, optimistic
+  hashes, dry-run/apply, exact destructive confirmations, and disposable gates
+- [ ] If 0.8.1 fails, evaluate Shortcuts Safari actions, shipping Safari
+  WebExtension feature detection, and semantic non-coordinate Accessibility in
+  that order; do not assume WebKit source means Safari implements bookmark CRUD
+
+### 0.9.0: Phone and Messages CLI feasibility
+
+- [ ] Investigate whether macOS Phone/FaceTime and Messages can support safe,
+  local, read-only CLI adapters for recent call history and recent messages
+  - Inventory the supported macOS versions and actual installed applications;
+    do not assume `Phone.app` exists or owns call history on every supported Mac
+  - Audit public frameworks, application scripting dictionaries, Shortcuts
+    actions, Apple Events, Continuity boundaries, and documented export paths
+    before considering local stores
+  - If public interfaces are insufficient, separately evaluate strictly
+    read-only local database/index access with Full Disk Access, runtime schema
+    fingerprints, immutable connections, bounded queries, and fail-closed
+    compatibility. Do not implement or expose this fallback without a recorded
+    architecture and privacy decision
+- [ ] Define a metadata-first candidate contract without committing to it:
+  `phone calls recent` for direction/time/duration/missed state and
+  `messages recent` for service/direction/time/conversation and bounded text
+  projection. Participant handles, message bodies, attachment paths, raw local
+  IDs, and account identifiers require explicit projection and redaction rules
+- [ ] Map TCC and user-consent behavior for Full Disk Access, Automation,
+  Contacts resolution, Messages data, and Phone/FaceTime data. Permission status
+  must not prompt; only an explicit request path may initiate ordinary consent
+- [ ] Keep 0.9.0 research and any initial adapter read-only: no send/reply,
+  call initiation, voicemail mutation, mark-read, reaction, attachment export,
+  conversation deletion, or call-history deletion
+- [ ] Produce a separate go/no-go decision for Phone/call history and Messages.
+  Validate parsers only with synthetic fixtures; any live smoke must be
+  privacy-minimized, bounded, separately authorized, and must not print personal
+  handles or content
+
 ## Cross-cutting requirements for every release
 
 - [x] Document Terminal, stdin, and stdout usage

@@ -25,6 +25,7 @@
 | Calendar JSON、日期范围或周期 scope 无效 | `CALENDAR_INVALID_INPUT` / `CALENDAR_INVALID_DATE_RANGE` / `CALENDAR_RECURRING_SPAN_REQUIRED` | 5 |
 | Calendar 幂等创建内容不一致 | `CALENDAR_IDEMPOTENCY_CONFLICT` | 5 |
 | Calendar 冲突扫描范围过大 | `CALENDAR_CONFLICT_SCAN_LIMIT_EXCEEDED` | 5 |
+| Safari adapter、权限、schema 或 mutation 错误 | `SAFARI_*` | 10 |
 | 用法或查询参数错误 | `error.code = INVALID_QUERY` | 64 |
 
 错误写入 stderr，成功的 JSON 写入 stdout。调用方应先根据退出码分支，
@@ -41,3 +42,8 @@ Calendar query 返回统一 `items`、`limit`、`nextCursor`、`truncated`、`co
 `calevent_`、source、calendar 和 cursor 都是本机 opaque 值；调用方不得解析。
 移动事件后返回的新 `calevent_` ID取代旧 ID。周期事件 edit/delete 必须显式提供
 `--span this` 或 `--span future`。
+
+Safari bookmark 与 Reading List ID 都是本机 opaque 值。query cursor 绑定完整
+`Bookmarks.plist` fingerprint；snapshot 发生任何变化后必须返回 stale cursor 错误。
+Reading List add 不回显 URL、title 或 preview。pending/unknown 结果必须包含
+`nextAction`，Agent 不得自动重试。

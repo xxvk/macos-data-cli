@@ -122,6 +122,30 @@ fixtures.
 - The recurring real gate must verify `this` and `future` mutation scope and
   remove every occurrence even when an intermediate assertion fails.
 
+## Safari contract (0.8)
+
+- Safari 0.8.0 reads bookmarks and Reading List from a bounded, non-symlink
+  `Bookmarks.plist` snapshot. It must preserve a strictly read-only file handle
+  and fail closed on malformed, oversized, duplicate-proxy, or excessively deep
+  structures.
+- Ordinary bookmarks exclude Safari proxy nodes and the Reading List subtree.
+  All item, folder, and cursor IDs are opaque; cursors bind the exact snapshot
+  SHA-256 and become stale after any plist change.
+- The only 0.8.0 write is an explicit Reading List add through Safari's official
+  AppleScript command. Require strict JSON, `--dry-run|--apply`, normalized URL
+  idempotency, a five-second deadline, and immediate bounded read-back. Never
+  automatically retry pending or unknown outcomes.
+- Never return or diagnose raw plist IDs, plist bytes, titles, URLs, preview
+  text, user paths, or AppleScript source.
+- Direct `Bookmarks.plist` mutation is not a 0.8.0 capability. The 0.8.1
+  feasibility gate requires Safari fully exited, an exact metadata-preserving
+  backup, atomic replacement, disposable nodes only, local parser/UI read-back,
+  and user-observed creation and deletion on a second iCloud device. Never stop
+  or modify iCloud synchronization processes.
+- Existing Safari data is never a mutation fixture. Every live add or direct
+  mutation gate requires explicit current-task authorization and verified
+  zero-residue cleanup.
+
 ## Codex authorization and Computer Use
 
 - Codex should automatically perform authorization and settings flows that do

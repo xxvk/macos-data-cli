@@ -104,6 +104,24 @@ bash scripts/run_local_contacts_integration.sh --with-writes
 - 真实 apply 测试不得修改现有用户事件，只能使用完成后删除的一次性 fixture。
 - 真实周期 gate 必须验证 `this` 和 `future` 范围，并在中途断言失败时也清理全部 occurrence。
 
+## Safari contract（0.8）
+
+- Safari 0.8.0 从有界、非 symlink 的 `Bookmarks.plist` snapshot 读取 bookmark 与
+  Reading List；文件访问严格只读。malformed、过大、Reading List proxy 重复或层级/节点超限
+  时必须 fail closed。
+- 普通 bookmark 排除 Safari proxy 和 Reading List subtree。item、folder 与 cursor ID 均为
+  opaque；cursor 绑定准确 snapshot SHA-256，plist 发生任何变化后必须 stale。
+- 0.8.0 唯一写能力是通过 Safari 官方 AppleScript 命令显式 add Reading List。必须使用严格
+  JSON、`--dry-run|--apply`、标准化 URL 幂等、五秒 deadline 和立即有界回读；pending 或
+  unknown 结果禁止自动重试。
+- 返回值和诊断不得包含 raw plist ID、plist bytes、title、URL、preview、用户路径或
+  AppleScript source。
+- 直接修改 `Bookmarks.plist` 不属于 0.8.0。0.8.1 feasibility gate 必须确保 Safari 完全
+  退出、准确保留 metadata 的 backup、原子替换、仅使用一次性节点、本机 parser/UI 回读，
+  并由用户在第二台 iCloud 设备确认创建和删除。不得停止或修改 iCloud 同步进程。
+- 现有 Safari 数据绝不作为 mutation fixture。每次真实 add 或 direct mutation gate 都需要
+  当前任务明确授权，并验证 fixture 零残留。
+
 ## Codex 授权与 Computer Use
 
 - 对于不需要密码、Apple ID 或安全确认的授权和设置流程，应由 Codex 自动完成。

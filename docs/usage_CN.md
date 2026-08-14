@@ -5,7 +5,7 @@ Automation 接口访问 macOS 数据，Agent 不需要专用集成即可调用�
 
 ## 统一资源查询
 
-使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos、Notes 和 Shortcuts 资源作用域：
+使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos、Notes、Shortcuts 和 Safari 资源作用域：
 
 ```text
 macos-data resources --format json
@@ -21,6 +21,51 @@ Photos 始终报告一个 `photosLibrary` scope；未授权时不可读，limite
 `limited`，可读但不代表完整照片库。
 Notes 始终报告一个只读 `notesLibrary` scope；permission 表示负责执行进程对 Notes.app 的
 Automation 状态，不代表可以访问 Notes 私有数据库。
+Safari 报告一个 `safariLibrary` scope。readable 表示负责执行进程可读取
+`Bookmarks.plist`；writable 表示同时能够回读且 Safari Automation 当前允许 0.8.0 的
+Reading List add，不代表支持 bookmark mutation。
+
+## Safari（0.8.0 开发切片）
+
+Safari bookmark 与 Reading List 共用一份有界、严格只读 plist snapshot。读取可能要求
+稳定 app 或 Terminal host 获得 Full Disk Access。除非明确使用 `--request`，permission
+命令不会弹授权：
+
+```bash
+macos-data safari permission --format json
+macos-data safari permission --request --format json
+```
+
+普通 bookmark 命令会排除 Safari proxy 和 Reading List subtree，folder 关系使用 opaque ID。
+filter 使用 AND 语义；默认每页 50、最大 200。底层 plist 变化后旧 cursor 必须 stale。
+
+```bash
+macos-data safari bookmarks list --limit 50 --format json
+macos-data safari bookmarks query --text "reference" --format json
+macos-data safari bookmarks query --url "https://example.com" \
+  --folder-id <opaque-folder-id> --format json
+macos-data safari bookmarks get --id <opaque-bookmark-or-folder-id> --format json
+
+macos-data safari reading-list list --read false --limit 50 --format json
+macos-data safari reading-list query --text "article" --format json
+macos-data safari reading-list get --id <opaque-reading-list-id> --format json
+```
+
+Reading List add 只接受严格 JSON。结果不会回显 URL、title 或 preview，只返回 URL SHA-256
+和可选 opaque 回读 ID：
+
+```bash
+printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
+  | macos-data safari reading-list add --stdin --dry-run --format json
+
+printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
+  | macos-data safari reading-list add --stdin --apply --format json
+```
+
+相同标准化 URL 是安全 no-op。`save_accepted_readback_pending` 与
+`SAFARI_READING_LIST_OUTCOME_UNKNOWN` 都禁止自动重试；应等待 Safari 保存后用原 URL
+query。0.8.0 永不直接写 `Bookmarks.plist`。独立 0.8.1 direct-mutation gate 见
+[Safari 架构](development/safari-adapter-architecture_CN.md)。
 
 ## Shortcuts（0.7.0–0.7.2）
 

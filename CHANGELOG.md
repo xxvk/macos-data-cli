@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.8.0 — 2026-08-15
+
+### Added
+
+- Added the Safari 0.8.0 development adapter for bounded read-only bookmark and
+  Reading List discovery, opaque identifiers, strict filters, pagination with
+  plist-fingerprint cursor invalidation, and privacy-minimized resources and
+  permission reporting.
+- Added guarded Reading List creation through Safari's official AppleScript
+  command with strict JSON, normalized-URL idempotency, dry-run/apply, bounded
+  read-back, stable pending/unknown outcomes, and no automatic retry.
+- Added synthetic Safari adapter tests, no-apply CLI contracts, privacy-safe
+  local read/dry-run smoke scripts, and a separate 0.8.1 direct-plist mutation
+  feasibility plan requiring disposable fixtures and second-device iCloud proof.
+
+### Limitations
+
+- Version 0.8.0 never directly writes `Bookmarks.plist` and does not create,
+  edit, move, or delete ordinary bookmarks or folders.
+- Source version metadata is now 0.8.0. Commit, tag, push, GitHub Release, and
+  Homebrew publication remain separately authorized actions.
+
+### Validation
+
+- Passed the complete Swift suite, no-apply CLI contracts, privacy-safe Safari
+  read/dry-run smoke tests, and a Release build on Safari 27 / Xcode 27 Beta 5.
+- The explicitly authorized stable-app Reading List gate returned pending without
+  retry, then exact-URL read-back confirmed one item. After separate action-time
+  confirmation, Safari UI removed only that fixture and both UI and CLI returned
+  zero matches.
+
 ## 0.7.2 — 2026-08-15
 
 ### Added

@@ -7,7 +7,7 @@ integration.
 ## Unified resources
 
 List the currently discoverable Contacts, Mail, Calendar, Reminders, Photos,
-Notes, and Shortcuts resource scopes in one
+Notes, Shortcuts, and Safari resource scopes in one
 machine-readable response:
 
 ```text
@@ -29,6 +29,56 @@ incomplete library view.
 Notes reports one read-only `notesLibrary` scope. Its permission reflects the
 responsible process's Notes.app Automation state and does not imply access to a
 private Notes database.
+Safari reports one `safariLibrary` scope. Readability means the responsible
+process can read `Bookmarks.plist`; writability means that read-back is available
+and Safari Automation currently permits the 0.8.0 Reading List add command. It
+does not imply bookmark mutation support.
+
+## Safari (0.8.0 development slice)
+
+Safari bookmarks and Reading List share one bounded, read-only property-list
+snapshot. Reads may require Full Disk Access for the stable app or Terminal host.
+Permission status never prompts unless `--request` is explicit:
+
+```bash
+macos-data safari permission --format json
+macos-data safari permission --request --format json
+```
+
+Ordinary bookmark commands exclude Safari proxy nodes and the Reading List
+subtree. Folder relationships use opaque IDs. Filters combine with AND semantics;
+pages default to 50 and cap at 200. Cursors become stale whenever the underlying
+plist changes.
+
+```bash
+macos-data safari bookmarks list --limit 50 --format json
+macos-data safari bookmarks query --text "reference" --format json
+macos-data safari bookmarks query --url "https://example.com" \
+  --folder-id <opaque-folder-id> --format json
+macos-data safari bookmarks get --id <opaque-bookmark-or-folder-id> --format json
+
+macos-data safari reading-list list --read false --limit 50 --format json
+macos-data safari reading-list query --text "article" --format json
+macos-data safari reading-list get --id <opaque-reading-list-id> --format json
+```
+
+Reading List creation accepts strict JSON only. The result does not echo the
+URL, title, or preview; it returns a URL SHA-256 and optional opaque read-back ID.
+
+```bash
+printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
+  | macos-data safari reading-list add --stdin --dry-run --format json
+
+printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
+  | macos-data safari reading-list add --stdin --apply --format json
+```
+
+An existing normalized URL is a safe no-op. `save_accepted_readback_pending`
+and `SAFARI_READING_LIST_OUTCOME_UNKNOWN` both prohibit automatic retry; query
+the original URL after Safari saves. Version 0.8.0 never writes
+`Bookmarks.plist` directly. See the
+[Safari architecture](development/safari-adapter-architecture.md) for the
+separate 0.8.1 direct-mutation feasibility gate.
 
 ## Shortcuts (0.7.0–0.7.2)
 

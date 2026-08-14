@@ -567,6 +567,84 @@ Cherri 作为可选外部编译器调用，不复制其 GPL-2.0 源码；Apple �
   - 所有 disposable fixture 均在取得单独 action-time 确认后永久删除，准确名称搜索为 No Results
 - [ ] 未来声明支持新的 macOS/Shortcuts 版本前，重新运行该版本的 semantic fixture gate；0.7.2 不承诺跨版本稳定
 
+### 0.8.0：Safari 书签与阅读列表
+
+架构文档：[Safari adapter 0.8](docs/development/safari-adapter-architecture_CN.md)。
+
+- [x] 在不修改数据的前提下审计 Safari 27 公开接口和本机存储
+  - Safari scripting dictionary 只公开 Reading List 新增，不提供 bookmark CRUD，
+    也不提供 Reading List read/update/delete
+  - 本机主数据是 `~/Library/Safari/Bookmarks.plist`，不是所检查的 Safari SQLite
+- [x] 实现有界、严格只读的 bookmark 与 Reading List snapshot
+  - Foundation parser 支持 binary/XML plist，限制 32 MiB、50,000 nodes、depth 64，
+    schema 异常一律 fail closed
+  - 原始 UUID 转为 hash opaque ID；普通 bookmark 不混入 proxy/Reading List；
+    URL、title、preview、UUID、path 不进入 diagnostics
+  - query 使用 AND 语义、最大 200 分页；cursor 绑定 filter 与准确 plist SHA-256，
+    Safari 状态变化后旧 cursor 必须 stale
+- [x] 增加 `safari permission`、bookmark list/query/get、Reading List
+  list/query/get，使用共享 JSON contract 和 exit 10
+- [x] 实现受保护 Reading List add
+  - 严格 stdin/file JSON、仅 HTTP/HTTPS、有界 title/preview、显式 dry-run/apply、
+    标准化 URL no-op、五秒 Safari Apple Event、立即 plist 回读，以及 pending/unknown
+    禁止自动重试
+  - AppleScript 已通过 compile-only 检查；尚未写入真实项目
+- [x] synthetic TDD、no-apply CLI contract、真实 Safari list/get 与 add dry-run
+  隐私 smoke 均通过；私有临时 JSON 已删除
+- [x] 为稳定 Debug app 请求 Safari Automation，并在另行明确授权后执行一次性
+  Reading List add/read-back/UI cleanup gate
+  - Apple Event 返回 `save_accepted_readback_pending`，CLI 未重试；随后按准确 URL query
+    找到唯一 opaque Reading List item
+  - 取得单独 action-time 确认后，Safari UI 只删除精确筛选的 fixture；UI 搜索和准确 URL
+    CLI query 最终均为零匹配
+- [x] 运行完整 Swift、Release/no-apply gate 和文档审计
+- [x] 全部本机 gate 通过后把源码版本从 0.7.2 更新为 0.8.0；commit/push/tag/release
+  仍需单独授权
+
+### 0.8.1：直接修改 Bookmarks.plist 可行性
+
+- [ ] 先在 synthetic/copy fixture 证明 parser/serializer 无损 round trip，保留未知值、
+  顺序、mode、owner 和 xattr
+- [ ] 实现有人值守的 quiescence/backup gate：Safari 必须退出、无 Safari process 持有
+  plist、文件连续两次稳定；mutation 前创建 mode 0600 recovery copy 和隐私安全 metadata
+- [ ] 原子新增且仅新增一个 disposable folder/bookmark；通过 Safari UI 与 0.8 parser
+  回读，并证明所有旧 subtree 未触碰
+- [ ] 必须由用户确认第二台 iCloud 设备出现 fixture；同一台 Mac 重启不算 sync 证明
+- [ ] 通过 Safari 自己的路线只删除 fixture，并在两台设备证明消失；不得出现 duplicate、
+  resurrection、旧节点丢失、schema drift 或 sync error
+- [ ] 给出 go/no-go 决策；远端状态不可证明或任何数据异常都必须判定 direct mutation
+  失败，禁止自动重试或开放公开写命令
+
+### 0.8.2：受保护 Safari mutation（取决于 0.8.1）
+
+- [ ] 只有 0.8.1 证明本机与跨设备安全后，才设计 bookmark create/update/move/delete
+  与 Reading List update/delete，并要求 backup、乐观 hash、dry-run/apply、破坏性确认和
+  disposable gate
+- [ ] 如果 0.8.1 失败，再依次评估 Shortcuts Safari action、实际 Safari WebExtension
+  feature detection、非坐标语义 Accessibility；不能因为 WebKit 有源码就假定 Safari 已支持
+
+### 0.9.0：Phone 与 Messages CLI 可行性调研
+
+- [ ] 调研 macOS Phone/FaceTime 与 Messages 能否形成安全、本机、只读的 CLI adapter，目标是
+  获取最近通话记录与最近消息
+  - 先盘点受支持 macOS 版本和实际安装 app；不得假定每台受支持 Mac 都存在 `Phone.app`，
+    也不得假定它一定是通话记录的 owner
+  - 优先审计公共 Framework、app scripting dictionary、Shortcuts action、Apple Events、
+    Continuity 边界和官方 export；之后才考虑本地 store
+  - 如果公共接口不足，另行评估严格只读的本地 database/index：要求 Full Disk Access、运行时
+    schema fingerprint、immutable connection、有界 query 和版本不兼容时 fail closed；没有形成
+    单独架构与隐私决策前，不实现或公开该 fallback
+- [ ] 先设计但不承诺 metadata-first 候选 contract：`phone calls recent` 返回方向、时间、时长、
+  missed 状态；`messages recent` 返回 service、方向、时间、conversation 和有界正文 projection。
+  联系方式、正文、attachment path、raw local ID 与 account identifier 必须另行定义显式 projection
+  和脱敏规则
+- [ ] 明确 Full Disk Access、Automation、Contacts 名称解析、Messages 数据和 Phone/FaceTime
+  数据对应的 TCC/用户授权行为。permission status 不得弹窗；只有显式 request 路径可发起普通授权
+- [ ] 0.9.0 调研及可能的初始 adapter 保持只读：不发送/回复消息、不发起通话、不修改 voicemail、
+  不 mark-read、不 reaction、不导出 attachment、不删除 conversation 或通话记录
+- [ ] Phone/通话记录与 Messages 分别给出 go/no-go 决策。parser 只使用 synthetic fixture；任何
+  真实 smoke 都必须隐私最小化、有界、另行明确授权，且不得打印个人联系方式或正文
+
 ## 每个版本的横向完成条件
 
 - [x] 提供 Terminal、标准输入和标准输出调用示例

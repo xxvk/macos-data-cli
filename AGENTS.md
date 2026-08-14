@@ -44,6 +44,9 @@ For Shortcuts 0.7.1 authoring, also read:
     compiling, signing, importing, registering, or updating a Shortcut
 13. `docs/development/shortcuts-existing-editing.md` or the Chinese version
     before inspecting or planning edits for an arbitrary existing Shortcut
+14. `docs/development/safari-adapter-architecture.md` or the Chinese version
+    before reading Safari data, adding a Reading List item, or investigating
+    direct bookmark mutation
 
 Shortcuts authoring rules:
 
@@ -407,6 +410,33 @@ not assume a Homebrew or Release binary while development is in progress.
 - Attachment mutation, shared/locked writes, and cross-account moves remain
   unsupported.
 
+## Non-negotiable Safari rules
+
+- Safari 0.8.0 may read only the bounded public-user `Bookmarks.plist` snapshot.
+  Reject symlinks, oversized files, malformed roots, duplicate Reading List
+  proxies, excessive depth/node counts, and unknown unsafe structures.
+- Bookmark, folder, Reading List, and cursor IDs are adapter-owned opaque values.
+  A cursor is bound to the exact plist SHA-256 and must fail stale after any
+  snapshot change.
+- Never return or log Safari raw plist IDs, plist contents, titles, URLs,
+  previews, paths, or AppleScript source. Live smoke output is aggregate or
+  opaque only.
+- Safari 0.8.0 must never directly modify `Bookmarks.plist`. Its only write is
+  explicit Reading List add through Safari's official AppleScript command with
+  strict JSON, `--dry-run|--apply`, a five-second deadline, normalized-URL
+  idempotency, and immediate bounded read-back.
+- Pending or unknown Reading List outcomes prohibit automatic retry. The Agent
+  must query the normalized URL after Safari has had time to save.
+- Direct plist mutation belongs exclusively to the separately authorized 0.8.1
+  feasibility gate. Safari must be fully exited; use only disposable fixtures,
+  preserve metadata and unknown fields, write atomically, and prove local
+  read-back plus creation and deletion on a second iCloud device. Never stop or
+  edit iCloud synchronization processes. Failure closes this route and triggers
+  evaluation of public Shortcuts, WebExtension, or semantic UI alternatives.
+- Real Reading List add or direct-plist gates require explicit current-task
+  authorization and zero-residue cleanup. Existing personal Safari data is
+  never a mutation fixture.
+
 ## Local verification
 
 These checks are local-only and do not require CI:
@@ -432,6 +462,8 @@ bash scripts/run_photos_export_smoke.sh
 bash scripts/run_notes_write_integration.sh
 bash scripts/run_notes_folder_integration.sh
 bash scripts/run_shortcuts_authoring_smoke.sh
+bash scripts/run_safari_read_smoke.sh
+bash scripts/run_safari_dry_run_smoke.sh
 # Add --apply only for an explicitly authorized disposable signed-app gate.
 bash scripts/run_local_calendar_integration.sh
 bash scripts/run_installed_release_smoke.sh

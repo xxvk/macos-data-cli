@@ -66,6 +66,12 @@ assert_contains "$TMP_DIR/shortcuts-permission.out" '"contractVersion"[[:space:]
 assert_contains "$TMP_DIR/shortcuts-permission.out" '"access"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
 assert_contains "$TMP_DIR/shortcuts-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
 
+"$CLI" safari permission --format json >"$TMP_DIR/safari-permission.out"
+assert_contains "$TMP_DIR/safari-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
+assert_contains "$TMP_DIR/safari-permission.out" '"automation"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
+assert_contains "$TMP_DIR/safari-permission.out" '"bookmarksReadable"[[:space:]]*:[[:space:]]*(true|false)'
+assert_contains "$TMP_DIR/safari-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
+
 "$CLI" notes --help >"$TMP_DIR/notes-help.out"
 assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read commands and guarded 0\.6\.1/0\.6\.2 writes'
 
@@ -84,8 +90,14 @@ assert_contains "$TMP_DIR/shortcuts-help.out" 'CREATE MANAGED SHORTCUT'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'UPDATE MANAGED SHORTCUT'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'FORGET MANAGED SHORTCUT'
 
+"$CLI" safari --help >"$TMP_DIR/safari-help.out"
+assert_contains "$TMP_DIR/safari-help.out" 'Safari 0\.8 commands'
+assert_contains "$TMP_DIR/safari-help.out" 'reading-list add'
+assert_contains "$TMP_DIR/safari-help.out" 'Bookmark plist mutation is not part of 0\.8\.0'
+
 "$CLI" --help >"$TMP_DIR/global-help.out"
 assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error, 9 Shortcuts error'
+assert_contains "$TMP_DIR/global-help.out" '10 Safari error'
 
 set +e
 printf '' | "$CLI" contacts create --stdin --dry-run --format json >"$TMP_DIR/empty-stdin.out" 2>&1
@@ -132,6 +144,13 @@ run_expected_failure photos-get-missing-id 7 "$CLI" photos get --format json
 run_expected_failure photos-export-missing-output 7 "$CLI" photos export --id photo_invalid --format json
 run_expected_failure photos-export-invalid-variant 7 "$CLI" photos export --id photo_invalid --output /tmp/never-created --variant guessed --format json
 run_expected_failure photos-export-stdout-forbidden 7 "$CLI" photos export --id photo_invalid --output - --format json
+run_expected_failure safari-bookmarks-invalid-limit 10 "$CLI" safari bookmarks list --limit 0 --format json
+run_expected_failure safari-bookmarks-get-missing-id 64 "$CLI" safari bookmarks get --format json
+run_expected_failure safari-reading-list-invalid-read 10 "$CLI" safari reading-list query --read yes --format json
+run_expected_failure safari-reading-list-add-missing-input 10 "$CLI" safari reading-list add --dry-run --format json
+run_expected_failure safari-reading-list-add-conflicting-mode 10 "$CLI" safari reading-list add --stdin --dry-run --apply --format json <<<'{"url":"https://macos-data.invalid/fixture-080"}'
+run_expected_failure safari-reading-list-add-unknown-field 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"https://macos-data.invalid/fixture-080","unknown":true}'
+run_expected_failure safari-reading-list-add-unsafe-url 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"file:///tmp/private"}'
 run_expected_failure notes-folders-invalid-limit 8 "$CLI" notes folders --limit 0 --format json
 run_expected_failure notes-folders-missing-value 8 "$CLI" notes folders --account-id --format json
 run_expected_failure notes-folder-create-missing-input 8 "$CLI" notes folder create --dry-run --format json
