@@ -15,17 +15,19 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.4.0</string>
+	<string>0.5.0</string>
 	<key>CFBundleVersion</key>
-	<string>0.4.0</string>
+	<string>0.5.0</string>
 	<key>LSUIElement</key>
-	<true/>
+	<false/>
 	<key>NSContactsUsageDescription</key>
 	<string>macos-data needs Contacts access to read and manage your iCloud contacts from the local CLI.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>macos-data needs full Calendar access to query and explicitly manage events in your iCloud calendars.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>macos-data needs full Reminders access to query and explicitly manage reminders in your iCloud lists.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>macos-data needs Photos access to query photo and album metadata and to export only explicitly requested assets.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>macos-data uses Mail.app automation only for explicitly requested Mail fallback and reveal operations.</string>
 </dict>

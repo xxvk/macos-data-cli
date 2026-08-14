@@ -9,7 +9,7 @@ GUI 自动化、特定平台集成，或直接接触不稳定的内部数据格�
 
 ## 项目状态
 
-当前源码版本为 0.4.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.5.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -27,6 +27,9 @@ create/edit/delete 的 dry-run 和 apply 路径已经实现。只读和 dry-run 
 Reminders 0.4 增加权限/list、有限 query/get、受保护 CRUD、complete/reopen、alarm 和
 recurrence；基础及周期 iCloud gate 均通过且 fixture 零残留。
 
+Photos 0.5 增加 PhotoKit 权限、album 发现、有界 metadata-only asset query/get、opaque ID、
+limited library 语义，以及默认禁网和禁止覆盖的单资源安全 export。
+
 详细开发计划请参阅：
 
 - [中文路线图](ROADMAP_CN.md)
@@ -42,6 +45,7 @@ recurrence；基础及周期 iCloud gate 均通过且 fixture 零残留。
 - [变更记录](CHANGELOG.md)
 - [发布签名与 notarization TODO](docs/development/distribution-signing.md)
 - [Calendar 0.3 架构](docs/development/calendar-adapter-architecture_CN.md)
+- [Photos 0.5 架构](docs/development/photos-adapter-architecture_CN.md)
 
 ## 核心目标
 
@@ -210,7 +214,7 @@ Homebrew 更新、Gatekeeper、quarantine 处理和本地发布验证流程，�
 
 ## 后续方向
 
-Calendar 0.3 和 Reminders 0.4 已发布，后续 adapter 仍按 roadmap 推进。
+Calendar 0.3、Reminders 0.4 和 Photos 0.5 已发布，后续 adapter 仍按 roadmap 推进。
 `macos-data` 在整个 0.x 阶段保持 canonical command，正式命名复审延后至 1.0.0 发布前。
 当前 Reminders 开发切片支持 full-access 发现、受限 query/get，以及带 read-back 状态和
 可选短期幂等的 `create --dry-run|--apply`。部分编辑和受保护的单条删除已实现；编辑真实写入
@@ -218,6 +222,9 @@ Calendar 0.3 和 Reminders 0.4 已发布，后续 adapter 仍按 roadmap 推进�
 gate 已实现；一次性 create/get/edit/complete/reopen/delete gate 已在本机 iCloud
 通过，最终同名匹配数量为 0。详见
 [Reminders 使用说明](docs/usage_CN.md)。
+Photos 当前提供 permission/resource discovery、有限 album metadata 分页，以及默认隐藏精确
+位置的 metadata-only asset query/get，并支持默认禁网、禁止覆盖的单资源安全 export，详见
+[Photos 架构](docs/development/photos-adapter-architecture_CN.md)。
 Mail 0.2 采用
 只读 SQLite/EMLX、Mail.app Apple Events 回退和可视化确认的混合架构。
 详见 [Mail 架构决策](docs/development/mail-adapter-architecture_CN.md)。vCard、批量操作和

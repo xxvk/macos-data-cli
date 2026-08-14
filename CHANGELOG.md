@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 — 2026-08-14
+
+### Added
+
+- Added the public-PhotoKit Photos adapter with explicit authorization status
+  and request commands, full versus limited access semantics, album hierarchy,
+  opaque identifiers, and filter-bound pagination.
+- Added bounded metadata-only asset query/get with creation range, album, media,
+  favorite, hidden, and opt-in location filters without downloading media.
+- Added guarded one-resource export with offline and no-overwrite defaults,
+  explicit network opt-in, private temporary output, atomic move, and mode 0600.
+- Added synthetic tests, CLI negative contracts, signed-app TCC verification,
+  privacy-minimized live metadata gates, and offline/network export gates.
+
 ## 0.4.0 — 2026-08-14
 
 ### Added

@@ -10,7 +10,7 @@ adapters when no public framework exposes the required data.
 
 ## Project status
 
-The current source release is 0.4.0. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.5.0. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -33,6 +33,10 @@ Reminders 0.4 adds permission/list discovery, bounded
 query/get, guarded CRUD, completion/reopen, alarms and recurrence. Disposable
 basic and recurring iCloud gates passed with zero fixture residue.
 
+Photos 0.5 adds PhotoKit authorization, album discovery, bounded metadata-only
+asset query/get, opaque identifiers, limited-library semantics, and guarded
+single-resource export with offline and no-overwrite defaults.
+
 See the detailed roadmaps:
 
 - [中文路线图](ROADMAP_CN.md)
@@ -47,6 +51,7 @@ User documentation:
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
 - [Calendar 0.3 architecture](docs/development/calendar-adapter-architecture.md)
+- [Photos 0.5 architecture](docs/development/photos-adapter-architecture.md)
 
 ## Mail 0.2 commands
 
@@ -222,8 +227,8 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-Calendar 0.3 and Reminders 0.4 are released. Future adapters remain planned.
-`macos-data` remains the canonical command through
+Calendar 0.3, Reminders 0.4, and Photos 0.5 are released.
+Future adapters remain planned. `macos-data` remains the canonical command through
 0.x; naming is reviewed again before 1.0.0.
 The current Reminders development slice supports full-access discovery,
 bounded query/get, and guarded `create --dry-run|--apply` with read-back states
@@ -233,6 +238,10 @@ real-write verification. The automatic cleanup gate is implemented. The disposab
 create/get/edit/complete/reopen/delete gate
 passed against local iCloud with final matching count zero. See
 [Reminders usage](docs/usage.md).
+Photos currently exposes permission/resource discovery, bounded album pages,
+metadata-only asset query/get with location opt-in, and guarded single-resource
+export with offline/no-overwrite defaults. See the
+[Photos architecture](docs/development/photos-adapter-architecture.md).
 Mail 0.2 uses a read-only local SQLite/EMLX path with Mail.app Apple Events
 fallback and visual verification. See the
 [Mail architecture decision](docs/development/mail-adapter-architecture.md).

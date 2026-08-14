@@ -5,6 +5,7 @@ public enum DataResourceKind: String, Codable, Equatable, Sendable {
     case mailAccount
     case calendarSource
     case remindersSource
+    case photosLibrary
 }
 
 public enum DataResourceProvider: String, Codable, Equatable, Sendable {
@@ -12,6 +13,7 @@ public enum DataResourceProvider: String, Codable, Equatable, Sendable {
     case iCloud
     case mail
     case eventKit
+    case photos
 }
 
 public enum DataPermissionState: String, Codable, Equatable, Sendable {
@@ -19,6 +21,7 @@ public enum DataPermissionState: String, Codable, Equatable, Sendable {
     case denied
     case notDetermined
     case requiresConsent
+    case limited
     case unavailable
     case unknown
 }

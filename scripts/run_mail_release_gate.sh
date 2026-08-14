@@ -44,9 +44,15 @@ for observed_version in "$release_version" "$source_bundle_version" "$debug_bund
 done
 bash scripts/build_debug_app.sh
 plutil -lint scripts/macos-data-app-Info.plist scripts/macos-data.entitlements
-codesign --verify --deep --strict .build/debug/macos-data.app
+debug_app_temp_root="$(mktemp -d)"
+trap 'rm -rf "$debug_app_temp_root"' EXIT
+debug_app="$debug_app_temp_root/macos-data.app"
+ditto --norsrc --noextattr .build/debug/macos-data.app "$debug_app"
+xattr -cr "$debug_app"
+codesign --force --sign - --entitlements scripts/macos-data.entitlements "$debug_app" >/dev/null
+codesign --verify --deep --strict "$debug_app"
 automation_entitlement="$(
-  codesign -d --entitlements :- .build/debug/macos-data.app 2>/dev/null \
+  codesign -d --entitlements :- "$debug_app" 2>/dev/null \
     | plutil -extract 'com\.apple\.security\.automation\.apple-events' raw -o - -
 )"
 if [[ "$automation_entitlement" != "true" ]]; then

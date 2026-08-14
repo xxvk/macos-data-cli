@@ -191,7 +191,7 @@ final class ContactPayloadTests: XCTestCase {
     }
 
     func testCLIReleaseVersionIsCalendarAdapterRelease() {
-        XCTAssertEqual(CLIVersion.current, "0.4.0")
+        XCTAssertEqual(CLIVersion.current, "0.5.0")
     }
 
     func testCLIExitCodesAndErrorCodesAreStable() {

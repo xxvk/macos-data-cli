@@ -39,6 +39,20 @@ codesign --verify --deep --strict .build/debug/macos-data.app
 codesign -d --entitlements - .build/debug/macos-data.app
 ```
 
+Photos 还必须保留
+`com.apple.security.personal-information.photos-library`。不要在 agent sandbox 中直接运行
+PhotoKit 命令后据此判断 app 权限：TCC 可能将 Codex/ChatGPT 识别为 responsible process。
+真实 gate 使用稳定路径 app 和 LaunchServices：
+
+```bash
+MACOS_DATA_APP="$HOME/Applications/macos-data-debug.app" \
+  bash scripts/run_photos_read_smoke.sh
+```
+
+`open -n -W -o <temporary-file> --stderr <temporary-file> <app> --args ...`
+可以保持 app 的独立 TCC 身份并捕获 JSON；smoke 只打印聚合数量。ad-hoc 重建改变 code hash，
+因此替换 app 后需要重签名，必要时只重置 `com.xvk.macos-data-cli` 的 Photos 条目。
+
 第一次使用时启动权限请求：
 
 ```bash

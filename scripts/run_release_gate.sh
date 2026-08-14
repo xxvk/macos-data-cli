@@ -24,15 +24,15 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
-[[ "$EXPECTED_VERSION" == "0.4.0" ]] || {
-  echo "0.4 release gate requires VERSION=0.4.0; observed=$EXPECTED_VERSION" >&2
+[[ "$EXPECTED_VERSION" == "0.5.0" ]] || {
+  echo "0.5 release gate requires VERSION=0.5.0; observed=$EXPECTED_VERSION" >&2
   exit 1
 }
 
 plutil -lint Sources/macos-data/Info.plist scripts/macos-data-app-Info.plist scripts/macos-data.entitlements >/dev/null
-rg -q '^## 0\.3\.0 — ' CHANGELOG.md
-rg -q 'current source release is 0\.3\.0' README.md
-rg -q '当前源码版本为 0\.3\.0' README_CN.md
+rg -q '^## 0\.5\.0 — ' CHANGELOG.md
+rg -q 'current source release is 0\.5\.0' README.md
+rg -q '当前源码版本为 0\.5\.0' README_CN.md
 
 swift test --quiet
 swift build -c release
@@ -51,7 +51,13 @@ for observed in "$RELEASE_VERSION" "$SOURCE_BUNDLE_VERSION" "$SOURCE_BUILD_VERSI
 done
 
 bash scripts/build_debug_app.sh >/dev/null
-DEBUG_APP="$ROOT_DIR/.build/debug/macos-data.app"
+DEBUG_APP_SOURCE="$ROOT_DIR/.build/debug/macos-data.app"
+DEBUG_APP_TEMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$DEBUG_APP_TEMP_ROOT"' EXIT
+DEBUG_APP="$DEBUG_APP_TEMP_ROOT/macos-data.app"
+ditto --norsrc --noextattr "$DEBUG_APP_SOURCE" "$DEBUG_APP"
+xattr -cr "$DEBUG_APP"
+codesign --force --sign - --entitlements "$ROOT_DIR/scripts/macos-data.entitlements" "$DEBUG_APP" >/dev/null
 DEBUG_CLI="$DEBUG_APP/Contents/MacOS/macos-data"
 codesign --verify --deep --strict "$DEBUG_APP"
 AUTOMATION_ENTITLEMENT="$(
@@ -60,6 +66,14 @@ AUTOMATION_ENTITLEMENT="$(
 )"
 [[ "$AUTOMATION_ENTITLEMENT" == "true" ]] || {
   echo "Mail Automation entitlement is missing from the signed Debug app." >&2
+  exit 1
+}
+PHOTOS_ENTITLEMENT="$(
+  codesign -d --entitlements :- "$DEBUG_APP" 2>/dev/null \
+    | plutil -extract 'com\.apple\.security\.personal-information\.photos-library' raw -o - -
+)"
+[[ "$PHOTOS_ENTITLEMENT" == "true" ]] || {
+  echo "Photos Library entitlement is missing from the signed Debug app." >&2
   exit 1
 }
 

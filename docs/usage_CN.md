@@ -4,7 +4,7 @@
 
 ## 统一资源查询
 
-使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar 和 Reminders 资源作用域：
+使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders 和 Photos 资源作用域：
 
 ```text
 macos-data resources --format json
@@ -14,11 +14,66 @@ macos-data resources --format json
 `readable`、`writable`、`selected`、`permission` 能力状态。Contacts 的 selected 状态
 反映已经验证的 iCloud 容器。Mail 不会因为“存在一个账号”就擅自标记为 selected；
 偏好的 `aim-tech.jp` 工作邮箱仍需要隐私安全的显式验证。Calendar 在获得 full access 后
-返回 EventKit source；selected 只会标记唯一验证通过的 iCloud CalDAV source。
+返回 EventKit source；selected 只会标记唯一验证通过的 iCloud CalDAV source。Reminders
+采用相同的 fail-closed iCloud source 策略，并使用独立的 `remindersSource` kind。
+Photos 始终报告一个 `photosLibrary` scope；未授权时不可读，limited 时 permission 为
+`limited`，可读但不代表完整照片库。
+
+## Photos（0.5 开发切片）
+
+不触发弹窗地读取当前权限：
+
+```text
+macos-data photos permission --format json
+```
+
+显式请求 Photos read/write 权限：
+
+```text
+macos-data photos permission --request --format json
+```
+
+响应包含 `access`、`readable`、`complete` 和 `requested`。`limited` 表示
+`readable: true`、`complete: false`。授权后可以枚举 album metadata：
+
+```text
+macos-data photos albums --kind all --limit 50 --format json
+macos-data photos albums --kind user --limit 50 --cursor <opaque-cursor> --format json
+```
+
+结果保留用户 folder 层级、区分 user/smart album，并允许 title 重名；后续选择必须使用 opaque
+album ID。按 creation date 查询有界 asset metadata；默认排除 hidden asset 和精确位置：
+
+```text
+macos-data photos query --start 2026-08-01T00:00:00Z --end 2026-08-15T00:00:00Z \
+  [--album-id <opaque-album-id>] [--media image|video|audio|unknown] \
+  [--favorite true|false] [--include-hidden] [--include-location] \
+  [--limit <1...200>] [--cursor <opaque-cursor>] --format json
+macos-data photos get --id <opaque-asset-id> [--include-location] --format json
+```
+
+时间范围必须有序且不超过 366 天。query/get 只返回 metadata 和 opaque reference，
+不调用媒体 manager，也不会触发 iCloud 媒体下载；本阶段 `contentAvailability` 固定为
+`unknown`。
+
+将一个显式资源导出到新的本地文件：
+
+```text
+macos-data photos export --id <opaque-asset-id> --output <file> \
+  [--variant original|current|paired-video|adjustment-data] \
+  [--allow-network] --format json
+```
+
+默认 variant 为 `original`，禁止网络且禁止覆盖。资源仅在 iCloud 时，默认返回
+`PHOTOS_CONTENT_NOT_LOCAL`，不留下残片；`--allow-network` 才代表显式下载同意。同一优先级
+存在多个资源时拒绝猜测。成功输出先在目标目录旁建立私有临时文件，再原子移动，并设置为
+`0600`。JSON 只返回 opaque asset ID、variant、resource kind、content type、byte count 和
+networkAllowed，不包含媒体 byte，也不回显输出路径。照片库修改尚未实现。参阅
+[Photos 0.5 架构](development/photos-adapter-architecture_CN.md)。
 
 本机 Debug、Xcode 工具链和 Contacts 授权流程请先阅读[本机 Debug 与 Contacts 授权](development/local-debug-and-tcc_CN.md)。
 
-## Calendar（0.3 开发中）
+## Calendar（0.3）
 
 请求读取和写入所需的 EventKit full access：
 

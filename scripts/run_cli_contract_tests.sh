@@ -51,6 +51,11 @@ run_expected_failure() {
 assert_contains "$TMP_DIR/count.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
 assert_contains "$TMP_DIR/count.out" '"ok"[[:space:]]*:[[:space:]]*true'
 
+"$CLI" photos permission --format json >"$TMP_DIR/photos-permission.out"
+assert_contains "$TMP_DIR/photos-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
+assert_contains "$TMP_DIR/photos-permission.out" '"access"[[:space:]]*:[[:space:]]*"(notDetermined|restricted|denied|limited|authorized)"'
+assert_contains "$TMP_DIR/photos-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
+
 set +e
 printf '' | "$CLI" contacts create --stdin --dry-run --format json >"$TMP_DIR/empty-stdin.out" 2>&1
 empty_code=$?
@@ -87,6 +92,15 @@ run_expected_failure reminders-edit-empty-patch 6 "$CLI" reminders edit --id rem
 run_expected_failure reminders-edit-completion-is-separate 6 "$CLI" reminders edit --id reminder_invalid --stdin --dry-run --format json <<<'{"completed":true}'
 run_expected_failure reminders-complete-missing-mode 6 "$CLI" reminders complete --id reminder_invalid --format json
 run_expected_failure reminders-reopen-invalid-mode 6 "$CLI" reminders reopen --id reminder_invalid --apply --dry-run --format json
+run_expected_failure photos-albums-invalid-limit 7 "$CLI" photos albums --limit 0 --format json
+run_expected_failure photos-albums-invalid-kind 7 "$CLI" photos albums --kind unsupported --format json
+run_expected_failure photos-query-missing-range 7 "$CLI" photos query --format json
+run_expected_failure photos-query-invalid-favorite 7 "$CLI" photos query --start 2026-01-01T00:00:00Z --end 2026-01-02T00:00:00Z --favorite yes --format json
+run_expected_failure photos-query-overwide-range 7 "$CLI" photos query --start 2025-01-01T00:00:00Z --end 2026-01-03T00:00:00Z --format json
+run_expected_failure photos-get-missing-id 7 "$CLI" photos get --format json
+run_expected_failure photos-export-missing-output 7 "$CLI" photos export --id photo_invalid --format json
+run_expected_failure photos-export-invalid-variant 7 "$CLI" photos export --id photo_invalid --output /tmp/never-created --variant guessed --format json
+run_expected_failure photos-export-stdout-forbidden 7 "$CLI" photos export --id photo_invalid --output - --format json
 
 set +e
 printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1

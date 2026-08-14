@@ -28,6 +28,10 @@ let package = Package(
             name: "RemindersAdapter",
             targets: ["RemindersAdapter"]
         ),
+        .library(
+            name: "PhotosAdapter",
+            targets: ["PhotosAdapter"]
+        ),
         .executable(
             name: "macos-data",
             targets: ["macos-data"]
@@ -75,9 +79,17 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        .target(
+            name: "PhotosAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Photos",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .executableTarget(
             name: "macos-data",
-            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -126,6 +138,13 @@ let package = Package(
         .testTarget(
             name: "RemindersTests",
             dependencies: ["RemindersAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "PhotosTests",
+            dependencies: ["PhotosAdapter"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

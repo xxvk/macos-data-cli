@@ -5,6 +5,7 @@ import ContactsAdapter
 import MailAdapter
 import CalendarAdapter
 import RemindersAdapter
+import PhotosAdapter
 
 @main
 struct MacosDataCLI {
@@ -42,7 +43,7 @@ struct MacosDataCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] {
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] {
             printHelp()
             return
         }
@@ -59,6 +60,8 @@ struct MacosDataCLI {
             let calendarStore = CalendarStore(permission: calendarPermission, sourceSelector: calendarSourceSelector)
             let remindersPermission = RemindersPermission()
             let remindersStore = RemindersStore(permission: remindersPermission, sourceSelector: remindersSourceSelector)
+            let photosPermission = PhotosPermission()
+            let photosStore = PhotosStore(permission: photosPermission)
             switch arguments {
             case ["resources"]:
                 emitJSONSuccess(makeResourcesResult(
@@ -68,6 +71,39 @@ struct MacosDataCLI {
                     calendarStore: calendarStore,
                     remindersPermission: remindersPermission,
                     remindersStore: remindersStore,
+                    photosPermission: photosPermission
+                ))
+            case ["photos", "permission"]:
+                emitJSONSuccess(PhotosPermissionResult(
+                    access: photosPermission.status.rawValue,
+                    readable: photosPermission.status.canRead,
+                    complete: photosPermission.status.complete,
+                    requested: false
+                ))
+            case ["photos", "permission", "--request"]:
+                let status = await photosPermission.requestReadWriteAccess()
+                emitJSONSuccess(PhotosPermissionResult(
+                    access: status.rawValue,
+                    readable: status.canRead,
+                    complete: status.complete,
+                    requested: true
+                ))
+                if !status.canRead { Foundation.exit(CLIExitCode.photosFailure.rawValue) }
+            case let args where args.count >= 2 && args[0] == "photos" && args[1] == "albums":
+                let request = try parsePhotoAlbumArguments(Array(args.dropFirst(2)))
+                emitJSONSuccess(try photosStore.albums(kind: request.kind, limit: request.limit, cursor: request.cursor))
+            case let args where args.count >= 2 && args[0] == "photos" && args[1] == "query":
+                emitPhotosJSONSuccess(try photosStore.query(parsePhotoQueryArguments(Array(args.dropFirst(2)))))
+            case let args where args.count >= 2 && args[0] == "photos" && args[1] == "get":
+                let request = try parsePhotoGetArguments(Array(args.dropFirst(2)))
+                emitPhotosJSONSuccess(try photosStore.get(id: request.id, includeLocation: request.includeLocation))
+            case let args where args.count >= 2 && args[0] == "photos" && args[1] == "export":
+                let request = try parsePhotoExportArguments(Array(args.dropFirst(2)))
+                emitPhotosJSONSuccess(try await photosStore.export(
+                    id: request.id,
+                    outputURL: request.outputURL,
+                    variant: request.variant,
+                    allowNetwork: request.allowNetwork
                 ))
             case ["calendar", "permission"]:
                 let granted = try await calendarPermission.requestFullAccess()
@@ -367,10 +403,16 @@ struct MacosDataCLI {
         } catch let error as ReminderError {
             report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
             Foundation.exit(CLIExitCode.remindersFailure.rawValue)
+        } catch let error as PhotoError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.photosFailure.rawValue)
+            Foundation.exit(CLIExitCode.photosFailure.rawValue)
         } catch let error as PaginationError {
             if rawArguments.first == "reminders" {
                 report(error: error == .invalidLimit ? "Reminder limit must be between 1 and 200." : "Reminder cursor is invalid or stale.", code: CLIErrorCode.reminders.rawValue, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
                 Foundation.exit(CLIExitCode.remindersFailure.rawValue)
+            } else if rawArguments.first == "photos" {
+                report(error: error == .invalidLimit ? "Photos limit must be between 1 and 200." : "Photos cursor is invalid or stale.", code: CLIErrorCode.photos.rawValue, arguments: rawArguments, exitCode: CLIExitCode.photosFailure.rawValue)
+                Foundation.exit(CLIExitCode.photosFailure.rawValue)
             } else {
                 report(error: error == .invalidLimit ? "Calendar limit must be between 1 and 200." : "Calendar cursor is invalid or stale.", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
                 Foundation.exit(CLIExitCode.calendarFailure.rawValue)
@@ -402,10 +444,205 @@ struct MacosDataCLI {
     private struct CalendarUpdatePreview: Encodable { let operation: String; let dryRun: Bool; let before: CalendarEventPayload; let after: CalendarEventPayload }
     private struct CalendarPermissionResult: Encodable { let granted: Bool; let access: String }
     private struct RemindersPermissionResult: Encodable { let granted: Bool; let access: String }
+    private struct PhotosPermissionResult: Encodable {
+        let access: String
+        let readable: Bool
+        let complete: Bool
+        let requested: Bool
+    }
+    private struct PhotoAlbumArguments {
+        var kind: PhotoAlbumQueryKind = .all
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+    }
+    private struct PhotoGetArguments {
+        let id: String
+        let includeLocation: Bool
+    }
+    private struct PhotoExportArguments {
+        let id: String
+        let outputURL: URL
+        let variant: PhotoExportVariant
+        let allowNetwork: Bool
+    }
 
     private static func emitJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) { print(text) }
+    }
+
+    private static func emitPhotosJSONSuccess<T: Encodable>(_ value: T) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) {
+            print(text)
+        }
+    }
+
+
+    private static func parsePhotoAlbumArguments(_ arguments: [String]) throws -> PhotoAlbumArguments {
+        var result = PhotoAlbumArguments()
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard seen.insert(option).inserted else {
+                throw PhotoError.invalidArgument("duplicate albums option")
+            }
+            guard index + 1 < arguments.count else {
+                throw PhotoError.invalidArgument("\(option) requires a value")
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--kind":
+                guard let kind = PhotoAlbumQueryKind(rawValue: value) else {
+                    throw PhotoError.invalidArgument("--kind must be user, smart, or all")
+                }
+                result.kind = kind
+            case "--limit":
+                guard let limit = Int(value), (1...Pagination.maximumLimit).contains(limit) else {
+                    throw PhotoError.invalidLimit
+                }
+                result.limit = limit
+            case "--cursor":
+                guard !value.isEmpty else { throw PhotoError.invalidIdentifier }
+                result.cursor = value
+            default:
+                throw PhotoError.invalidArgument("unsupported albums option")
+            }
+            index += 2
+        }
+        return result
+    }
+
+    private static func parsePhotoQueryArguments(_ arguments: [String]) throws -> PhotoAssetQuery {
+        var start: Date?
+        var end: Date?
+        var albumID: String?
+        var mediaType: PhotoMediaType?
+        var favorite: Bool?
+        var includeHidden = false
+        var includeLocation = false
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var seen = Set<String>()
+        var index = 0
+
+        while index < arguments.count {
+            let option = arguments[index]
+            guard seen.insert(option).inserted else { throw PhotoError.invalidArgument("duplicate query option") }
+            if option == "--include-hidden" || option == "--include-location" {
+                if option == "--include-hidden" { includeHidden = true } else { includeLocation = true }
+                index += 1
+                continue
+            }
+            guard index + 1 < arguments.count else { throw PhotoError.invalidArgument("\(option) requires a value") }
+            let value = arguments[index + 1]
+            switch option {
+            case "--start":
+                guard let date = ISO8601DateFormatter().date(from: value) else { throw PhotoError.invalidArgument("--start must be ISO 8601") }
+                start = date
+            case "--end":
+                guard let date = ISO8601DateFormatter().date(from: value) else { throw PhotoError.invalidArgument("--end must be ISO 8601") }
+                end = date
+            case "--album-id":
+                guard !value.isEmpty else { throw PhotoError.invalidIdentifier }
+                albumID = value
+            case "--media":
+                guard let parsed = PhotoMediaType(rawValue: value) else { throw PhotoError.invalidArgument("--media must be image, video, audio, or unknown") }
+                mediaType = parsed
+            case "--favorite":
+                guard value == "true" || value == "false" else { throw PhotoError.invalidArgument("--favorite must be true or false") }
+                favorite = value == "true"
+            case "--limit":
+                guard let parsed = Int(value), (1...Pagination.maximumLimit).contains(parsed) else { throw PhotoError.invalidLimit }
+                limit = parsed
+            case "--cursor":
+                guard !value.isEmpty else { throw PhotoError.invalidIdentifier }
+                cursor = value
+            default:
+                throw PhotoError.invalidArgument("unsupported query option")
+            }
+            index += 2
+        }
+        guard let start, let end else { throw PhotoError.invalidArgument("query requires --start and --end") }
+        return PhotoAssetQuery(
+            start: start,
+            end: end,
+            albumID: albumID,
+            mediaType: mediaType,
+            favorite: favorite,
+            includeHidden: includeHidden,
+            includeLocation: includeLocation,
+            limit: limit,
+            cursor: cursor
+        )
+    }
+
+    private static func parsePhotoGetArguments(_ arguments: [String]) throws -> PhotoGetArguments {
+        var id: String?
+        var includeLocation = false
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard seen.insert(option).inserted else { throw PhotoError.invalidArgument("duplicate get option") }
+            if option == "--include-location" {
+                includeLocation = true
+                index += 1
+                continue
+            }
+            guard option == "--id", index + 1 < arguments.count else { throw PhotoError.invalidArgument("get accepts --id and --include-location") }
+            guard !arguments[index + 1].isEmpty else { throw PhotoError.invalidIdentifier }
+            id = arguments[index + 1]
+            index += 2
+        }
+        guard let id else { throw PhotoError.invalidArgument("get requires --id") }
+        return PhotoGetArguments(id: id, includeLocation: includeLocation)
+    }
+
+    private static func parsePhotoExportArguments(_ arguments: [String]) throws -> PhotoExportArguments {
+        var id: String?
+        var output: String?
+        var variant = PhotoExportVariant.original
+        var allowNetwork = false
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard seen.insert(option).inserted else { throw PhotoError.invalidArgument("duplicate export option") }
+            if option == "--allow-network" {
+                allowNetwork = true
+                index += 1
+                continue
+            }
+            guard index + 1 < arguments.count else { throw PhotoError.invalidArgument("\(option) requires a value") }
+            let value = arguments[index + 1]
+            switch option {
+            case "--id":
+                guard !value.isEmpty else { throw PhotoError.invalidIdentifier }
+                id = value
+            case "--output":
+                guard !value.isEmpty, value != "-" else { throw PhotoError.invalidOutput }
+                output = value
+            case "--variant":
+                guard let parsed = PhotoExportVariant(rawValue: value) else {
+                    throw PhotoError.invalidArgument("--variant must be original, current, paired-video, or adjustment-data")
+                }
+                variant = parsed
+            default:
+                throw PhotoError.invalidArgument("unsupported export option")
+            }
+            index += 2
+        }
+        guard let id, let output else { throw PhotoError.invalidArgument("export requires --id and --output") }
+        return PhotoExportArguments(
+            id: id,
+            outputURL: URL(fileURLWithPath: output).standardizedFileURL,
+            variant: variant,
+            allowNetwork: allowNetwork
+        )
     }
 
     private static func emitCalendarJSONSuccess<T: Encodable>(_ value: T) {
@@ -966,7 +1203,8 @@ struct MacosDataCLI {
         calendarPermission: CalendarPermission,
         calendarStore: CalendarStore,
         remindersPermission: RemindersPermission,
-        remindersStore: RemindersStore
+        remindersStore: RemindersStore,
+        photosPermission: PhotosPermission
     ) -> DataResourcesResult {
         var resources: [DataResource] = []
         var limitations: [String] = []
@@ -1041,6 +1279,19 @@ struct MacosDataCLI {
             limitations.append("reminders_permission_restricted")
         case .writeOnly:
             limitations.append("reminders_full_access_required")
+        }
+        resources.append(PhotosResourceMapper.map(status: photosPermission.status))
+        switch photosPermission.status {
+        case .authorized:
+            break
+        case .limited:
+            limitations.append("photos_access_limited")
+        case .notDetermined:
+            limitations.append("photos_permission_not_determined")
+        case .denied:
+            limitations.append("photos_permission_denied")
+        case .restricted:
+            limitations.append("photos_permission_restricted")
         }
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
@@ -1183,9 +1434,10 @@ struct MacosDataCLI {
           macos-data mail <command> [options]
           macos-data calendar <command> [options]
           macos-data reminders <command> [options]
+          macos-data photos <command> [options]
 
         Unified resources:
-          resources --format json                List Contacts, Mail, Calendar, and Reminders resources
+          resources --format json                List Contacts, Mail, Calendar, Reminders, and Photos resources
                                              with selection, permission, and limitations
 
         Calendar commands:
@@ -1252,6 +1504,29 @@ struct MacosDataCLI {
           nullable fields, and values replace fields. Completion uses separate commands.
           Complete/reopen set or clear completionDate. Recurring completion may
           return the next visible occurrence separately as nextOccurrence.
+
+        Photos 0.5 commands:
+          permission --format json           Report Photos read authorization without prompting
+          permission --request --format json Request Photos read/write authorization
+          albums [--kind user|smart|all] [--limit <1...200>]
+            [--cursor <cursor>] --format json
+                                             List user folders/albums and smart albums
+          query --start <iso8601> --end <iso8601> [--album-id <opaque-id>]
+            [--media image|video|audio|unknown] [--favorite true|false]
+            [--include-hidden] [--include-location] [--limit <1...200>]
+            [--cursor <cursor>] --format json List bounded asset metadata
+          get --id <opaque-id> [--include-location] --format json
+                                             Read one asset's metadata
+          export --id <opaque-id> --output <file>
+            [--variant original|current|paired-video|adjustment-data]
+            [--allow-network] --format json   Export one explicitly selected resource
+
+        Photos safety:
+          Album discovery preserves hierarchy and duplicate titles, using opaque
+          IDs for selection. Query/get never download media; hidden assets and
+          exact location require explicit options. Limited access reports
+          complete=false. Asset query range is limited to 366 days. Export
+          defaults to original, offline-only, no overwrite, and private output.
 
         Mail commands:
           doctor --format json               Inspect Mail store, schema, and permissions

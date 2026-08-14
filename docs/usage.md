@@ -5,7 +5,7 @@ integration.
 
 ## Unified resources
 
-List the currently discoverable Contacts, Mail, Calendar, and Reminders resource scopes in one
+List the currently discoverable Contacts, Mail, Calendar, Reminders, and Photos resource scopes in one
 machine-readable response:
 
 ```text
@@ -21,6 +21,69 @@ privacy-safe verification. With full access, Calendar reports EventKit sources
 and selects only the uniquely verified iCloud CalDAV source. Reminders follows
 the same fail-closed iCloud source policy and reports a distinct
 `remindersSource` resource kind.
+Photos always reports one `photosLibrary` scope. Before authorization it is not
+readable; limited access is readable with permission `limited` but represents an
+incomplete library view.
+private Notes database.
+
+## Photos (0.5 development slice)
+
+Inspect authorization without triggering a prompt:
+
+```text
+macos-data photos permission --format json
+```
+
+Request read/write Photos authorization explicitly:
+
+```text
+macos-data photos permission --request --format json
+```
+
+The response includes `access`, `readable`, `complete`, and `requested`.
+`limited` means `readable: true` and `complete: false`. This development slice
+can enumerate album metadata after authorization:
+
+```text
+macos-data photos albums --kind all --limit 50 --format json
+macos-data photos albums --kind user --limit 50 --cursor <opaque-cursor> --format json
+```
+
+Results preserve user folder hierarchy, distinguish user and smart albums, and
+allow duplicate titles; use opaque album IDs rather than titles for future
+selection. Query bounded asset metadata by creation date, with hidden assets and
+exact location excluded by default:
+
+```text
+macos-data photos query --start 2026-08-01T00:00:00Z --end 2026-08-15T00:00:00Z \
+  [--album-id <opaque-album-id>] [--media image|video|audio|unknown] \
+  [--favorite true|false] [--include-hidden] [--include-location] \
+  [--limit <1...200>] [--cursor <opaque-cursor>] --format json
+macos-data photos get --id <opaque-asset-id> [--include-location] --format json
+```
+
+The range must be ordered and at most 366 days. Query/get return metadata and
+opaque references only; they do not call media managers or trigger iCloud media
+downloads. `contentAvailability` remains `unknown` in this slice.
+
+Export one explicit resource to a new local file:
+
+```text
+macos-data photos export --id <opaque-asset-id> --output <file> \
+  [--variant original|current|paired-video|adjustment-data] \
+  [--allow-network] --format json
+```
+
+The default variant is `original`; network access and overwrite are disabled.
+If the resource exists only in iCloud, the default command returns
+`PHOTOS_CONTENT_NOT_LOCAL` and leaves no partial file. `--allow-network` is an
+explicit download opt-in. Multiple same-priority resources return an ambiguity
+error instead of guessing. Successful output is staged beside the destination,
+moved atomically, and set to mode `0600`. JSON reports only the opaque asset ID,
+variant, resource kind, content type, byte count, and whether network was
+allowed; it never contains media bytes or echoes the output path. Library
+mutation is not implemented yet.
+See the [Photos 0.5 architecture](development/photos-adapter-architecture.md).
 
 ## Calendar (0.3)
 

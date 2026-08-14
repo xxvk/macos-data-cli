@@ -32,6 +32,11 @@ For Reminders 0.4 planning or implementation, also read:
 10. `docs/development/reminders-adapter-architecture.md` and the Chinese version
     before changing Reminders contracts or runtime code
 
+For Photos 0.5 planning or implementation, also read:
+
+11. `docs/development/photos-adapter-architecture.md` and the Chinese version
+    before changing PhotoKit permissions, metadata, album, export, or mutation
+    behavior
 
 ## Current development executable
 
@@ -216,6 +221,46 @@ not assume a Homebrew or Release binary while development is in progress.
   `scripts/run_local_reminders_integration.sh --with-writes --confirm "REMINDERS CRUD TEST"`;
   its confirmation argument does not replace explicit current-task authorization.
 
+## Non-negotiable Photos rules
+
+- Use public PhotoKit only. Never read Photos databases, library packages,
+  caches, or private frameworks and never automate Photos.app coordinates.
+- `photos permission` is status-only and must not prompt. Only the explicit
+  `photos permission --request` command may request read/write authorization.
+- Treat limited access as readable but incomplete. Preserve `complete: false`;
+  never interpret an empty limited result as an empty full library.
+- Treat asset, album, and cursor IDs as opaque local adapter values. Album names
+  are not selectors because duplicate titles are valid.
+- Metadata query/get must not request image/video bytes or trigger iCloud
+  downloads. Exact location is opt-in only.
+- Export defaults to no network, refuses overwrite, writes no binary to JSON or
+  stdout, and must distinguish originals from paired/adjusted/rendered resources.
+- Use `scripts/run_photos_export_smoke.sh` for the live export gate. It may only
+  write inside its private temporary directory and must remove output on exit.
+  Never add `--allow-network` unless the user explicitly approves downloading a
+  selected iCloud-backed resource for that gate.
+- Do not expose Photos mutation until each command has dry-run/apply semantics
+  and a disposable imported-fixture cleanup gate. Existing personal assets are
+  never mutation fixtures.
+- Do not log asset filenames, locations, local identifiers, album names, output
+  paths, or media bytes. Live smoke tests print aggregate state only.
+- Use `scripts/run_photos_read_smoke.sh` for the live album gate. It prints only
+  authorization, aggregate kind counts, completeness, and truncation; it must
+  stop before collection fetch when access is unreadable.
+- Agent sandboxes can become the TCC responsible process. For the real local
+  gate, use a stable installed bundle and set `MACOS_DATA_APP`; the smoke script
+  will launch it through LaunchServices. Do not treat a direct sandbox denial as
+  evidence about the app bundle's Photos permission.
+- Use `scripts/run_photos_metadata_smoke.sh` for bounded query/get verification.
+  It queries at most five recent assets, uses one opaque ID internally for get,
+  and prints counts/schema state only. Never print asset IDs, dates, filenames,
+  albums, locations, or media bytes.
+- Preserve `com.apple.security.personal-information.photos-library` in the
+  signed app. Verify the signed entitlement itself. For ad-hoc development,
+  install without extended attributes at a stable path and re-sign there;
+  iCloud-workspace resource forks and changing code hashes invalidate TCC or
+  strict code-signing evidence.
+
 ## Local verification
 
 These checks are local-only and do not require CI:
@@ -235,6 +280,9 @@ bash scripts/run_release_gate.sh
 bash scripts/run_calendar_contract_tests.sh
 bash scripts/run_calendar_read_smoke.sh
 bash scripts/run_calendar_dry_run_smoke.sh
+bash scripts/run_photos_read_smoke.sh
+bash scripts/run_photos_metadata_smoke.sh
+bash scripts/run_photos_export_smoke.sh
 bash scripts/run_local_calendar_integration.sh
 bash scripts/run_installed_release_smoke.sh
 bash scripts/check_public_release_prerequisites.sh
