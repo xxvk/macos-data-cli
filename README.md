@@ -44,7 +44,7 @@ operations require an additional confirmation phrase. See the full
 
 ## Project status
 
-The current source release is 0.6.2. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.7.0. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -95,6 +95,15 @@ signed-app soft-delete gate passed: after explicit action-time approval, only
 the disposable fixture was permanently removed through Notes UI, an unrelated
 Recently Deleted note was preserved, and the final signed-app query returned
 zero sentinel matches.
+
+Shortcuts 0.7.0 uses the system `/usr/bin/shortcuts`
+command and public `Shortcuts Events` scripting dictionary. Permission,
+bounded list/get/folders, guarded run, and folder move are implemented. The
+synthetic TDD suite and disposable live gate pass: exact text output, move
+preview, move apply/read-back, restoration, and zero fixture residue were all
+verified. The adapter also starts the on-demand Shortcuts Events helper for cold
+commands and captures plaintext output from the system CLI's stdout. It neither
+reads action graphs nor accesses the private Shortcuts database.
 
 See the detailed roadmaps:
 

@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.7.0 — 2026-08-14
+
+### Added
+
+- Added a public-interface-only Shortcuts adapter using `/usr/bin/shortcuts`
+  and the `Shortcuts Events` scripting dictionary. It provides permission,
+  bounded list/get/folders, opaque identifiers, stable pagination, and public
+  metadata without reading action graphs or private Shortcuts stores.
+- Added guarded shortcut execution with exact confirmation, at most 16 input
+  files, a 1–300 second deadline, bounded inline UTF-8 output, no-overwrite
+  file output, SHA-256 reporting, and explicit no-retry timeout semantics.
+- Added dry-run and confirmed folder moves using opaque shortcut/folder IDs,
+  same-folder no-op behavior, and immediate destination-folder read-back.
+- Added Shortcuts exit code 9, structured errors, process-level CLI negative
+  contracts, 14 adapter tests, and a disposable live run/move/read-back gate.
+
+### Fixed
+
+- Start the on-demand `Shortcuts Events` helper for cold commands instead of
+  rejecting a normal idle-helper state before the Apple Event is sent.
+- Capture plaintext shortcut results from the Apple CLI's stdout before UTF-8,
+  size, hash, JSON, or atomic-output handling. The live fixture verified the
+  exact 28-byte result and was removed together with both test folders, leaving
+  zero fixture residue.
+
+### Limitations
+
+- Version 0.7.0 cannot inspect or edit action graphs. Cherri managed-source
+  authoring is planned for 0.7.1; arbitrary existing-shortcut editing remains
+  an explicitly experimental 0.7.2 investigation.
+
 ## 0.6.2 — 2026-08-14
 
 ### Added

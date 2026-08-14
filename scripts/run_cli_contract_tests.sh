@@ -61,11 +61,21 @@ assert_contains "$TMP_DIR/notes-permission.out" '"contractVersion"[[:space:]]*:[
 assert_contains "$TMP_DIR/notes-permission.out" '"access"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
 assert_contains "$TMP_DIR/notes-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
 
+"$CLI" shortcuts permission --format json >"$TMP_DIR/shortcuts-permission.out"
+assert_contains "$TMP_DIR/shortcuts-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
+assert_contains "$TMP_DIR/shortcuts-permission.out" '"access"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
+assert_contains "$TMP_DIR/shortcuts-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
+
 "$CLI" notes --help >"$TMP_DIR/notes-help.out"
 assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read commands and guarded 0\.6\.1/0\.6\.2 writes'
 
+"$CLI" shortcuts --help >"$TMP_DIR/shortcuts-help.out"
+assert_contains "$TMP_DIR/shortcuts-help.out" 'Shortcuts 0\.7 commands'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'MOVE SHORTCUT'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'RUN SHORTCUT'
+
 "$CLI" --help >"$TMP_DIR/global-help.out"
-assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error'
+assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error, 9 Shortcuts error'
 
 set +e
 printf '' | "$CLI" contacts create --stdin --dry-run --format json >"$TMP_DIR/empty-stdin.out" 2>&1
@@ -149,6 +159,13 @@ run_expected_failure notes-edit-body-unknown-field 8 "$CLI" notes edit-body --id
 run_expected_failure notes-edit-body-invalid-hash 8 "$CLI" notes edit-body --id note_invalid --stdin --dry-run --format json <<<'{"bodyFormat":"plaintext","body":"x","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"bad"}'
 run_expected_failure notes-bind-wrong-confirmation 8 "$CLI" notes write-account bind --account-id notesaccount_invalid --apply --confirm "BIND NOTES" --format json
 run_expected_failure notes-clear-wrong-confirmation 8 "$CLI" notes write-account clear --apply --confirm "CLEAR NOTES" --format json
+run_expected_failure shortcuts-list-invalid-limit 9 "$CLI" shortcuts list --limit 0 --format json
+run_expected_failure shortcuts-get-invalid-id 9 "$CLI" shortcuts get --id shortcut_invalid --format json
+run_expected_failure shortcuts-run-missing-apply 9 "$CLI" shortcuts run --id shortcut_invalid --format json
+run_expected_failure shortcuts-run-wrong-confirmation 9 "$CLI" shortcuts run --id shortcut_invalid --apply --confirm "RUN" --format json
+run_expected_failure shortcuts-run-invalid-timeout 9 "$CLI" shortcuts run --id shortcut_invalid --timeout 0 --apply --confirm "RUN SHORTCUT" --format json
+run_expected_failure shortcuts-move-missing-confirmation 9 "$CLI" shortcuts move --id shortcut_invalid --destination-folder-id shortcutfolder_invalid --apply --format json
+run_expected_failure shortcuts-move-conflicting-mode 9 "$CLI" shortcuts move --id shortcut_invalid --destination-folder-id shortcutfolder_invalid --dry-run --apply --format json
 
 set +e
 printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1

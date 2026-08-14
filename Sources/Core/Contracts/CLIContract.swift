@@ -8,6 +8,7 @@ public enum CLIExitCode: Int32 {
     case remindersFailure = 6
     case photosFailure = 7
     case notesFailure = 8
+    case shortcutsFailure = 9
     case usage = 64
 }
 
@@ -19,6 +20,7 @@ public enum CLIErrorCode: String {
     case reminders = "REMINDERS_ERROR"
     case photos = "PHOTOS_ERROR"
     case notes = "NOTES_ERROR"
+    case shortcuts = "SHORTCUTS_ERROR"
     case invalidQuery = "INVALID_QUERY"
     case cli = "CLI_ERROR"
 }

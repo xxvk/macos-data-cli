@@ -373,6 +373,92 @@ Release/debug app 编译并通过全部 222 个 Swift tests。标准测试使用
   - 全部 gate 通过后，help、README、usage、架构文档、CHANGELOG、capability 与所有版本入口才统一
     更新为 0.6.2
 
+### 0.7.0：Shortcuts 稳定运行与组织能力
+
+版本边界：只使用 `/usr/bin/shortcuts`、Shortcuts URL scheme 和公开的
+`Shortcuts Events` scripting dictionary；不读取或修改 Shortcuts 私有数据库，也不编辑动作图。
+
+- [x] 实现 `shortcuts list` 与 `shortcuts get`
+  - 返回 opaque shortcut ID、名称、folder、subtitle、颜色、图标、是否接受输入和 action count；
+    不把名称作为稳定身份，不声称能够读取动作或参数
+  - 支持有界分页、稳定排序、strict JSON、结构化 Automation/Shortcuts helper 错误和隐私安全日志
+  - Shortcuts synthetic tests 中的 metadata/opaque ID/pagination 项已通过；真实只读 gate 返回
+    2 个 shortcut、6 个 folder、`complete=true`，单条 opaque-ID get 通过且未输出用户字段
+- [x] 实现 `shortcuts run`
+  - 支持明确选择的 shortcut ID、文件或 stdin 输入以及有界输出；交互式 prompt shortcut 必须明确
+    标记为不适合无人值守 Agent 调用
+  - 定义 deadline、取消、输出大小上限，以及 `outcome_unknown` 时禁止自动重试的规则
+  - opaque-ID system CLI bridge、最多 16 个 input、1～300 秒 deadline、256 KiB inline UTF-8、
+    no-overwrite file output、SHA-256 与准确确认短语已实现并通过 synthetic/negative contract。
+    一次性真实 fixture 返回准确的 28-byte plaintext sentinel 并验证 SHA-256；plaintext 从系统
+    CLI 的 stdout 捕获，因为该文本结果不适用 `--output-path`
+- [x] 实现 `shortcuts folders` 与 `shortcuts move`
+  - folder discovery 返回 opaque ID；move 只能使用 shortcut ID 和 destination folder ID，禁止按名称猜测
+  - move 默认 dry-run，apply 前重新读取 source/destination，写后验证 folder identity；相同 folder 为安全 no-op
+  - folder discovery、filter-bound pagination、move preview/no-op、raw-ID mutation bridge 与即时 read-back
+    已实现；真实 fixture 已通过 preview、apply/read-back、destination get、恢复与最终 source-folder get
+- [x] 完成 synthetic TDD、CLI negative contract 和一次性真实 gate
+  - 覆盖 helper 不可用、Automation 拒绝、stale ID、同名 shortcut、超时、输出截断和日志脱敏
+  - 使用专用 fixture 验证 list/get/run/move/read-back，并在测试后恢复原 folder；不执行用户现有 shortcut
+  - 已使用一个专用两动作文本 fixture 与两个明确测试 folder 完成；清理后 fixture shortcut/folder 均为
+    0，原有 2 个 shortcut、6 个 folder 恢复且 `complete=true`
+  - 冷启动回归允许实际 bridge 启动按需运行的 Shortcuts Events helper，避免在 Apple Event 发送前
+    因 helper 空闲未运行而错误拒绝正常命令
+  - 0.7.0 release gate 已通过版本一致性、全量 Swift suite、Release/签名 Debug build、共享
+    CLI/Calendar contracts，以及 Mail doctor/metadata/content/attachment smoke。本机存在多个匹配的
+    iCloud Calendar source，因此 Calendar live smoke 保持稳定 fail-closed，未执行 Calendar 写入
+  - 与 Release byte-identical 的 candidate 已并行安装为
+    `/opt/homebrew/bin/macos-data-0.7.0-rc`，未覆盖 Homebrew 管理的 0.6.2 canonical command。
+    最终组合 gate 以 `installedSmoke=true` 通过，覆盖 0.7.0 版本、Calendar/Shortcuts contracts 和
+    Mail SQLite fast path；canonical Homebrew symlink 等待单独授权的公开发布后再切换
+
+### 0.7.1：Cherri 受管理源码 authoring
+
+版本边界：只创建和更新以 `.cherri` 源码作为 SSOT、由 macos-data registry 管理的 shortcut。
+Cherri 作为可选外部编译器调用，不复制其 GPL-2.0 源码；Apple 未公开的 Shortcut 文件格式必须明确
+标记为 experimental，并为每个受支持 macOS/Shortcuts 版本设置兼容性 gate。
+
+- [ ] 实现 `shortcuts author validate` 与 `shortcuts author build`
+  - validate 检查 Cherri 可用性、源码大小、允许的 include/package、敏感值规则和目标 action 定义
+  - build 在私有临时目录生成 `.shortcut`，使用系统 `shortcuts sign`，返回 source/compiled SHA-256、
+    action count 和签名模式，不输出源码、参数或 secret
+- [ ] 实现受保护的 `shortcuts create`
+  - 默认 dry-run；apply 需要准确确认短语，并通过 Shortcuts.app 完成可见导入
+  - 使用短期 idempotency receipt；导入后按 opaque ID、名称、action count 和显式 smoke input/output 回读
+- [ ] 实现受保护的 `shortcuts update`
+  - 只接受 registry 中已有的 managed shortcut，要求 expected source hash，禁止把任意用户 shortcut
+    静默纳入管理
+  - Apple 没有公开原地动作图替换 API，因此首版采用“编译候选版本 -> 导入 -> 验证 -> 明确确认替换/保留旧版”；
+    失败时保留旧版，禁止先删后装
+- [ ] 建立私有本机 registry 和完整 gate
+  - registry 只保存 opaque shortcut ID、source/compiled hash、action count、版本和时间；权限为目录 `0700`、
+    文件 `0600`、原子写入，不保存动作参数、源码、Token 或其他 secret
+  - disposable fixture 覆盖 validate、build、sign、import、运行、源码修改、再次导入、回读和清理；
+    macOS/Shortcuts 大版本变化时必须重新执行
+
+### 0.7.2：任意现有 Shortcut 的实验性编辑
+
+版本边界：目标是修改不是由 macos-data 创建的现有 shortcut。Apple 当前没有公开动作图 CRUD API，
+因此本版本只能在明确 `experimental`、显式授权和 fail-closed 条件下实现，不承诺跨系统版本稳定。
+
+- [ ] 先完成现有 shortcut 的安全采集与能力分级
+  - 优先使用用户显式提供的本地 unsigned `.shortcut` 或 Cherri source；iCloud share link 可能上传内容，
+    必须单独确认并提示隐私风险
+  - signed file 无法可靠反编译、未知 action、device-bound reference、secret 或未支持结构必须拒绝或要求
+    用户在 Shortcuts.app 中手工迁移，不访问 SQLite/CloudKit/private framework
+- [ ] 设计语义 Accessibility 编辑 backend
+  - 仅按 AX role、identifier、label 和结构定位控件，禁止屏幕坐标、图像匹配和无界点击
+  - 每个 edit plan 先输出动作级 diff；apply 需要准确确认，逐步验证编辑器状态，任何歧义立即停止
+- [ ] 支持受限的原地修改
+  - 初始 allowlist 仅覆盖已验证 action 的新增、删除、移动和参数替换；控制流、magic variable、第三方 action
+    和 device-bound reference 必须分别通过 fixture 后才能启用
+  - 使用 shortcut ID、expected action count 和可获取的 metadata 作为并发保护；因公开接口无法读取完整动作图，
+    不得宣称具备完整事务或无损 round trip
+- [ ] 完成版本化 UI fixture 与恢复 gate
+  - 每个支持的 macOS/Shortcuts 版本保存语义 UI fixture 和失败样本；真实测试只操作 disposable shortcut
+  - apply 前复制/导出可恢复候选，修改后验证 action count 和黑盒运行结果；无法证明结果时返回
+    `outcome_unknown`、保留原对象并禁止自动重试
+
 ## 每个版本的横向完成条件
 
 - [x] 提供 Terminal、标准输入和标准输出调用示例
@@ -577,7 +663,8 @@ Computer Use 只允许用于首次创建或人工恢复这些 fixture。正常�
 
 ## 暂不考虑
 
-- GUI 自动化和屏幕坐标操作
+- 通用 GUI 坐标自动化和图像匹配；0.7.2 仅评估严格限定、语义化且显式标记为 experimental 的
+  Shortcuts Accessibility backend
 - Apple 私有 API
 - 写入 macOS 内部数据库；Mail adapter 仅允许文档化、可替换、严格只读的本地索引读取
 - 云端上传或集中式联系人同步

@@ -190,8 +190,8 @@ final class ContactPayloadTests: XCTestCase {
         XCTAssertFalse(decoded.complete)
     }
 
-    func testCLIReleaseVersionMatchesNotesAdapterRelease() {
-        XCTAssertEqual(CLIVersion.current, "0.6.2")
+    func testCLIReleaseVersionMatchesCurrentRelease() {
+        XCTAssertEqual(CLIVersion.current, "0.7.0")
     }
 
     func testCLIExitCodesAndErrorCodesAreStable() {

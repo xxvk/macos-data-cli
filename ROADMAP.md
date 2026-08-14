@@ -452,6 +452,132 @@ bundles outside this iCloud/File Provider checkout.
   - Help, README, usage, architecture notes, CHANGELOG, capability output, and all
     version entry points were updated together to 0.6.2 only after these gates passed
 
+### 0.7.0: Stable Shortcuts runtime and organization
+
+Version boundary: use only `/usr/bin/shortcuts`, the Shortcuts URL scheme, and
+the public `Shortcuts Events` scripting dictionary. Do not read or mutate the
+private Shortcuts database and do not edit action graphs.
+
+- [x] Implement `shortcuts list` and `shortcuts get`
+  - Return opaque shortcut ID, name, folder, subtitle, color, icon, input
+    acceptance, and action count. Names are not stable identity, and the
+    contract must not claim to expose actions or parameters
+  - Add bounded pagination, stable ordering, strict JSON, structured
+    Automation/helper errors, and privacy-safe diagnostics
+  - Metadata/opaque-ID/pagination coverage passes within the Shortcuts
+    synthetic tests. The read-only live gate returned two shortcuts, six folders,
+    `complete=true`, and a successful opaque-ID get without printing user fields
+- [x] Implement `shortcuts run`
+  - Accept an explicitly selected shortcut ID, file/stdin input, and bounded
+    output. Mark prompt-driven shortcuts as unsuitable for unattended Agents
+  - Define deadlines, cancellation, output limits, and no automatic retry after
+    `outcome_unknown`
+  - The opaque-ID system CLI bridge, 16-input cap, 1...300-second deadline,
+    256-KiB inline UTF-8 cap, no-overwrite file output, SHA-256, and exact
+    confirmation phrase are implemented and pass synthetic/negative contracts.
+    The disposable live fixture returned the exact 28-byte plaintext sentinel
+    and verified its SHA-256. Plaintext is captured from the system CLI's stdout
+    because `--output-path` is not applicable to this text result
+- [x] Implement `shortcuts folders` and `shortcuts move`
+  - Return opaque folder IDs. Move requires shortcut and destination folder IDs
+    and must never infer either object from a display name
+  - Default to dry-run, re-read source/destination before apply, verify folder
+    identity after the write, and treat the same folder as a safe no-op
+  - Folder discovery, filter-bound pagination, move preview/no-op, raw-ID
+    mutation bridge, and immediate read-back are implemented. The live fixture
+    passed preview, apply/read-back, destination get, restoration, and final
+    source-folder get
+- [x] Complete synthetic TDD, CLI negative contracts, and a disposable live gate
+  - Cover helper failure, Automation denial, stale IDs, duplicate names,
+    timeout, output truncation, and diagnostic redaction
+  - Verify list/get/run/move/read-back with a dedicated fixture and restore its
+    original folder afterward; never execute an existing user shortcut
+  - Completed with one purpose-built two-action text fixture and two explicit
+    test folders. Cleanup left zero fixture shortcuts/folders and restored the
+    original two shortcuts and six folders with `complete=true`
+  - Cold-start regression coverage allows the actual bridge to launch the
+    on-demand Shortcuts Events helper instead of rejecting an idle helper before
+    the Apple Event is sent
+  - The 0.7.0 release gate passed version consistency, the full Swift suite,
+    Release and signed-Debug builds, shared CLI/Calendar contracts, and Mail
+    doctor/metadata/content/attachment smoke tests. Calendar live smoke retained
+    its stable fail-closed result because this host has multiple matching iCloud
+    sources; no Calendar write was attempted
+  - A byte-identical candidate was installed alongside the Homebrew-managed
+    0.6.2 command as `/opt/homebrew/bin/macos-data-0.7.0-rc`. The final combined
+    gate passed with `installedSmoke=true`, including version 0.7.0, Calendar and
+    Shortcuts contracts, and the Mail SQLite fast path. The canonical Homebrew
+    symlink remains unchanged until a separately authorized public release
+
+### 0.7.1: Cherri managed-source authoring
+
+Version boundary: create and update only shortcuts whose `.cherri` source is
+the SSOT and whose identity is tracked by the macos-data registry. Invoke Cherri
+as an optional external compiler without copying its GPL-2.0 source. Clearly
+label the undocumented Apple Shortcut file format as experimental and gate each
+supported macOS/Shortcuts version independently.
+
+- [ ] Implement `shortcuts author validate` and `shortcuts author build`
+  - Validate Cherri availability, source size, allowed includes/packages,
+    sensitive-value rules, and target action definitions
+  - Build in a private temporary directory, sign through the system
+    `shortcuts sign`, and return source/compiled SHA-256, action count, and
+    signing mode without emitting source, parameters, or secrets
+- [ ] Implement guarded `shortcuts create`
+  - Default to dry-run. Apply requires an exact confirmation phrase and performs
+    a visible import through Shortcuts.app
+  - Use a short-lived idempotency receipt and verify the imported opaque ID,
+    name, action count, and explicit smoke input/output
+- [ ] Implement guarded `shortcuts update`
+  - Accept only a managed shortcut already present in the registry and require
+    an expected source hash. Never silently adopt an arbitrary user shortcut
+  - Because Apple exposes no in-place action-graph replacement API, initially
+    compile, import, and verify a candidate before explicit replace/retain-old
+    confirmation. Never delete the old version first
+- [ ] Add a private local registry and complete live gate
+  - Store only opaque shortcut ID, source/compiled hashes, action count, version,
+    and timestamps. Use directory mode `0700`, file mode `0600`, and atomic
+    writes; never retain action parameters, source, tokens, or other secrets
+  - A disposable fixture must cover validate, build, sign, import, run, source
+    modification, re-import, read-back, and cleanup. Re-run the gate after each
+    major macOS/Shortcuts update
+
+### 0.7.2: Experimental editing of arbitrary existing shortcuts
+
+Version boundary: modify shortcuts that were not created by macos-data. Apple
+currently exposes no public action-graph CRUD API, so this version must remain
+explicitly experimental, permission-gated, and fail closed, with no promise of
+cross-version stability.
+
+- [ ] Add safe acquisition and capability classification
+  - Prefer a user-supplied local unsigned `.shortcut` or Cherri source. An
+    iCloud share link may upload content and therefore needs separate
+    confirmation plus a privacy warning
+  - Reject or require manual Shortcuts.app migration for signed files that
+    cannot be decoded reliably, unknown actions, device-bound references,
+    secrets, or unsupported structures. Never access SQLite, CloudKit, or a
+    private framework
+- [ ] Design a semantic Accessibility editing backend
+  - Locate controls only by AX role, identifier, label, and hierarchy. Prohibit
+    screen coordinates, image matching, and unbounded clicking
+  - Emit an action-level edit plan before mutation. Apply requires an exact
+    confirmation and verifies editor state after every step; ambiguity stops
+    the operation immediately
+- [ ] Support a constrained set of in-place edits
+  - Start with an allowlist of verified action insert/delete/reorder and
+    parameter replacement operations. Control flow, magic variables,
+    third-party actions, and device-bound references each require separate
+    fixtures before enablement
+  - Use shortcut ID, expected action count, and available metadata as concurrency
+    guards. Since the public interface cannot read a complete action graph, do
+    not claim full transactions or lossless round trips
+- [ ] Complete versioned UI fixtures and recovery gates
+  - Keep semantic UI fixtures and failure samples for every supported
+    macOS/Shortcuts version. Live tests may mutate only disposable shortcuts
+  - Create a recoverable candidate before apply and verify action count plus
+    black-box runtime behavior afterward. If the outcome cannot be proven,
+    return `outcome_unknown`, preserve the original object, and prohibit retries
+
 ## Cross-cutting requirements for every release
 
 - [x] Document Terminal, stdin, and stdout usage
@@ -716,7 +842,9 @@ Each adapter should define its own authorization requirements, model mapping, re
 
 ## Out of scope for now
 
-- GUI automation and screen-coordinate workflows
+- General GUI coordinate automation and image matching. Version 0.7.2 may
+  evaluate only a tightly scoped, semantic, explicitly experimental Shortcuts
+  Accessibility backend
 - Apple private APIs
 - Writes to internal macOS databases; the Mail adapter permits only its
   documented, replaceable, strictly read-only local-index path

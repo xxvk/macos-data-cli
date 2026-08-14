@@ -36,6 +36,10 @@ let package = Package(
             name: "NotesAdapter",
             targets: ["NotesAdapter"]
         ),
+        .library(
+            name: "ShortcutsAdapter",
+            targets: ["ShortcutsAdapter"]
+        ),
         .executable(
             name: "macos-data",
             targets: ["macos-data"]
@@ -99,9 +103,17 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        .target(
+            name: "ShortcutsAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Shortcuts",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .executableTarget(
             name: "macos-data",
-            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter", "ShortcutsAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -164,6 +176,13 @@ let package = Package(
         .testTarget(
             name: "NotesTests",
             dependencies: ["NotesAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "ShortcutsTests",
+            dependencies: ["ShortcutsAdapter"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

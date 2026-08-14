@@ -40,7 +40,7 @@ macos-data mail doctor --format json
 
 ## 项目状态
 
-当前源码版本为 0.6.2。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.7.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -79,6 +79,12 @@ create/rename/move/read-back gate 已通过，并确认测试 note 零残留。
 soft-delete gate 已通过：取得 action-time 明确确认后，仅通过 Notes UI 永久删除一次性 fixture，
 保留一条无关的 Recently Deleted note，最终签名 app 查询确认 sentinel 零匹配。
 
+Shortcuts 0.7.0 使用系统 `/usr/bin/shortcuts` 和公开的 `Shortcuts Events`
+scripting dictionary，实现 permission、有限 list/get/folders、受保护 run 和 folder move。
+synthetic TDD 与一次性真实 gate 已通过：准确文本输出、move preview、move apply/read-back、恢复及
+fixture 零残留均已验证。adapter 会在冷启动命令中启动按需运行的 Shortcuts Events helper，并从
+系统 CLI 的 stdout 捕获 plaintext 输出；它不读取动作图，也不访问 Shortcuts 私有数据库。
+
 详细开发计划请参阅：
 
 - [中文路线图](ROADMAP_CN.md)
@@ -96,6 +102,7 @@ soft-delete gate 已通过：取得 action-time 明确确认后，仅通过 Note
 - [Calendar 0.3 架构](docs/development/calendar-adapter-architecture_CN.md)
 - [Photos 0.5 架构](docs/development/photos-adapter-architecture_CN.md)
 - [Notes 0.6 可行性决策](docs/development/notes-adapter-feasibility_CN.md)
+- [Shortcuts 命令与安全边界](docs/usage_CN.md#shortcuts070-开发切片)
 
 ## 核心目标
 

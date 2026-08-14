@@ -6,7 +6,8 @@ integration.
 
 ## Unified resources
 
-List the currently discoverable Contacts, Mail, Calendar, Reminders, Photos, and Notes resource scopes in one
+List the currently discoverable Contacts, Mail, Calendar, Reminders, Photos,
+Notes, and Shortcuts resource scopes in one
 machine-readable response:
 
 ```text
@@ -28,6 +29,58 @@ incomplete library view.
 Notes reports one read-only `notesLibrary` scope. Its permission reflects the
 responsible process's Notes.app Automation state and does not imply access to a
 private Notes database.
+
+## Shortcuts (0.7.0 development slice)
+
+Version 0.7.0 uses only the system `shortcuts` CLI and public `Shortcuts Events`
+scripting dictionary. Names are display-only and every selection uses an opaque
+ID. The public interface exposes action count, not the action graph or parameters.
+`Shortcuts Events` is an on-demand helper and may be absent while idle. Read and
+write commands start it without activating the Shortcuts UI before sending their
+bounded Apple Event; an actual launch or connection failure remains a structured
+error. The standalone permission probe may still report `targetNotRunning` while
+the helper is idle.
+
+```bash
+macos-data shortcuts permission --format json
+macos-data shortcuts permission --request --format json
+macos-data shortcuts list --limit 50 --format json
+macos-data shortcuts folders --limit 50 --format json
+macos-data shortcuts get --id <opaque-shortcut-id> --format json
+macos-data shortcuts list --folder-id <opaque-folder-id> --limit 50 --format json
+```
+
+Move defaults to preview. Apply requires the exact phrase and reads the folder ID
+back within the bounded Apple Event:
+
+```bash
+macos-data shortcuts move --id <opaque-shortcut-id> \
+  --destination-folder-id <opaque-folder-id> --dry-run --format json
+
+macos-data shortcuts move --id <opaque-shortcut-id> \
+  --destination-folder-id <opaque-folder-id> \
+  --apply --confirm "MOVE SHORTCUT" --format json
+```
+
+Running a shortcut can cause arbitrary external side effects, so it requires
+explicit apply and confirmation. At most 16 input files are accepted and the
+deadline is 1...300 seconds. Inline output defaults to UTF-8 text capped at
+256 KiB; binary or larger output requires a nonexistent `--output-path`, and
+overwrite is refused. A timeout means side effects may already have happened;
+Agents must not retry automatically.
+Plaintext results are emitted by Apple's CLI on stdout, so macos-data captures
+stdout privately, applies the size/UTF-8/hash checks, and only then returns JSON
+or atomically writes the requested output file.
+
+```bash
+macos-data shortcuts run --id <opaque-shortcut-id> \
+  --input-path ./input.txt --output-type public.utf8-plain-text --timeout 30 \
+  --apply --confirm "RUN SHORTCUT" --format json
+```
+
+Version 0.7.0 cannot read or edit action graphs. Cherri managed-source authoring
+is planned for 0.7.1, and experimental editing of arbitrary existing shortcuts
+for 0.7.2. No version may mutate Shortcuts SQLite or CloudKit data directly.
 
 ## Notes (0.6 read-only development slice)
 

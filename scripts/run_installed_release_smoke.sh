@@ -43,6 +43,12 @@ if ! rg -q '^Calendar commands:' "$TEMP_DIR/help.txt" || ! rg -q 'conflicts --st
   echo "installed binary help does not expose the Calendar 0.3 command surface" >&2
   exit 1
 fi
+if ! rg -q '^Shortcuts 0\.7 commands:' "$TEMP_DIR/help.txt" \
+  || ! rg -q 'RUN SHORTCUT' "$TEMP_DIR/help.txt" \
+  || ! rg -q 'MOVE SHORTCUT' "$TEMP_DIR/help.txt"; then
+  echo "installed binary help does not expose the Shortcuts 0.7 command surface" >&2
+  exit 1
+fi
 
 set +e
 "$CLI" calendar query --format json >"$TEMP_DIR/calendar-invalid.stdout" 2>"$TEMP_DIR/calendar-invalid.stderr"
@@ -50,6 +56,21 @@ calendar_status=$?
 set -e
 if [[ "$calendar_status" -ne 5 ]] || ! /usr/bin/jq -e '.error.code == "CALENDAR_INVALID_INPUT"' "$TEMP_DIR/calendar-invalid.stderr" >/dev/null; then
   echo "installed binary Calendar error contract is invalid" >&2
+  exit 1
+fi
+
+set +e
+"$CLI" shortcuts list --limit 0 --format json >"$TEMP_DIR/shortcuts-invalid.stdout" 2>"$TEMP_DIR/shortcuts-invalid.stderr"
+shortcuts_status=$?
+set -e
+if [[ "$shortcuts_status" -ne 9 ]] || ! /usr/bin/jq -e '.error.code == "SHORTCUTS_INVALID_LIMIT"' "$TEMP_DIR/shortcuts-invalid.stderr" >/dev/null; then
+  echo "installed binary Shortcuts error contract is invalid" >&2
+  exit 1
+fi
+
+run_json "$TEMP_DIR/shortcuts-permission.json" shortcuts permission --format json
+if ! /usr/bin/jq -e '.ok == true and .data.requested == false' "$TEMP_DIR/shortcuts-permission.json" >/dev/null; then
+  echo "installed binary Shortcuts permission contract is invalid" >&2
   exit 1
 fi
 
@@ -66,4 +87,4 @@ if ! /usr/bin/jq -e '.ok == true and .data.backend == "sqlite"' "$TEMP_DIR/query
 fi
 
 message_count="$(/usr/bin/jq -r '.data.messages | length' "$TEMP_DIR/query.json")"
-echo "Installed release smoke passed: version=$installed_version calendarContract=true backend=sqlite fastPath=true messages=$message_count"
+echo "Installed release smoke passed: version=$installed_version calendarContract=true shortcutsContract=true backend=sqlite fastPath=true messages=$message_count"

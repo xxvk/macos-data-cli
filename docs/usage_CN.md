@@ -5,7 +5,7 @@ Automation 接口访问 macOS 数据，Agent 不需要专用集成即可调用�
 
 ## 统一资源查询
 
-使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos 和 Notes 资源作用域：
+使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos、Notes 和 Shortcuts 资源作用域：
 
 ```text
 macos-data resources --format json
@@ -21,6 +21,49 @@ Photos 始终报告一个 `photosLibrary` scope；未授权时不可读，limite
 `limited`，可读但不代表完整照片库。
 Notes 始终报告一个只读 `notesLibrary` scope；permission 表示负责执行进程对 Notes.app 的
 Automation 状态，不代表可以访问 Notes 私有数据库。
+
+## Shortcuts（0.7.0 开发切片）
+
+0.7.0 只使用系统 `shortcuts` CLI 和公开的 `Shortcuts Events` scripting dictionary。
+名称只用于显示，所有选择均使用 opaque ID。公开接口只提供 action count，不提供动作图或参数。
+`Shortcuts Events` 是按需运行的 helper，空闲时可能不存在。读写命令会在发送有界 Apple Event 前
+自动启动它，但不会激活 Shortcuts UI；真实启动或连接失败仍返回结构化错误。单独执行 permission
+probe 时，如果 helper 正处于空闲未运行状态，仍可能返回 `targetNotRunning`。
+
+```bash
+macos-data shortcuts permission --format json
+macos-data shortcuts permission --request --format json
+macos-data shortcuts list --limit 50 --format json
+macos-data shortcuts folders --limit 50 --format json
+macos-data shortcuts get --id <opaque-shortcut-id> --format json
+macos-data shortcuts list --folder-id <opaque-folder-id> --limit 50 --format json
+```
+
+移动默认只预览；apply 需要准确确认短语，并在同一个有界 Apple Event 中回读 folder ID：
+
+```bash
+macos-data shortcuts move --id <opaque-shortcut-id> \
+  --destination-folder-id <opaque-folder-id> --dry-run --format json
+
+macos-data shortcuts move --id <opaque-shortcut-id> \
+  --destination-folder-id <opaque-folder-id> \
+  --apply --confirm "MOVE SHORTCUT" --format json
+```
+
+运行 Shortcut 可能触发任意外部副作用，因此必须明确 apply 和确认。最多接受 16 个输入文件，
+deadline 为 1～300 秒；默认把输出限制为 256 KiB UTF-8 文本。二进制或较大输出应提供不存在的
+`--output-path`，CLI 禁止覆盖。超时表示副作用可能已经发生，Agent 不得自动重试。
+Apple CLI 会把 plaintext 结果写到 stdout，因此 macos-data 先在私有临时文件中捕获 stdout，完成
+大小、UTF-8 和 hash 检查后，才返回 JSON 或原子写入用户指定的输出文件。
+
+```bash
+macos-data shortcuts run --id <opaque-shortcut-id> \
+  --input-path ./input.txt --output-type public.utf8-plain-text --timeout 30 \
+  --apply --confirm "RUN SHORTCUT" --format json
+```
+
+0.7.0 不支持读取或编辑 action graph。Cherri 受管理源码 authoring 属于 0.7.1；任意现有
+Shortcut 的实验性编辑属于 0.7.2。任何版本都不得直接修改 Shortcuts SQLite/CloudKit 数据。
 
 ## Notes（0.6 只读开发切片）
 

@@ -7,6 +7,7 @@ import CalendarAdapter
 import RemindersAdapter
 import PhotosAdapter
 import NotesAdapter
+import ShortcutsAdapter
 
 @main
 struct MacosDataCLI {
@@ -44,7 +45,7 @@ struct MacosDataCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] || arguments == ["notes", "--help"] {
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] || arguments == ["notes", "--help"] || arguments == ["shortcuts", "--help"] {
             printHelp()
             return
         }
@@ -65,6 +66,8 @@ struct MacosDataCLI {
             let photosStore = PhotosStore(permission: photosPermission)
             let notesPermission = NotesPermissionService()
             let notesStore = NotesStore(permission: notesPermission)
+            let shortcutsPermission = ShortcutsPermissionService()
+            let shortcutsStore = ShortcutsStore(permission: shortcutsPermission)
             switch arguments {
             case ["resources"]:
                 emitJSONSuccess(makeResourcesResult(
@@ -76,8 +79,35 @@ struct MacosDataCLI {
                     remindersStore: remindersStore,
                     photosPermission: photosPermission,
                     notesPermission: notesPermission,
-                    notesStore: notesStore
+                    notesStore: notesStore,
+                    shortcutsPermission: shortcutsPermission
                 ))
+            case ["shortcuts", "permission"]:
+                emitJSONSuccess(shortcutsPermission.check(requestConsent: false))
+            case ["shortcuts", "permission", "--request"]:
+                let result = shortcutsPermission.check(requestConsent: true)
+                emitJSONSuccess(result)
+                if !result.readable { Foundation.exit(CLIExitCode.shortcutsFailure.rawValue) }
+            case let args where args.count >= 2 && args[0] == "shortcuts" && args[1] == "list":
+                let request = try parseShortcutsPageArguments(Array(args.dropFirst(2)), allowsFolder: true)
+                emitJSONSuccess(try shortcutsStore.list(limit: request.limit, cursor: request.cursor, folderID: request.folderID))
+            case let args where args.count >= 2 && args[0] == "shortcuts" && args[1] == "folders":
+                let request = try parseShortcutsPageArguments(Array(args.dropFirst(2)), allowsFolder: false)
+                emitJSONSuccess(try shortcutsStore.folders(limit: request.limit, cursor: request.cursor))
+            case let args where args.count == 4 && args[0] == "shortcuts" && args[1] == "get" && args[2] == "--id":
+                emitJSONSuccess(try shortcutsStore.get(id: args[3]))
+            case let args where args.count >= 2 && args[0] == "shortcuts" && args[1] == "run":
+                let request = try parseShortcutRunArguments(Array(args.dropFirst(2)))
+                emitJSONSuccess(try shortcutsStore.run(
+                    id: request.id,
+                    inputPaths: request.inputPaths,
+                    outputPath: request.outputPath,
+                    outputType: request.outputType,
+                    timeoutSeconds: request.timeoutSeconds
+                ))
+            case let args where args.count >= 2 && args[0] == "shortcuts" && args[1] == "move":
+                let request = try parseShortcutMoveArguments(Array(args.dropFirst(2)))
+                emitJSONSuccess(try shortcutsStore.move(id: request.id, destinationFolderID: request.destinationFolderID, apply: request.apply))
             case ["notes", "permission"]:
                 emitJSONSuccess(notesPermission.check(requestConsent: false))
             case ["notes", "permission", "--request"]:
@@ -488,6 +518,9 @@ struct MacosDataCLI {
         } catch let error as NotesError {
             report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.notesFailure.rawValue)
             Foundation.exit(CLIExitCode.notesFailure.rawValue)
+        } catch let error as ShortcutsError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.shortcutsFailure.rawValue)
+            Foundation.exit(CLIExitCode.shortcutsFailure.rawValue)
         } catch let error as PaginationError {
             if rawArguments.first == "reminders" {
                 report(error: error == .invalidLimit ? "Reminder limit must be between 1 and 200." : "Reminder cursor is invalid or stale.", code: CLIErrorCode.reminders.rawValue, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
@@ -498,6 +531,9 @@ struct MacosDataCLI {
             } else if rawArguments.first == "notes" {
                 report(error: error == .invalidLimit ? "Notes limit must be between 1 and 200." : "Notes cursor is invalid or stale.", code: CLIErrorCode.notes.rawValue, arguments: rawArguments, exitCode: CLIExitCode.notesFailure.rawValue)
                 Foundation.exit(CLIExitCode.notesFailure.rawValue)
+            } else if rawArguments.first == "shortcuts" {
+                report(error: error == .invalidLimit ? "Shortcuts limit must be between 1 and 200." : "Shortcuts cursor is invalid or stale.", code: CLIErrorCode.shortcuts.rawValue, arguments: rawArguments, exitCode: CLIExitCode.shortcutsFailure.rawValue)
+                Foundation.exit(CLIExitCode.shortcutsFailure.rawValue)
             } else {
                 report(error: error == .invalidLimit ? "Calendar limit must be between 1 and 200." : "Calendar cursor is invalid or stale.", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
                 Foundation.exit(CLIExitCode.calendarFailure.rawValue)
@@ -1499,7 +1535,8 @@ struct MacosDataCLI {
         remindersStore: RemindersStore,
         photosPermission: PhotosPermission,
         notesPermission: NotesPermissionService,
-        notesStore: NotesStore
+        notesStore: NotesStore,
+        shortcutsPermission: ShortcutsPermissionService
     ) -> DataResourcesResult {
         var resources: [DataResource] = []
         var limitations: [String] = []
@@ -1605,6 +1642,16 @@ struct MacosDataCLI {
             limitations.append("notes_app_unavailable")
         case .unknown:
             limitations.append("notes_automation_unknown")
+        }
+        let shortcutsResult = shortcutsPermission.check(requestConsent: false)
+        resources.append(ShortcutsResourceMapper.map(status: shortcutsResult.access))
+        switch shortcutsResult.access {
+        case .available: break
+        case .requiresConsent: limitations.append("shortcuts_automation_requires_consent")
+        case .denied: limitations.append("shortcuts_automation_denied")
+        case .targetNotRunning: limitations.append("shortcuts_events_not_running")
+        case .targetUnavailable: limitations.append("shortcuts_events_unavailable")
+        case .unknown: limitations.append("shortcuts_automation_unknown")
         }
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
@@ -1736,6 +1783,120 @@ struct MacosDataCLI {
         return MailGetArguments(id: id, projection: projection, output: output)
     }
 
+    private struct ShortcutsPageArguments {
+        let limit: Int
+        let cursor: String?
+        let folderID: String?
+    }
+
+    private static func parseShortcutsPageArguments(_ arguments: [String], allowsFolder: Bool) throws -> ShortcutsPageArguments {
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var folderID: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            let allowed = allowsFolder ? ["--limit", "--cursor", "--folder-id"] : ["--limit", "--cursor"]
+            guard allowed.contains(option), seen.insert(option).inserted, index + 1 < arguments.count else {
+                throw ShortcutsError.invalidIdentifier
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--limit":
+                guard let parsed = Int(value), (1...Pagination.maximumLimit).contains(parsed) else { throw ShortcutsError.invalidLimit }
+                limit = parsed
+            case "--cursor": cursor = value
+            case "--folder-id": folderID = value
+            default: break
+            }
+            index += 2
+        }
+        return ShortcutsPageArguments(limit: limit, cursor: cursor, folderID: folderID)
+    }
+
+    private struct ShortcutMoveArguments {
+        let id: String
+        let destinationFolderID: String
+        let apply: Bool
+    }
+
+    private struct ShortcutRunArguments {
+        let id: String
+        let inputPaths: [URL]
+        let outputPath: URL?
+        let outputType: String
+        let timeoutSeconds: Int
+    }
+
+    private static func parseShortcutRunArguments(_ arguments: [String]) throws -> ShortcutRunArguments {
+        var id: String?
+        var inputPaths: [URL] = []
+        var outputPath: URL?
+        var outputType = "public.utf8-plain-text"
+        var timeoutSeconds = 30
+        var apply = false
+        var confirmation: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--id", "--input-path", "--output-path", "--output-type", "--timeout", "--apply", "--confirm"].contains(option) else {
+                throw ShortcutsError.invalidRunInput
+            }
+            if option != "--input-path" && !seen.insert(option).inserted { throw ShortcutsError.invalidRunInput }
+            if option == "--apply" { apply = true; index += 1; continue }
+            guard index + 1 < arguments.count else { throw ShortcutsError.invalidRunInput }
+            let value = arguments[index + 1]
+            switch option {
+            case "--id": id = value
+            case "--input-path": inputPaths.append(URL(fileURLWithPath: value))
+            case "--output-path": outputPath = URL(fileURLWithPath: value)
+            case "--output-type": outputType = value
+            case "--timeout":
+                guard let parsed = Int(value) else { throw ShortcutsError.invalidRunInput }
+                timeoutSeconds = parsed
+            case "--confirm": confirmation = value
+            default: break
+            }
+            index += 2
+        }
+        guard apply, confirmation == "RUN SHORTCUT" else { throw ShortcutsError.confirmationRequired }
+        guard let id else { throw ShortcutsError.invalidRunInput }
+        return ShortcutRunArguments(id: id, inputPaths: inputPaths, outputPath: outputPath, outputType: outputType, timeoutSeconds: timeoutSeconds)
+    }
+
+    private static func parseShortcutMoveArguments(_ arguments: [String]) throws -> ShortcutMoveArguments {
+        var id: String?
+        var destinationFolderID: String?
+        var apply = false
+        var dryRun = false
+        var confirmation: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--id", "--destination-folder-id", "--dry-run", "--apply", "--confirm"].contains(option),
+                  seen.insert(option).inserted else { throw ShortcutsError.invalidIdentifier }
+            switch option {
+            case "--dry-run": dryRun = true; index += 1
+            case "--apply": apply = true; index += 1
+            default:
+                guard index + 1 < arguments.count else { throw ShortcutsError.invalidIdentifier }
+                let value = arguments[index + 1]
+                if option == "--id" { id = value }
+                else if option == "--destination-folder-id" { destinationFolderID = value }
+                else { confirmation = value }
+                index += 2
+            }
+        }
+        guard let id, let destinationFolderID, !(apply && dryRun), !(!apply && confirmation != nil) else {
+            throw ShortcutsError.invalidIdentifier
+        }
+        if apply && confirmation != "MOVE SHORTCUT" { throw ShortcutsError.confirmationRequired }
+        return ShortcutMoveArguments(id: id, destinationFolderID: destinationFolderID, apply: apply)
+    }
+
     private static func printHelp() {
         print("""
         macos-data \(CLIVersion.current) — local macOS data CLI for agents and developers
@@ -1749,10 +1910,36 @@ struct MacosDataCLI {
           macos-data reminders <command> [options]
           macos-data photos <command> [options]
           macos-data notes <command> [options]
+          macos-data shortcuts <command> [options]
 
         Unified resources:
           resources --format json                List Contacts, Mail, Calendar, Reminders, Photos, and Notes resources
                                              with selection, permission, and limitations
+
+        Shortcuts 0.7 commands:
+          permission --format json           Report Shortcuts Events Automation status without prompting
+          permission --request --format json Explicitly request Shortcuts Automation consent
+          list [--folder-id <opaque-id>] [--limit <1...200>]
+            [--cursor <cursor>] --format json List bounded shortcut metadata
+          get --id <opaque-id> --format json  Read one shortcut's public metadata
+          run --id <opaque-id> [--input-path <file> ...]
+            [--output-path <file>] [--output-type <uti>] [--timeout <1...300>]
+            --apply --confirm "RUN SHORTCUT" --format json
+                                             Run one explicitly selected shortcut;
+                                             timeout outcomes must not be retried
+          folders [--limit <1...200>] [--cursor <cursor>] --format json
+                                             List shortcut folders with opaque IDs
+          move --id <opaque-id> --destination-folder-id <opaque-id>
+            [--dry-run] --format json         Preview a folder move (default)
+          move --id <opaque-id> --destination-folder-id <opaque-id>
+            --apply --confirm "MOVE SHORTCUT" --format json
+                                             Move and immediately verify folder identity
+
+        Shortcuts boundary:
+          Uses only the system shortcuts CLI and public Shortcuts Events
+          scripting dictionary. Names are display values, never identity.
+          Metadata includes action count but never claims to expose the action
+          graph or parameters. Private Shortcuts databases are never accessed.
 
         Calendar commands:
           permission                         Request full Calendar access
@@ -1983,7 +2170,7 @@ struct MacosDataCLI {
           Version: 0.1 (independent from the CLI release version)
           Exit codes: 0 success, 1 unexpected CLI error, 2 Contacts error,
             3 ambiguous/not-found query error, 4 Mail error, 5 Calendar error,
-            6 Reminders error, 7 Photos error, 8 Notes error,
+            6 Reminders error, 7 Photos error, 8 Notes error, 9 Shortcuts error,
             64 usage or invalid query
           Success: {"ok": true, "contractVersion": "0.1", "data": ...}
           Failure: {"ok": false, "contractVersion": "0.1", "error": {"code": ..., "message": ...}}

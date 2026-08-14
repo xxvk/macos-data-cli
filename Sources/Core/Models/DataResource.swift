@@ -7,6 +7,7 @@ public enum DataResourceKind: String, Codable, Equatable, Sendable {
     case remindersSource
     case photosLibrary
     case notesLibrary
+    case shortcutsLibrary
 }
 
 public enum DataResourceProvider: String, Codable, Equatable, Sendable {
@@ -16,6 +17,7 @@ public enum DataResourceProvider: String, Codable, Equatable, Sendable {
     case eventKit
     case photos
     case notes
+    case shortcuts
 }
 
 public enum DataPermissionState: String, Codable, Equatable, Sendable {
