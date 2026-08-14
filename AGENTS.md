@@ -261,6 +261,24 @@ not assume a Homebrew or Release binary while development is in progress.
   iCloud-workspace resource forks and changing code hashes invalidate TCC or
   strict code-signing evidence.
 
+## Non-negotiable Notes rules
+
+- Notes 0.6 uses the public Notes.app scripting dictionary through Apple Events;
+  do not call it a native Notes Framework adapter.
+- Never inspect Notes databases, caches, private frameworks, or Notes-owned
+  CloudKit containers, and never automate Notes.app by GUI coordinates.
+- `notes permission` is status-only and must not prompt. Only
+  `notes permission --request` may request Automation consent.
+- The default future query path is metadata-only. Note plaintext/HTML body must
+  require an explicit get projection, use a byte cap, and never enter logs.
+- Treat account, folder, note, attachment, and cursor IDs as adapter-owned opaque
+  values. Do not expose raw Notes scripting IDs in the JSON contract.
+- Every Apple Event operation must be bounded by object count and deadline;
+  never fetch body for `every note` and use a timeout circuit breaker.
+- Real write verification may use only a disposable test note with explicit
+  authorization and proven zero-residue cleanup. Existing notes are never
+  mutation fixtures.
+
 ## Local verification
 
 These checks are local-only and do not require CI:

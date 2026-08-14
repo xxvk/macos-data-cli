@@ -56,6 +56,17 @@ assert_contains "$TMP_DIR/photos-permission.out" '"contractVersion"[[:space:]]*:
 assert_contains "$TMP_DIR/photos-permission.out" '"access"[[:space:]]*:[[:space:]]*"(notDetermined|restricted|denied|limited|authorized)"'
 assert_contains "$TMP_DIR/photos-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
 
+"$CLI" notes permission --format json >"$TMP_DIR/notes-permission.out"
+assert_contains "$TMP_DIR/notes-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
+assert_contains "$TMP_DIR/notes-permission.out" '"access"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
+assert_contains "$TMP_DIR/notes-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
+
+"$CLI" notes --help >"$TMP_DIR/notes-help.out"
+assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read-only'
+
+"$CLI" --help >"$TMP_DIR/global-help.out"
+assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error'
+
 set +e
 printf '' | "$CLI" contacts create --stdin --dry-run --format json >"$TMP_DIR/empty-stdin.out" 2>&1
 empty_code=$?
@@ -101,6 +112,14 @@ run_expected_failure photos-get-missing-id 7 "$CLI" photos get --format json
 run_expected_failure photos-export-missing-output 7 "$CLI" photos export --id photo_invalid --format json
 run_expected_failure photos-export-invalid-variant 7 "$CLI" photos export --id photo_invalid --output /tmp/never-created --variant guessed --format json
 run_expected_failure photos-export-stdout-forbidden 7 "$CLI" photos export --id photo_invalid --output - --format json
+run_expected_failure notes-folders-invalid-limit 8 "$CLI" notes folders --limit 0 --format json
+run_expected_failure notes-folders-missing-value 8 "$CLI" notes folders --account-id --format json
+run_expected_failure notes-query-invalid-limit 8 "$CLI" notes query --limit 0 --format json
+run_expected_failure notes-query-invalid-date 8 "$CLI" notes query --modified-after not-a-date --format json
+run_expected_failure notes-query-missing-value 8 "$CLI" notes query --title --format json
+run_expected_failure notes-get-missing-id 8 "$CLI" notes get --format json
+run_expected_failure notes-get-invalid-body 8 "$CLI" notes get --id note_invalid --body markdown --format json
+run_expected_failure notes-get-duplicate-attachments 8 "$CLI" notes get --id note_invalid --include-attachments --include-attachments --format json
 
 set +e
 printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1

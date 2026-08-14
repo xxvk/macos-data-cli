@@ -118,32 +118,209 @@ Architecture: [Calendar adapter 0.3](docs/development/calendar-adapter-architect
 - [x] Pass the default no-apply 0.3.0 release gate: 121 Swift tests, shared and
   Calendar CLI contracts, Calendar read/dry-run smoke, Mail read-only smoke,
   Release build, signed Debug app verification, version audit, and diff check
-- [ ] Commit the final release candidate, merge it to `main`, rerun the gate from
-  a clean `main` worktree, and create annotated tag `v0.3.0`
+- [x] Commit the final release candidate, merge it to `main`, rerun the gate from
+  a clean `main` worktree, create annotated tag `v0.3.0`, publish the GitHub
+  Release asset, update the Homebrew Cask, and verify the installed 0.3.0 CLI
 
 ### 0.4: Reminders adapter
 
-- [ ] Use EventKit to access reminders
-- [ ] Support reminder lists, titles, notes, due dates, and completion state
-- [ ] Support reminder query, creation, update, and completion
-- [ ] Support list selection and multi-factor matching
-- [ ] Include dry-run, the JSON contract, and authorization checks
+Architecture draft: [Reminders adapter 0.4](docs/development/reminders-adapter-architecture.md).
 
-### 0.5: Notes adapter
+- [x] Define and review the 0.4 Reminders architecture before implementation:
+  user workflows, iCloud source/list selection, permissions, JSON models,
+  stable identifiers, recurrence and alarm semantics, pagination, write safety,
+  idempotency, error contract, and TDD/release gates
+- [x] Use EventKit to access reminders
+  - TDD foundation implemented: dedicated `RemindersAdapter` target, stable
+    permission errors/exit 6, full-access request, unique iCloud source
+    selection, and reminder-list discovery
+  - Local privacy-minimized verification passed with full access, one selected
+    source, and six lists; no reminder titles or contents were emitted
+  - Read-only query/get now use EventKit fetch plus local/server opaque-ID lookup;
+    fetches have a tested 10-second timeout and Task-cancellation path, a
+    post-fetch 5,000-item response cap, and incomplete due ranges are pushed
+    into EventKit predicates; EventKit still materializes its result array first
+- [x] Support reminder lists, titles, notes, due dates, and completion state
+  - Read JSON includes opaque ID, list, title, notes, URL, normalized priority,
+    completion state/date, start/due DateComponents, alarm details (including
+    read-only location alarms), and complete recurrence-rule details
+  - Date mapping distinguishes date-only, floating timed, and IANA-zone timed values
+- [x] Support reminder query, creation, update, and completion for non-recurring reminders
+  - `reminders query` and `reminders get` are implemented with status, due range,
+    list, title, limit, and opaque anchor cursor filters; cursors contain
+    privacy-safe SHA-256 fingerprints of the query, selected lists, and last
+    emitted item, avoiding silent offset drift
+  - Partial update is implemented with fail-closed patch decoding, nullable-field
+    clearing, writable iCloud list moves, location-alarm preservation, one save,
+    and explicit read-back states; real edit apply passed with final zero residue
+  - Complete/reopen are implemented with explicit completion timestamps, safe
+    no-op repeats, one-save apply, read-back states, and separate recurring
+    `nextOccurrence`; real apply and repeated no-op verification passed
+  - `create --dry-run|--apply [--idempotent]` is implemented with fail-closed JSON decoding, normalized
+    date/alarm/recurrence validation, writable-list resolution, and an ID-less
+    draft, EventKit save, opaque ID, immediate read-back states, and a private
+    60-second receipt
+  - Single-item delete preview/apply requires `--confirm "DELETE REMINDER"`, removes
+    exactly once, and distinguishes confirmed absence from pending read-back
+  - The disposable create/get/edit/complete/reopen/delete gate includes trap cleanup and final zero-match
+    verification; it passed against local iCloud with final matching count zero
+- [x] Verify recurring-reminder completion behavior against real iCloud EventKit
+  - Create one disposable daily recurrence, complete the current occurrence,
+    verify the next incomplete occurrence without inventing hidden instances,
+    then remove the entire disposable fixture with zero residue
+  - The local iCloud gate passed: the due date advanced, EventKit reused the
+    opaque reminder ID, `nextOccurrence` matched the query result, and cleanup
+    confirmed zero matching reminders
+- [x] Support list selection and multi-factor matching
+  - Query combines status, due range, list, and title with AND semantics; list
+    selection accepts an opaque ID or unique title and rejects ambiguity
+- [x] Include dry-run, the JSON contract, and authorization checks
+  - Authorization, JSON envelopes, exit 6, read contract tests, Release
+    compilation, and a privacy-minimized local read smoke are implemented
+  - Unified `resources` discovery reports the selected Reminders iCloud source
+    as readable and writable now that guarded create apply is implemented
 
-- [ ] Evaluate the supported scope of Apple public Notes APIs
-- [ ] Support note query and read operations
-- [ ] Define the MVP boundary for folders, attachments, links, and rich text
-- [ ] Document API limitations rather than relying on private database formats
-- [ ] Add authorization checks, stable errors, and tests
+### 0.5: Photos adapter
 
-### 0.6: Photos adapter
+- Architecture: [Photos adapter 0.5](docs/development/photos-adapter-architecture.md)
+- [x] Evaluate the Photos framework access and authorization model
+  - PhotoKit public APIs are viable. The first runtime slice is read-only
+    metadata and never reads private databases or downloads media bytes
+  - Full and limited access are distinct; limited results report
+    `complete: false`, and add-only permission is insufficient for reads
+  - Export is separate, no-network by default, and must distinguish available
+    metadata from iCloud-backed original bytes
+  - TDD permission/resource foundation is implemented with explicit limited
+    scope, status-only versus request commands, Info.plist usage text, stable
+    exit/error codes, and full regression plus no-write CLI contract passes
+- [x] Support read-only queries for photos and albums
+  - Album discovery is implemented with user folder hierarchy, user/smart
+    kinds, duplicate-title preservation, opaque IDs, kind-bound anchor cursors,
+    default 50/maximum 200 pages, and limited-access `complete: false`
+  - Synthetic TDD and permission-before-fetch behavior pass. The privacy-safe
+    real-library gate passed through the stable app identity with 34 aggregate
+    collections (11 user, 23 smart, 0 folders), `complete: true`, no truncation,
+    and no title/identifier/location/media output
+  - Asset query/get now supports a maximum 366-day creation range, album/media/
+    favorite filters, hidden and location opt-ins, opaque IDs, stable ordering,
+    filter-bound pagination, and metadata-only PhotoKit fetches
+- [x] Support metadata, creation dates, locations, and asset references
+  - The payload includes media kind/subtypes, dimensions, duration, creation and
+    modification dates, favorite/hidden/burst/Live Photo state, opaque asset ID,
+    and opt-in coordinates. Byte availability remains explicitly `unknown`
+- [x] Define safety boundaries for export, modification, and deletion
+  - Export is one asset per command, no-network and no-overwrite by default,
+    never emits media bytes to JSON/stdout, distinguishes resource variants,
+    and uses private temporary output plus atomic move
+  - The runtime command and TDD file coordinator are implemented. The offline
+    live gate checked five iCloud-only candidates: all failed closed with
+    `PHOTOS_CONTENT_NOT_LOCAL`, downloaded nothing, and left no output. On
+    2026-08-14, an explicitly user-approved network gate exported one original
+    from the same five-candidate sample, verified nonzero bytes and mode `0600`,
+    and removed the private temporary output on exit
+  - Import and metadata mutation remain deferred behind dry-run/apply and a
+    disposable-fixture cleanup gate. Deletion is last and must preserve
+    Recently Deleted semantics plus an exact confirmation phrase
+- [x] Include authorization checks, pagination, the JSON contract, and tests
+  - Nineteen Photos adapter tests, 176 total Swift tests, and CLI negative
+    contracts pass. The live gate
+    runs through a stable LaunchServices app identity and keeps asset JSON in a
+    private temporary directory, printing aggregate counts only. The 30-day
+    metadata sample returned the five-item cap and one opaque-ID get read-back passed
 
-- [ ] Evaluate the Photos framework access and authorization model
-- [ ] Support read-only queries for photos and albums
-- [ ] Support metadata, creation dates, locations, and asset references
-- [ ] Define safety boundaries for export, modification, and deletion
-- [ ] Include authorization checks, the JSON contract, and tests
+### 0.6: Notes adapter
+
+- Feasibility decision: [Notes adapter 0.6](docs/development/notes-adapter-feasibility.md)
+- [x] Audit the supported scope of Apple public Notes APIs before promising a
+  release number or implementation
+- [x] Decide whether a useful public-interface-only adapter can support note and
+  folder query/read without private database access or GUI-coordinate automation
+  - The macOS 26.5 SDK has no public Notes content framework. Notes.app 4.13 does
+    publish a scripting dictionary, so the accepted boundary is a read-only,
+    TCC-governed Apple Events adapter accurately labeled as Automation
+- [x] Define the possible MVP boundary for attachments, links, and rich text
+  - 0.6 includes attachment metadata and opt-in plaintext/HTML reads. Binary
+    export is deferred; tags, pinned state, rich-content structure, and lossless
+    HTML/Markdown round trips are not promised
+- [x] Assign version 0.6 and require authorization checks, stable errors, JSON
+  contracts, bounded Apple Events, synthetic TDD, and privacy-safe live gates
+- [x] Explicitly prohibit private Notes databases, private frameworks, direct
+  CloudKit-container access, and GUI-coordinate automation
+- [x] Implement the permission and capability foundation
+  - Added status-only and explicit-request commands, stable Automation states
+    and errors, a read-only unified `notesLibrary` resource, Info.plist usage
+    text, four synthetic tests, and CLI contract coverage. The non-prompting
+    local probe correctly reported `requiresConsent`
+- [x] Implement account and nested-folder discovery with opaque IDs
+  - Discovery is bounded to 32 accounts, 200 folders, depth 16, and five
+    seconds. SHA-256-derived IDs hide raw scripting identifiers; hierarchy,
+    default account, shared state, scoped pagination, and completeness are
+    covered by synthetic tests
+  - The stable-app live gate passed with one account and 12 folders,
+    `complete: true`, no truncation, aggregate-only output, and temporary JSON
+    cleanup
+- [x] Implement bounded metadata query and filter-bound pagination
+  - Metadata-only query supports account, folder, title substring, and
+    modification-time filters plus filter-bound opaque cursors. Enumeration is
+    capped at 200 notes and recursively walks at most 16 folder levels under a
+    five-second Apple Events deadline
+  - 19 Notes adapter tests, 195 total Swift tests, and CLI negative contracts
+    pass. The stable-app live
+    gate returned 163 notes, `complete: true`, no truncation, and full
+    creation/modification-date coverage while printing aggregate counts only
+- [x] Implement one-note get with explicit plaintext/HTML body opt-in
+  - Metadata-only is the default and does not call the body bridge. Plaintext or
+    HTML requires an explicit projection, password-protected notes fail closed,
+    and returned UTF-8 body content is capped at 256 KiB without diagnostic logging
+  - Synthetic tests cover metadata-only behavior, projection isolation, escaped
+    scripting IDs, locked notes, and oversized bodies. Disposable-note body
+    read-back remains part of the final stable-app live gate
+- [x] Add attachment metadata; defer binary export to its own safety gate
+  - Explicit opt-in returns at most 100 opaque attachment metadata records and
+    never reads attachment contents or invokes save/export. Synthetic mapping
+    and script-boundary tests pass; the live zero-attachment path returned an
+    empty complete list
+- [ ] Complete the stable-app Automation and disposable-note live gates
+  - Query, metadata-only get, plaintext, HTML, and zero-attachment read paths
+    passed through the stable app. The disposable note is recoverably stored in
+    Recently Deleted; permanent cleanup and a final zero-match check still need
+    explicit action-time approval
+
+### 0.6.1: Notes guarded writes
+
+Version decision: 0.6.0 remains the bounded read-only Notes release. Notes
+write support is developed and released separately as 0.6.1; the source version
+must not change until the implementation and release gates pass.
+
+- [ ] Define fail-closed write contracts and stable write/read-back states
+  - Every mutation defaults to `--dry-run`; persistence requires `--apply` and
+    structured JSON. Return `readback_confirmed` or
+    `save_accepted_readback_pending`; Agents must not retry the latter
+- [ ] Implement note creation in one explicitly selected folder
+  - Accept input file/stdin, never body text as a CLI argument. Support
+    plaintext converted to escaped HTML and explicit HTML, cap UTF-8 input at
+    256 KiB, reject unknown fields, locked/shared targets, and ambiguous folder
+    selection, and add a private short-lived idempotency receipt
+- [ ] Implement note rename with optimistic concurrency
+  - Require one opaque note ID plus expected `modificationDate`; return a dry-run
+    metadata diff without logging title/body content, save once, and read back
+- [ ] Implement note move with explicit destination and identity verification
+  - Require one opaque destination folder, fail closed across ambiguous account
+    scope, verify the moved note and whether its opaque ID changed, and never
+    infer a destination from a folder title
+- [ ] Keep existing-note body replacement outside the initial 0.6.1 release gate
+  - Whole-body HTML replacement can destroy unsupported rich structures and
+    attachment references. It needs a separate expected-modification token,
+    body hash preview, complex-content rejection, and disposable rich-note gate
+- [ ] Keep attachment mutation and note deletion outside the initial 0.6.1 gate
+  - Attachment add/remove needs independent file-size, local-file, cleanup, and
+    read-back rules. Delete remains soft-delete only and needs exact
+    confirmation plus documented Recently Deleted visibility; permanent delete
+    and empty-trash operations are not supported
+- [ ] Complete synthetic TDD, CLI negative contracts, and a disposable iCloud
+  create/rename/move/read-back/cleanup integration gate with zero active residue
+- [ ] Update `notesLibrary` writable capability, help, README, usage, CHANGELOG,
+  and version metadata only after all mandatory 0.6.1 gates pass
 
 ## Cross-cutting requirements for every release
 
@@ -161,8 +338,10 @@ Architecture: [Calendar adapter 0.3](docs/development/calendar-adapter-architect
   earlier development also ran on macOS 27.0)
 - [x] Update CLI help, README, and adapter documentation
 - [x] Provide reproducible source builds
-- [x] Build and install the local 0.2.0 Release binary under the Homebrew prefix
-- [ ] Publish the signed 0.2.0 asset and update the Homebrew Cask
+- [x] Build, publish, and install versioned Release binaries through the public
+  Homebrew Cask (verified through 0.3.0)
+- [ ] Replace ad-hoc distribution with Developer ID signing and Apple
+  notarization; this remains a separate distribution goal
 
 ## Pre-release hardening TODO
 
@@ -175,8 +354,10 @@ Architecture: [Calendar adapter 0.3](docs/development/calendar-adapter-architect
 - [x] Verify the locally installed binary separately from the source Release
   build (`scripts/run_installed_release_smoke.sh`: 0.2.0, V10 fast path,
   SQLite query backend)
-- [ ] Verify the public Homebrew Cask on a clean installation after its release
-  asset is published
+- [x] Verify the public Homebrew Cask artifact URL, SHA-256, archive layout,
+  managed binary link, `--version`, and installed smoke test for 0.3.0
+- [ ] Repeat the public Cask test on an independent clean Mac; the current
+  verification used a clean Cask installation state on the development Mac
 - [x] Verify phonetic fields with one explicitly authorized Japanese contact
   apply and read-back test (`xvk-test-contacts-001`)
 
@@ -233,9 +414,9 @@ automatic commit, push, or release actions.
 - [x] **Unify account / container / source capabilities**
   - Goal: define a shared read-only resource description, stable opaque ID,
     display name, type, capabilities, and permission state for Contacts iCloud
-    containers, Mail account scopes, and EventKit Calendar sources.
+    containers, Mail account scopes, and EventKit Calendar/Reminders sources.
   - Personal selection policy: Contacts prefers the personal iCloud container;
-    Calendar prefers the personal iCloud source; Mail prefers the `aim-tech.jp`
+    Calendar and Reminders prefer the personal iCloud source; Mail prefers the `aim-tech.jp`
     work account and does not default to iCloud Mail.
   - Scope: unify the Core contract, capability reporting, and verifiable
     selection policy only. Do not hard-code an Apple ID, email address, or
@@ -246,11 +427,11 @@ automatic commit, push, or release actions.
     structured errors; opaque IDs do not expose email addresses, account URLs,
     or internal database paths. Missing or ambiguous preferred resources must
     stop rather than silently switching accounts.
-  - Implemented locally: `macos-data resources --format json` lists the
-    verified Contacts containers and privacy-safe Mail account scopes. Calendar
-    is intentionally represented as the limitation
-    `calendar_adapter_not_implemented`; Mail accounts remain unselected until
-    the `aim-tech.jp` preference can be verified without exposing account data.
+  - Implemented: `macos-data resources --format json` lists verified Contacts
+    containers, privacy-safe Mail account scopes, and EventKit Calendar/Reminders sources.
+    Contacts, Calendar, and Reminders select only uniquely verified personal iCloud
+    resources. Mail remains unselected unless the preferred work account can be
+    verified without exposing account data.
 
 - [x] **Cross-adapter pagination protocol**
   - Goal: give Contacts, Mail, and Calendar consistent semantics for `limit`,
@@ -268,9 +449,10 @@ automatic commit, push, or release actions.
   - Verification: Core, Contacts, SQLite Mail, and Mail.app fallback fixtures
     cover first/last page, opaque cursor round-trips, invalid/stale cursors,
     result caps, and incomplete fallback semantics.
-- [ ] **Verify the public Homebrew Cask**: install the actual 0.2.0 asset from
-  the public Tap in a clean or isolated Homebrew environment; verify URL, SHA-256,
-  archive layout, `--version`, and `--help`.
+- [x] **Verify the public Homebrew Cask**: the historical 0.2.0 Cask was
+  installed and used, and the current 0.3.0 public asset was reinstalled from
+  the Tap with URL, SHA-256, archive layout, managed symlink, `--version`, and
+  installed smoke verification. Independent clean-Mac testing remains above.
 - [x] **Document unsigned-distribution limits**: without an Apple Developer
   Program, document Gatekeeper warnings, manual approval, SHA-256 verification,
   and the fact that installation is not frictionless. The local Release binary
@@ -391,11 +573,16 @@ Each adapter should define its own authorization requirements, model mapping, re
 
 ## Remaining design details
 
-- Define the canonical URL format and reserved scheme for `external_id`
-- Define how the iCloud-capable container is identified and how missing containers are reported
-- Define warning output when `metadata` cannot be mapped to Contacts
-- Decide whether the deletion confirmation phrase should include the contact name or external ID
-- Define the macOS 26/macOS 27 API and authorization regression matrix
+- [x] Define the canonical external ID URL as
+  `x-macos-data://external-id/<id>` with URL label `macos-data-cli`
+- [x] Identify the unique iCloud-capable Contacts container and fail closed when
+  it is missing or ambiguous
+- [ ] Define structured warning output when `metadata` cannot be mapped to an
+  Apple framework field
+- [x] Keep destructive confirmation phrases command-specific and independent of
+  mutable display names
+- [x] Define and run the macOS 26 baseline / macOS 27 development compatibility
+  and authorization regression matrix
 
 ## Out of scope for now
 

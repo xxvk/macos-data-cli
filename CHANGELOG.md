@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 — 2026-08-14
+
+### Added
+
+- Added a bounded read-only Notes.app Automation adapter with explicit
+  permission status/request, privacy-safe account and nested-folder discovery,
+  and opaque identifiers.
+- Added metadata-only note query/get with bounded enumeration, filter-bound
+  pagination, explicit plaintext or HTML body projection, locked-note failure,
+  and a 256 KiB body limit.
+- Added opt-in attachment metadata without reading or exporting attachment
+  bytes, plus stable Notes errors and unified `notesLibrary` capability output.
+- Added synthetic Notes tests, CLI negative contracts, signed-app Automation
+  checks, and privacy-minimized discovery, metadata, and disposable-note read
+  gates. Notes writes remain outside 0.6.0 and are planned for 0.6.1.
+
 ## 0.5.0 — 2026-08-14
 
 ### Added

@@ -32,6 +32,10 @@ let package = Package(
             name: "PhotosAdapter",
             targets: ["PhotosAdapter"]
         ),
+        .library(
+            name: "NotesAdapter",
+            targets: ["NotesAdapter"]
+        ),
         .executable(
             name: "macos-data",
             targets: ["macos-data"]
@@ -87,9 +91,17 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        .target(
+            name: "NotesAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Notes",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .executableTarget(
             name: "macos-data",
-            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -145,6 +157,13 @@ let package = Package(
         .testTarget(
             name: "PhotosTests",
             dependencies: ["PhotosAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "NotesTests",
+            dependencies: ["NotesAdapter"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

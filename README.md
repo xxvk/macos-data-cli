@@ -10,7 +10,7 @@ adapters when no public framework exposes the required data.
 
 ## Project status
 
-The current source release is 0.5.0. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.6.0. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -37,6 +37,11 @@ Photos 0.5 adds PhotoKit authorization, album discovery, bounded metadata-only
 asset query/get, opaque identifiers, limited-library semantics, and guarded
 single-resource export with offline and no-overwrite defaults.
 
+Notes 0.6 adds a bounded, read-only Notes.app Automation adapter for permission
+status, account and nested-folder discovery, metadata query, explicit
+plaintext/HTML reads, and attachment metadata. It does not access private Notes
+stores. Guarded write operations remain planned separately for 0.6.1.
+
 See the detailed roadmaps:
 
 - [中文路线图](ROADMAP_CN.md)
@@ -52,6 +57,7 @@ User documentation:
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
 - [Calendar 0.3 architecture](docs/development/calendar-adapter-architecture.md)
 - [Photos 0.5 architecture](docs/development/photos-adapter-architecture.md)
+- [Notes 0.6 feasibility decision](docs/development/notes-adapter-feasibility.md)
 
 ## Mail 0.2 commands
 
@@ -227,8 +233,10 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-Calendar 0.3, Reminders 0.4, and Photos 0.5 are released.
-Future adapters remain planned. `macos-data` remains the canonical command through
+Calendar 0.3, Reminders 0.4, Photos 0.5, and the bounded read-only Notes 0.6
+source releases are complete. Guarded Notes create/rename/move writes are
+assigned to 0.6.1. Notes integration is Automation rather than a native Notes
+Framework and must not access private Notes stores. `macos-data` remains the canonical command through
 0.x; naming is reviewed again before 1.0.0.
 The current Reminders development slice supports full-access discovery,
 bounded query/get, and guarded `create --dry-run|--apply` with read-back states

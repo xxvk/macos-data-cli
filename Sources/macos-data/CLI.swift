@@ -6,6 +6,7 @@ import MailAdapter
 import CalendarAdapter
 import RemindersAdapter
 import PhotosAdapter
+import NotesAdapter
 
 @main
 struct MacosDataCLI {
@@ -43,7 +44,7 @@ struct MacosDataCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] {
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] || arguments == ["notes", "--help"] {
             printHelp()
             return
         }
@@ -62,6 +63,8 @@ struct MacosDataCLI {
             let remindersStore = RemindersStore(permission: remindersPermission, sourceSelector: remindersSourceSelector)
             let photosPermission = PhotosPermission()
             let photosStore = PhotosStore(permission: photosPermission)
+            let notesPermission = NotesPermissionService()
+            let notesStore = NotesStore(permission: notesPermission)
             switch arguments {
             case ["resources"]:
                 emitJSONSuccess(makeResourcesResult(
@@ -71,8 +74,30 @@ struct MacosDataCLI {
                     calendarStore: calendarStore,
                     remindersPermission: remindersPermission,
                     remindersStore: remindersStore,
-                    photosPermission: photosPermission
+                    photosPermission: photosPermission,
+                    notesPermission: notesPermission
                 ))
+            case ["notes", "permission"]:
+                emitJSONSuccess(notesPermission.check(requestConsent: false))
+            case ["notes", "permission", "--request"]:
+                let result = notesPermission.check(requestConsent: true)
+                emitJSONSuccess(result)
+                if !result.readable { Foundation.exit(CLIExitCode.notesFailure.rawValue) }
+            case ["notes", "accounts"]:
+                emitJSONSuccess(try notesStore.accounts())
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "folders":
+                let request = try parseNotesFolderArguments(Array(args.dropFirst(2)))
+                emitJSONSuccess(try notesStore.folders(
+                    limit: request.limit,
+                    cursor: request.cursor,
+                    accountID: request.accountID,
+                    parentID: request.parentID
+                ))
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "query":
+                emitNotesJSONSuccess(try notesStore.query(parseNotesQueryArguments(Array(args.dropFirst(2)))))
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "get":
+                let request = try parseNotesGetArguments(Array(args.dropFirst(2)))
+                emitNotesJSONSuccess(try notesStore.get(id: request.id, bodyFormat: request.bodyFormat, includeAttachments: request.includeAttachments))
             case ["photos", "permission"]:
                 emitJSONSuccess(PhotosPermissionResult(
                     access: photosPermission.status.rawValue,
@@ -406,6 +431,9 @@ struct MacosDataCLI {
         } catch let error as PhotoError {
             report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.photosFailure.rawValue)
             Foundation.exit(CLIExitCode.photosFailure.rawValue)
+        } catch let error as NotesError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.notesFailure.rawValue)
+            Foundation.exit(CLIExitCode.notesFailure.rawValue)
         } catch let error as PaginationError {
             if rawArguments.first == "reminders" {
                 report(error: error == .invalidLimit ? "Reminder limit must be between 1 and 200." : "Reminder cursor is invalid or stale.", code: CLIErrorCode.reminders.rawValue, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
@@ -413,6 +441,9 @@ struct MacosDataCLI {
             } else if rawArguments.first == "photos" {
                 report(error: error == .invalidLimit ? "Photos limit must be between 1 and 200." : "Photos cursor is invalid or stale.", code: CLIErrorCode.photos.rawValue, arguments: rawArguments, exitCode: CLIExitCode.photosFailure.rawValue)
                 Foundation.exit(CLIExitCode.photosFailure.rawValue)
+            } else if rawArguments.first == "notes" {
+                report(error: error == .invalidLimit ? "Notes limit must be between 1 and 200." : "Notes cursor is invalid or stale.", code: CLIErrorCode.notes.rawValue, arguments: rawArguments, exitCode: CLIExitCode.notesFailure.rawValue)
+                Foundation.exit(CLIExitCode.notesFailure.rawValue)
             } else {
                 report(error: error == .invalidLimit ? "Calendar limit must be between 1 and 200." : "Calendar cursor is invalid or stale.", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
                 Foundation.exit(CLIExitCode.calendarFailure.rawValue)
@@ -465,6 +496,18 @@ struct MacosDataCLI {
         let variant: PhotoExportVariant
         let allowNetwork: Bool
     }
+    private struct NotesFolderArguments {
+        var accountID: String?
+        var parentID: String?
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+    }
+
+    private struct NotesGetArguments {
+        let id: String
+        let bodyFormat: NotesBodyFormat
+        let includeAttachments: Bool
+    }
 
     private static func emitJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -480,6 +523,111 @@ struct MacosDataCLI {
         }
     }
 
+    private static func emitNotesJSONSuccess<T: Encodable>(_ value: T) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) {
+            print(text)
+        }
+    }
+
+    private static func parseNotesFolderArguments(_ arguments: [String]) throws -> NotesFolderArguments {
+        var result = NotesFolderArguments()
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard seen.insert(option).inserted else { throw NotesError.invalidIdentifier }
+            guard index + 1 < arguments.count else { throw NotesError.invalidIdentifier }
+            let value = arguments[index + 1]
+            guard !value.isEmpty else { throw NotesError.invalidIdentifier }
+            switch option {
+            case "--account-id": result.accountID = value
+            case "--parent-id": result.parentID = value
+            case "--limit":
+                guard let limit = Int(value), (1...Pagination.maximumLimit).contains(limit) else {
+                    throw NotesError.invalidLimit
+                }
+                result.limit = limit
+            case "--cursor": result.cursor = value
+            default: throw NotesError.invalidIdentifier
+            }
+            index += 2
+        }
+        return result
+    }
+
+    private static func parseNotesQueryArguments(_ arguments: [String]) throws -> NotesQuery {
+        var accountID: String?
+        var folderID: String?
+        var title: String?
+        var modifiedAfter: Date?
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard seen.insert(option).inserted, index + 1 < arguments.count else { throw NotesError.invalidQuery }
+            let value = arguments[index + 1]
+            guard !value.isEmpty else { throw NotesError.invalidQuery }
+            switch option {
+            case "--account-id": accountID = value
+            case "--folder-id": folderID = value
+            case "--title":
+                guard value.count <= 200 else { throw NotesError.invalidQuery }
+                title = value
+            case "--modified-after":
+                guard let parsed = ISO8601DateFormatter().date(from: value) else { throw NotesError.invalidQuery }
+                modifiedAfter = parsed
+            case "--limit":
+                guard let parsed = Int(value), (1...Pagination.maximumLimit).contains(parsed) else {
+                    throw NotesError.invalidLimit
+                }
+                limit = parsed
+            case "--cursor": cursor = value
+            default: throw NotesError.invalidQuery
+            }
+            index += 2
+        }
+        return NotesQuery(
+            accountID: accountID,
+            folderID: folderID,
+            title: title,
+            modifiedAfter: modifiedAfter,
+            limit: limit,
+            cursor: cursor
+        )
+    }
+
+    private static func parseNotesGetArguments(_ arguments: [String]) throws -> NotesGetArguments {
+        var id: String?
+        var bodyFormat = NotesBodyFormat.none
+        var includeAttachments = false
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--id", "--body", "--include-attachments"].contains(option), seen.insert(option).inserted else { throw NotesError.invalidQuery }
+            if option == "--include-attachments" {
+                includeAttachments = true
+                index += 1
+                continue
+            }
+            guard index + 1 < arguments.count else { throw NotesError.invalidQuery }
+            let value = arguments[index + 1]
+            if option == "--id" {
+                id = value
+            } else {
+                guard let parsed = NotesBodyFormat(rawValue: value) else { throw NotesError.invalidQuery }
+                bodyFormat = parsed
+            }
+            index += 2
+        }
+        guard let id, !id.isEmpty else { throw NotesError.invalidIdentifier }
+        return NotesGetArguments(id: id, bodyFormat: bodyFormat, includeAttachments: includeAttachments)
+    }
 
     private static func parsePhotoAlbumArguments(_ arguments: [String]) throws -> PhotoAlbumArguments {
         var result = PhotoAlbumArguments()
@@ -1204,7 +1352,8 @@ struct MacosDataCLI {
         calendarStore: CalendarStore,
         remindersPermission: RemindersPermission,
         remindersStore: RemindersStore,
-        photosPermission: PhotosPermission
+        photosPermission: PhotosPermission,
+        notesPermission: NotesPermissionService
     ) -> DataResourcesResult {
         var resources: [DataResource] = []
         var limitations: [String] = []
@@ -1292,6 +1441,22 @@ struct MacosDataCLI {
             limitations.append("photos_permission_denied")
         case .restricted:
             limitations.append("photos_permission_restricted")
+        }
+        let notesResult = notesPermission.check(requestConsent: false)
+        resources.append(NotesResourceMapper.map(status: notesResult.access))
+        switch notesResult.access {
+        case .available:
+            break
+        case .requiresConsent:
+            limitations.append("notes_automation_requires_consent")
+        case .denied:
+            limitations.append("notes_automation_denied")
+        case .targetNotRunning:
+            limitations.append("notes_app_not_running")
+        case .targetUnavailable:
+            limitations.append("notes_app_unavailable")
+        case .unknown:
+            limitations.append("notes_automation_unknown")
         }
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
@@ -1435,9 +1600,10 @@ struct MacosDataCLI {
           macos-data calendar <command> [options]
           macos-data reminders <command> [options]
           macos-data photos <command> [options]
+          macos-data notes <command> [options]
 
         Unified resources:
-          resources --format json                List Contacts, Mail, Calendar, Reminders, and Photos resources
+          resources --format json                List Contacts, Mail, Calendar, Reminders, Photos, and Notes resources
                                              with selection, permission, and limitations
 
         Calendar commands:
@@ -1528,6 +1694,30 @@ struct MacosDataCLI {
           complete=false. Asset query range is limited to 366 days. Export
           defaults to original, offline-only, no overwrite, and private output.
 
+        Notes 0.6 read-only commands:
+          permission --format json           Report Notes.app Automation status without prompting
+          permission --request --format json Explicitly request Notes.app Automation consent
+          accounts --format json             List bounded Notes accounts with opaque IDs
+          folders [--account-id <id>] [--parent-id <id>]
+            [--limit <1...200>] [--cursor <cursor>] --format json
+                                             List bounded nested-folder metadata
+          query [--account-id <id>] [--folder-id <id>] [--title <text>]
+            [--modified-after <iso8601>] [--limit <1...200>]
+            [--cursor <cursor>] --format json List metadata-only note records
+          get --id <opaque-id> [--body none|plaintext|html]
+            [--include-attachments] --format json
+                                             Read one note; body defaults to none
+
+        Notes boundary:
+          Notes uses the public Notes.app scripting dictionary through Apple
+          Events; there is no public Notes content Framework. Discovery reads
+          account/folder structure and explicitly requested note metadata.
+          Body reads require explicit plaintext/html opt-in and are capped at
+          256 KiB; locked notes fail closed. Query scans at most 200 note metadata records in five
+          seconds and returns complete=false if that bound is reached. It
+          never reads private Notes databases,
+          CloudKit containers, caches, or GUI coordinates.
+
         Mail commands:
           doctor --format json               Inspect Mail store, schema, and permissions
           accounts --format json             List privacy-safe local account scopes
@@ -1603,7 +1793,8 @@ struct MacosDataCLI {
           Version: 0.1 (independent from the CLI release version)
           Exit codes: 0 success, 1 unexpected CLI error, 2 Contacts error,
             3 ambiguous/not-found query error, 4 Mail error, 5 Calendar error,
-            6 Reminders error, 64 usage or invalid query
+            6 Reminders error, 7 Photos error, 8 Notes error,
+            64 usage or invalid query
           Success: {"ok": true, "contractVersion": "0.1", "data": ...}
           Failure: {"ok": false, "contractVersion": "0.1", "error": {"code": ..., "message": ...}}
           Add --format json to commands that support machine-readable output.

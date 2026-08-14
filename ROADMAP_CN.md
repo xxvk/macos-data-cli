@@ -141,27 +141,145 @@
 
 ### 0.4：Reminders adapter
 
-- [ ] 基于 EventKit 访问提醒事项
-- [ ] 支持提醒列表、标题、备注、截止时间和完成状态
-- [ ] 支持提醒的查询、创建、更新和完成
-- [ ] 支持列表选择和多因素匹配
-- [ ] 支持 dry-run、JSON contract 和权限检查
+- [x] 基于 EventKit 访问提醒事项
+  - 已建立独立 `RemindersAdapter` target、full-access 权限、唯一 iCloud source
+    选择、列表发现和稳定 exit 6 错误 contract
+  - query/get 已使用 EventKit 异步 fetch 与 opaque ID；包含 10 秒 timeout、Task
+    cancellation、5,000 条 fetch 后上限和有界日期 predicate
+- [x] 支持提醒列表、标题、备注、截止时间和完成状态
+  - 读取 JSON 已覆盖列表、标题、备注、URL、优先级、完成状态/时间、start/due
+    DateComponents、alarm 和 recurrence
+  - 日期区分 date-only、floating timed 和 IANA 时区 timed value
+- [x] 支持非周期提醒的查询、创建、更新和完成
+  - query/get 已支持状态、due 范围、列表、标题、limit 和隐私安全 anchor cursor
+  - `create --dry-run|--apply [--idempotent]` 已实现：严格 JSON、日期/alarm/recurrence
+    校验、可写 list 解析、EventKit 单次 save、opaque ID、即时 read-back 状态和私有
+    60 秒 receipt
+  - 单条 delete dry-run/apply 已实现；apply 要求 `--confirm "DELETE REMINDER"`，只 remove
+    一次，并区分 absence confirmed 和 read-back pending
+  - 一次性 create/get/edit/complete/reopen/delete gate 已在本机 iCloud 通过 trap cleanup
+    和最终零匹配验证
+  - 部分 edit 已实现严格 patch 解码、可空字段清空、可写 iCloud list 移动、地点 alarm
+    保护、单次 save 和明确回读状态；真实 edit apply 已通过且最终零残留
+  - complete/reopen 已实现明确 completion timestamp、安全重复 no-op、单次 save、回读状态
+    和周期 `nextOccurrence`；真实 apply 与重复 no-op 验证已通过
+- [x] 真实验证周期 reminder 完成后的 EventKit 行为
+  - 创建一次性 daily recurrence，完成当前 occurrence，在不虚构隐藏实例的前提下验证
+    下一未完成 occurrence，最后清理整个测试 fixture 并确认零残留
+  - 本机 iCloud gate 已通过：due 日期向后推进，EventKit 复用了同一个 opaque reminder
+    ID，`nextOccurrence` 与 query 结果一致，清理后同名 reminder 数量为 0
+- [x] 支持列表选择和多因素匹配
+  - query 以 AND 语义组合状态、due 范围、list 和标题；list 可用 opaque ID 或唯一标题
+    选择，歧义时拒绝继续
+- [x] 支持 dry-run、JSON contract 和权限检查
+  - 权限、JSON envelope、exit 6、read contract tests、Release 编译和隐私最小化
+    本机 read smoke 已实现
+  - `resources` 在 guarded create apply 实现后将选中的 Reminders iCloud source
+    报告为 readable/writable；不代表其他 mutation 已完成
 
-### 0.5：Notes adapter
+### 0.5：Photos adapter
 
-- [ ] 评估 Apple Notes 公共 API 的可用范围
-- [ ] 支持笔记查询和读取
-- [ ] 明确文件夹、附件、链接和富文本的 MVP 边界
-- [ ] 在公开 API 能力不足时记录限制，不依赖私有数据库格式
-- [ ] 支持权限检查、稳定错误格式和测试
+- 架构文档：[Photos adapter 0.5](docs/development/photos-adapter-architecture_CN.md)
+- [x] 评估 Photos framework 的访问和授权模型
+  - PhotoKit 公开 API 可用；第一阶段只读 metadata，不读取私有数据库，也不下载媒体字节
+  - full 和 limited 权限必须区分；limited 返回 `complete: false`，add-only 不能满足读取
+  - export 独立实现，默认禁止网络，并区分可用 metadata 与 iCloud-backed 原始文件
+  - TDD permission/resource 基础已实现：limited scope、status-only/request 命令、Info.plist、
+    稳定 exit/error code，并通过完整回归和无写入 CLI contract
+- [x] 支持照片和相册的只读查询
+  - album discovery 已实现用户 folder 层级、user/smart kind、重名 title、opaque ID、
+    kind-bound anchor cursor、默认 50/最大 200 分页和 limited `complete: false`
+  - synthetic TDD 与 permission-before-fetch 已通过；稳定 app 身份下的隐私最小化真实图库
+    gate 已通过：共 34 个集合（11 user、23 smart、0 folder），`complete: true`、未截断，
+    且未输出 title/identifier/location/media
+  - asset query/get 已支持最长 366 天的 creation range、album/media/favorite filter、
+    hidden/location opt-in、opaque ID、稳定排序、filter-bound pagination 和纯 metadata PhotoKit fetch
+- [x] 支持元数据、创建时间、位置和资源引用
+  - payload 包含媒体类型/subtype、尺寸、时长、创建/修改时间、favorite/hidden/burst/
+    Live Photo、opaque asset ID 和 opt-in 坐标；媒体 byte 可用性明确保持 `unknown`
+- [x] 明确导出、修改和删除操作的安全边界
+  - export 每次只处理一个 asset，默认禁止网络、禁止覆盖，不把媒体 byte 写入 JSON/stdout，
+    区分资源变体，并通过私有临时文件和原子移动完成输出
+  - runtime command 与 TDD file coordinator 已实现。离线真实 gate 检查 5 个 iCloud-only
+    candidate，全部 fail closed 为 `PHOTOS_CONTENT_NOT_LOCAL`，未下载、未留输出。2026-08-14
+    经用户明确批准的网络 gate 从同一组 5 个 candidate 中成功导出 1 个 original，验证非零
+    byte 与 `0600` 权限，并在退出时删除私有临时输出
+  - import 和 metadata mutation 继续延后，必须先具备 dry-run/apply 与一次性 fixture cleanup；
+    delete 最后实现，并保留 Recently Deleted 语义和准确确认短语
+- [x] 支持权限检查、JSON contract 和测试
+  - 19 项 Photos adapter 测试、176 项 Swift 总测试和 CLI 负向 contract 已通过；真实 gate
+    通过稳定 LaunchServices app 身份运行，asset JSON 只进入私有临时目录，对外仅打印聚合数量；
+    30 天 sample 返回 5 条上限记录，并通过一条 opaque-ID get 回读
 
-### 0.6：Photos adapter
+### 0.6：Notes adapter
 
-- [ ] 评估 Photos framework 的访问和授权模型
-- [ ] 支持照片和相册的只读查询
-- [ ] 支持元数据、创建时间、位置和资源引用
-- [ ] 明确导出、修改和删除操作的安全边界
-- [ ] 支持权限检查、JSON contract 和测试
+- 可行性决策：[Notes adapter 0.6](docs/development/notes-adapter-feasibility_CN.md)
+- [x] 审计 Apple Notes 公开 API 的可用范围，不提前承诺版本或实现
+- [x] 判断 public-interface-only adapter 是否足以支持 note/folder query 和 read
+  - macOS 26.5 SDK 没有公开 Notes 内容 Framework；Notes.app 4.13 正式发布 scripting
+    dictionary，因此接受的边界是只读、受 TCC 管理且准确标记为 Automation 的 Apple Events adapter
+- [x] 明确 attachment、link 和 rich text 的 MVP 边界
+  - 0.6 支持 attachment metadata 和显式 opt-in 的 plaintext/HTML；binary export 延后；不承诺
+    tag、pinned、富内容结构或 HTML/Markdown 无损 round trip
+- [x] 分配 0.6，并要求权限检查、稳定错误、JSON contract、有界 Apple Events、synthetic TDD
+  和隐私安全 live gate
+- [x] 明确禁止私有 Notes 数据库、私有 Framework、直接访问 Notes CloudKit container 和 GUI 坐标自动化
+- [x] 实现 permission 与 capability foundation
+  - 已加入 status-only/显式 request 命令、稳定 Automation 状态与错误、统一只读
+    `notesLibrary` resource、Info.plist usage text、4 项 synthetic test 和 CLI contract；本机
+    非交互 probe 正确返回 `requiresConsent`
+- [x] 实现 account 和嵌套 folder discovery，并使用 opaque ID
+  - discovery 上限为 32 account、200 folder、16 层和 5 秒；SHA-256-derived ID 隐藏原始
+    scripting identifier；synthetic test 覆盖层级、默认 account、shared、scope-bound 分页和完整性
+  - 稳定 App 真实 gate 返回 1 个 account、12 个 folder、`complete: true`、未截断，只输出聚合
+    结果并清理临时 JSON
+- [x] 实现有界 metadata query 与 filter-bound pagination
+  - metadata-only query 支持 account、folder、标题 substring 和修改时间 filter，以及与全部
+    filter 绑定的 opaque cursor；最多枚举 200 条 note、递归 16 层 folder，并设置 5 秒
+    Apple Events deadline
+  - 19 项 Notes adapter 测试、195 项 Swift 总测试和 CLI 负向 contract 已通过；
+    稳定 App 真实 gate 返回 163 条 note、
+    `complete: true`、未截断、创建与修改时间覆盖完整，并且只打印聚合数量
+- [x] 实现单条 note get，plaintext/HTML body 必须显式 opt-in
+  - 默认 metadata-only，且不调用 body bridge；plaintext/HTML 必须显式选择，password-protected
+    note fail closed，返回 UTF-8 正文上限为 256 KiB，诊断日志不记录正文
+  - synthetic test 覆盖 metadata-only、projection 隔离、scripting ID 转义、locked note 和超限
+    body；一次性 note 正文回读仍保留在最终稳定 App live gate
+- [x] 加入 attachment metadata；binary export 延后到独立安全 gate
+  - 显式 opt-in 最多返回 100 条 opaque attachment metadata，绝不读取 contents 或调用
+    save/export；synthetic mapping 与脚本边界测试通过，真实零附件路径返回空且 complete 的列表
+- [ ] 完成稳定 App Automation 与一次性 note live gate
+  - query、metadata-only get、plaintext、HTML 和零附件读取均已通过稳定 App；一次性 note 当前
+    可恢复地位于 Recently Deleted，永久清理和最终零匹配仍需要 action-time 明确批准
+
+### 0.6.1：Notes 受保护写入
+
+版本决策：0.6.0 保持为有界只读 Notes release；Notes 写入作为独立的 0.6.1 开发和发布。
+在实现与 release gate 全部通过前，不修改源码版本号。
+
+- [ ] 定义 fail-closed 写 contract 和稳定 write/read-back 状态
+  - 所有 mutation 默认 `--dry-run`，只有 `--apply` 才持久化；返回
+    `readback_confirmed` 或 `save_accepted_readback_pending`，Agent 不得自动重试后者
+- [ ] 在一个显式 folder 中创建 note
+  - 正文只接受 input file/stdin，不允许作为 CLI 参数进入 shell history；支持 plaintext 安全
+    转义为 HTML 和显式 HTML，UTF-8 输入上限 256 KiB；拒绝未知字段、locked/shared target 和
+    folder 歧义，并使用私有短期 idempotency receipt
+- [ ] 使用乐观并发控制实现 note rename
+  - 必须提供一个 opaque note ID 和预期 `modificationDate`；dry-run 只返回不泄露 title/body 的
+    metadata diff；apply 只 save 一次并立即回读
+- [ ] 使用显式目标 folder 实现 note move，并验证 identity
+  - 必须提供一个 opaque destination folder；account scope 有歧义时 fail closed；验证移动后的
+    note 以及 opaque ID 是否变化；绝不通过 folder title 猜测目标
+- [ ] 现有 note 的 body replacement 不进入首个 0.6.1 release gate
+  - 整体替换 HTML 可能破坏未支持的富内容和 attachment reference；以后必须单独实现 expected
+    modification token、body hash preview、复杂内容拒绝和一次性 rich-note gate
+- [ ] attachment mutation 和 note delete 不进入首个 0.6.1 release gate
+  - attachment add/remove 需要独立的文件大小、本地文件、清理和回读规则；delete 只允许软删除，
+    需要准确确认短语并记录 Recently Deleted 可见性；不支持永久删除或清空废纸篓
+- [ ] 完成 synthetic TDD、CLI 负向 contract，以及一次性 iCloud
+  create/rename/move/read-back/cleanup 集成 gate，并确认 active residue 为 0
+- [ ] 只有全部 0.6.1 必做 gate 通过后，才更新 `notesLibrary` writable capability、help、README、
+  usage、CHANGELOG 和版本 metadata
 
 ## 每个版本的横向完成条件
 

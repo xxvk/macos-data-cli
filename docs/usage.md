@@ -1,11 +1,12 @@
 # Usage
 
-`macos-data` is a local Terminal CLI. It reads and writes macOS data through Apple public frameworks; agents do not need a special integration.
+`macos-data` is a local Terminal CLI. It uses Apple public frameworks and
+explicitly documented app Automation interfaces; agents do not need a special
 integration.
 
 ## Unified resources
 
-List the currently discoverable Contacts, Mail, Calendar, Reminders, and Photos resource scopes in one
+List the currently discoverable Contacts, Mail, Calendar, Reminders, Photos, and Notes resource scopes in one
 machine-readable response:
 
 ```text
@@ -24,7 +25,82 @@ the same fail-closed iCloud source policy and reports a distinct
 Photos always reports one `photosLibrary` scope. Before authorization it is not
 readable; limited access is readable with permission `limited` but represents an
 incomplete library view.
+Notes reports one read-only `notesLibrary` scope. Its permission reflects the
+responsible process's Notes.app Automation state and does not imply access to a
 private Notes database.
+
+## Notes (0.6 read-only development slice)
+
+Inspect Notes.app Automation status without prompting:
+
+```text
+macos-data notes permission --format json
+```
+
+Only an explicit request may ask macOS for consent:
+
+```text
+macos-data notes permission --request --format json
+```
+
+The response contains `access`, `readable`, `complete`, and `requested`.
+Possible access states are `available`, `denied`, `requiresConsent`,
+`targetNotRunning`, `targetUnavailable`, and `unknown`.
+
+Discover bounded account and nested-folder structure without reading note titles
+or bodies:
+
+```text
+macos-data notes accounts --format json
+macos-data notes folders [--account-id <opaque-id>] [--parent-id <opaque-id>] \
+  [--limit <1...200>] [--cursor <opaque-cursor>] --format json
+```
+
+Account and folder IDs are SHA-256-derived adapter-owned selectors; raw Notes
+scripting IDs are not returned. Folder cursors are bound to the account/parent
+filter and stale or cross-filter reuse fails closed.
+
+Query bounded note metadata without reading note bodies:
+
+```text
+macos-data notes query [--account-id <opaque-id>] [--folder-id <opaque-id>] \
+  [--title <substring>] [--modified-after <iso8601>] \
+  [--limit <1...200>] [--cursor <opaque-cursor>] --format json
+```
+
+Results contain only adapter-owned note/account/folder IDs, title, creation and
+modification dates, and password-protected/shared flags. They do not contain
+plaintext, HTML, attachments, or raw Notes scripting IDs. Query cursors are
+bound to all filters and fail closed when reused with a different filter.
+Enumeration is capped at 32 accounts, 200 folders, 200 notes, depth 16, and a
+five-second Apple Events deadline; overall process launch time may be longer.
+`complete: false` means the bounded snapshot cannot prove that all matching
+notes were examined. The adapter uses the Notes.app scripting dictionary and
+never reads private Notes stores or CloudKit containers. See the
+[Notes 0.6 feasibility decision](development/notes-adapter-feasibility.md).
+
+Read one selected note. Metadata is the default and does not fetch a body:
+
+```text
+macos-data notes get --id <opaque-note-id> --format json
+macos-data notes get --id <opaque-note-id> --body plaintext --format json
+macos-data notes get --id <opaque-note-id> --body html --format json
+macos-data notes get --id <opaque-note-id> --include-attachments --format json
+```
+
+`plaintext` and `html` are explicit sensitive-data opt-ins. Returned UTF-8 body
+data is capped at 256 KiB; larger and password-protected notes fail closed. The
+one-note Apple Event is deadline-bounded, but Notes supplies the property before
+the CLI can enforce its UTF-8 response cap, so this is an output boundary rather
+than a strict Apple Events peak-memory guarantee. Body content is never written
+to diagnostic logs.
+
+Attachment metadata is also explicit. It returns at most 100 adapter-owned
+opaque attachment IDs plus name, creation/modification dates, content
+identifier, URL, and shared state. It never reads attachment `contents`, saves,
+or exports binary data. `attachmentsComplete: false` means the per-note cap was
+reached. Binary export remains deferred behind its own destination, byte-limit,
+no-overwrite, and cleanup gate.
 
 ## Photos (0.5 development slice)
 

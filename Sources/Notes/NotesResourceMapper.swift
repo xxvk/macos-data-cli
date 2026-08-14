@@ -1,0 +1,26 @@
+import Core
+
+public enum NotesResourceMapper {
+    public static func map(status: NotesAutomationStatus) -> DataResource {
+        let permission: DataPermissionState = switch status {
+        case .available: .available
+        case .denied: .denied
+        case .requiresConsent: .requiresConsent
+        case .targetNotRunning, .targetUnavailable: .unavailable
+        case .unknown: .unknown
+        }
+
+        return DataResource(
+            id: "notes_library_default",
+            kind: .notesLibrary,
+            provider: .notes,
+            displayName: "Apple Notes",
+            capabilities: DataResourceCapabilities(
+                readable: status.readable,
+                writable: false,
+                selected: true,
+                permission: permission
+            )
+        )
+    }
+}

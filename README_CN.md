@@ -9,7 +9,7 @@ GUI 自动化、特定平台集成，或直接接触不稳定的内部数据格�
 
 ## 项目状态
 
-当前源码版本为 0.5.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.6.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -30,6 +30,10 @@ recurrence；基础及周期 iCloud gate 均通过且 fixture 零残留。
 Photos 0.5 增加 PhotoKit 权限、album 发现、有界 metadata-only asset query/get、opaque ID、
 limited library 语义，以及默认禁网和禁止覆盖的单资源安全 export。
 
+Notes 0.6 增加有界、只读的 Notes.app Automation adapter：权限状态、account 和
+嵌套 folder 发现、metadata query、显式 plaintext/HTML 读取与 attachment metadata。
+它不访问 Notes 私有 store；受保护写入单独归入 0.6.1。
+
 详细开发计划请参阅：
 
 - [中文路线图](ROADMAP_CN.md)
@@ -46,6 +50,7 @@ limited library 语义，以及默认禁网和禁止覆盖的单资源安全 exp
 - [发布签名与 notarization TODO](docs/development/distribution-signing.md)
 - [Calendar 0.3 架构](docs/development/calendar-adapter-architecture_CN.md)
 - [Photos 0.5 架构](docs/development/photos-adapter-architecture_CN.md)
+- [Notes 0.6 可行性决策](docs/development/notes-adapter-feasibility_CN.md)
 
 ## 核心目标
 
@@ -214,7 +219,9 @@ Homebrew 更新、Gatekeeper、quarantine 处理和本地发布验证流程，�
 
 ## 后续方向
 
-Calendar 0.3、Reminders 0.4 和 Photos 0.5 已发布，后续 adapter 仍按 roadmap 推进。
+Calendar 0.3、Reminders 0.4、Photos 0.5 和有界只读的 Notes 0.6 源码版本已完成。
+受保护的 Notes create/rename/move 写入归入 0.6.1。Notes 集成属于 Automation，
+不是原生 Notes Framework，也不得读取 Notes 私有 store。
 `macos-data` 在整个 0.x 阶段保持 canonical command，正式命名复审延后至 1.0.0 发布前。
 当前 Reminders 开发切片支持 full-access 发现、受限 query/get，以及带 read-back 状态和
 可选短期幂等的 `create --dry-run|--apply`。部分编辑和受保护的单条删除已实现；编辑真实写入

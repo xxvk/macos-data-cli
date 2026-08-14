@@ -24,15 +24,15 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
-[[ "$EXPECTED_VERSION" == "0.5.0" ]] || {
-  echo "0.5 release gate requires VERSION=0.5.0; observed=$EXPECTED_VERSION" >&2
+[[ "$EXPECTED_VERSION" == "0.6.0" ]] || {
+  echo "0.6 release gate requires VERSION=0.6.0; observed=$EXPECTED_VERSION" >&2
   exit 1
 }
 
 plutil -lint Sources/macos-data/Info.plist scripts/macos-data-app-Info.plist scripts/macos-data.entitlements >/dev/null
-rg -q '^## 0\.5\.0 — ' CHANGELOG.md
-rg -q 'current source release is 0\.5\.0' README.md
-rg -q '当前源码版本为 0\.5\.0' README_CN.md
+rg -q '^## 0\.6\.0 — ' CHANGELOG.md
+rg -q 'current source release is 0\.6\.0' README.md
+rg -q '当前源码版本为 0\.6\.0' README_CN.md
 
 swift test --quiet
 swift build -c release

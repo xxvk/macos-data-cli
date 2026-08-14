@@ -1,10 +1,11 @@
 # 使用说明
 
-`macos-data` 是一个本地 Terminal CLI。它通过 Apple 公共 Framework 访问 macOS 数据，Agent 不需要专用集成即可调用。
+`macos-data` 是一个本地 Terminal CLI。它使用 Apple 公共 Framework 和明确公开的 App
+Automation 接口访问 macOS 数据，Agent 不需要专用集成即可调用。
 
 ## 统一资源查询
 
-使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders 和 Photos 资源作用域：
+使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos 和 Notes 资源作用域：
 
 ```text
 macos-data resources --format json
@@ -18,6 +19,71 @@ macos-data resources --format json
 采用相同的 fail-closed iCloud source 策略，并使用独立的 `remindersSource` kind。
 Photos 始终报告一个 `photosLibrary` scope；未授权时不可读，limited 时 permission 为
 `limited`，可读但不代表完整照片库。
+Notes 始终报告一个只读 `notesLibrary` scope；permission 表示负责执行进程对 Notes.app 的
+Automation 状态，不代表可以访问 Notes 私有数据库。
+
+## Notes（0.6 只读开发切片）
+
+不触发弹窗地检查 Notes.app Automation 状态：
+
+```text
+macos-data notes permission --format json
+```
+
+只有显式命令可以请求 macOS 授权：
+
+```text
+macos-data notes permission --request --format json
+```
+
+响应包含 `access`、`readable`、`complete` 和 `requested`。access 可能为 `available`、
+`denied`、`requiresConsent`、`targetNotRunning`、`targetUnavailable` 或 `unknown`。
+
+只读发现有界 account 与嵌套 folder 结构，不读取 note 标题或正文：
+
+```text
+macos-data notes accounts --format json
+macos-data notes folders [--account-id <opaque-id>] [--parent-id <opaque-id>] \
+  [--limit <1...200>] [--cursor <opaque-cursor>] --format json
+```
+
+account/folder ID 由 SHA-256 生成并由 adapter 管理，不返回 Notes 原始 scripting ID。folder
+cursor 与 account/parent filter 绑定，跨 filter 或 stale cursor 会 fail closed。
+
+只读查询有界 note metadata，不读取正文：
+
+```text
+macos-data notes query [--account-id <opaque-id>] [--folder-id <opaque-id>] \
+  [--title <substring>] [--modified-after <iso8601>] \
+  [--limit <1...200>] [--cursor <opaque-cursor>] --format json
+```
+
+结果只包含 adapter-owned note/account/folder ID、标题、创建/修改时间以及
+password-protected/shared 标志；不包含 plaintext、HTML、attachment 或 Notes 原始 scripting ID。
+query cursor 与全部 filter 绑定，换 filter 复用时会 fail closed。枚举上限为 32 个 account、
+200 个 folder、200 条 note、16 层以及 5 秒 Apple Events deadline；CLI 启动总耗时可能更长。
+`complete: false` 表示有界快照无法证明已检查全部匹配 note。adapter 通过 Apple Events 使用
+Notes.app scripting dictionary，绝不读取 Notes 私有 store 或 CloudKit container。参阅
+[Notes 0.6 可行性决策](development/notes-adapter-feasibility_CN.md)。
+
+读取一条已选择的 note；默认只返回 metadata，不获取正文：
+
+```text
+macos-data notes get --id <opaque-note-id> --format json
+macos-data notes get --id <opaque-note-id> --body plaintext --format json
+macos-data notes get --id <opaque-note-id> --body html --format json
+macos-data notes get --id <opaque-note-id> --include-attachments --format json
+```
+
+`plaintext` 和 `html` 是对敏感正文的显式 opt-in。返回的 UTF-8 正文上限为 256 KiB；超过上限
+或 password-protected note 均 fail closed。单条 Apple Event 有 deadline，但 Notes 会先提供完整
+property，CLI 随后才能执行 UTF-8 输出上限，因此这是输出边界，不是 Apple Events 峰值内存的
+严格保证。诊断日志绝不记录正文内容。
+
+attachment metadata 同样需要显式 opt-in。每条 note 最多返回 100 个 adapter-owned opaque
+attachment ID，以及名称、创建/修改时间、content identifier、URL 和 shared 状态；绝不读取
+attachment `contents`，也不执行 save 或 binary export。`attachmentsComplete: false` 表示达到
+单 note 上限。binary export 继续延后，必须另行定义目标文件、byte 上限、禁止覆盖和清理 gate。
 
 ## Photos（0.5 开发切片）
 
