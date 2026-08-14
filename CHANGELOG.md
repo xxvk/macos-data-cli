@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.7.2 — 2026-08-15
+
+### Added
+
+- Added bounded local inspection and redacted edit planning for explicitly
+  supplied `.cherri` and `.shortcut` files. Inputs are non-symlink local files
+  capped at 10 MiB; URI/share-link acquisition, private databases, CloudKit,
+  private frameworks, clipboard reads, and implicit imports remain prohibited.
+- Added guarded copy-first editing for resolver-approved Text and Comment action
+  graphs: Text replacement, append-only Text insertion, bounded deletion that
+  leaves at least one action, and bounded all-move reordering.
+- Added strict SHA-256 concurrency guards, exact `EDIT SHORTCUT COPY`
+  confirmation, complete semantic read-back after every operation, redacted
+  output, and fail-closed `outcome_unknown` behavior with no automatic retry.
+- Added bounded read-only Accessibility discovery plus focused acquisition,
+  planning, semantic resolver, coordinator, guarded bridge, concrete session,
+  privacy, and CLI contract coverage.
+
+### Fixed
+
+- Read real visual action order through a closed-set-validated
+  `AXChildrenInNavigationOrder` path, with top-left Y ordering when complete
+  positions are available, instead of trusting stale ordinary `AXChildren`.
+- Wait for the exact smaller graph after resolver-bound action deletion so a
+  transient stale Shortcuts graph fails closed rather than causing another
+  duplicate or delete attempt.
+- Reject no-op moves, semantically indistinguishable adjacent actions, mixed
+  operation families, middle insertion, malformed or ambiguous UI trees, and
+  unsupported or privacy-sensitive artifacts before mutation.
+
+### Validation
+
+- Passed 113 Shortcuts tests, the complete Swift test matrix, no-apply Debug and
+  Release CLI contracts, and a production build on macOS 27 Beta 5 with Xcode
+  27 Beta 5.
+- Disposable copy-first replace, append, delete, and move fixtures preserved the
+  originals. Every fixture was permanently deleted after separate action-time
+  confirmation; the library returned from four to two and exact-name searches
+  returned no results.
+
+### Limitations
+
+- Editing is experimental, copy-first, and limited to the proven closed set.
+  It does not mutate the original object, support arbitrary-position insertion,
+  mix operation families, handle control flow, magic variables, third-party
+  actions, or promise compatibility with another macOS/Shortcuts version.
+
 ## 0.7.1 — 2026-08-14
 
 ### Added

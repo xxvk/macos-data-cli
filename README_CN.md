@@ -40,7 +40,7 @@ macos-data mail doctor --format json
 
 ## 项目状态
 
-当前源码版本为 0.7.1。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.7.2。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -89,6 +89,30 @@ managed-forget 代码。create/update 除非提供准确确认短语，否则只
 不能被静默接管。macOS 27 Beta 5 + Cherri 2.3.0 的一次性 create/run/retain-old update/run/cleanup
 gate 已通过，fixture/registry 零残留。两个可正常运行的导入对象公开 action count 都是 `0`，因此
 编译 count 与 observed count 分开返回；两者不一致时同名 replace fail closed。
+开发树也已加入 0.7.2 受保护的现有对象编辑：`shortcuts edit inspect` 安全分类单个本地 `.cherri` 或
+`.shortcut`，不导入、不打开、不持久化，也不回显内容。opaque/signed artifact、未知 action、
+magic variable/附件等嵌套结构、疑似 secret 与 device-bound reference 均 fail closed 为人工迁移；
+输入严格限于本地文件：iCloud share link 与其他 URI 在读取前拒绝，不下载、不跟随 redirect、不读取
+clipboard，也不触发 import；
+符合条件的 unsigned artifact 可交给 `shortcuts edit plan`，用输入 SHA-256 保护并在内存 shadow graph
+中验证 `insert_text`、`replace_text`、`delete_action`、`move_action`；结果完全脱敏且不写 Shortcuts.app。
+仅包含 `replace_text` 的 plan、“graph 已有 Text 且只在末尾 `insert_text`”的 plan，或删除后至少保留
+一个 action 的有界全 `delete_action` plan，可使用
+`shortcuts edit copy`：dry-run 不读取 AX；apply 要求准确的
+可见 editor 名称 SHA-256 和 `EDIT SHORTCUT COPY`，先复制原件，只修改 resolver 认可的 Text value，
+并逐步回读。末尾追加使用准确的 `duplicateAction:`；delete 只按 resolver 绑定的 Close button，并等待准确
+缩小后的 graph。有界全 `move_action` plan 已开放 copy-first apply：每个相邻 reorder 只调用准确 menu identifier，
+并回读完整视觉顺序。中间/无来源 insert、混合 operation plan、同索引 move 与语义不可区分的相邻 action 继续拒绝。
+`shortcuts edit ui-inspect` 进一步提供有界、只读 AX 结构发现：不弹授权、不激活、不点击、不输入，
+也不返回 label/title/identifier，并始终关闭 apply。
+macOS 27 Beta 5 disposable gate 已校准准确的 `editor.shortcutname` marker，脱敏发现唯一 candidate，
+随后删除 fixture，并确认搜索与 candidate 均为零残留。
+内部 copy-first mutation coordinator 已完成 TDD 设计边界：要求准确确认、预演完整 plan、证明不同 identity
+且 graph 完全一致的恢复副本，并逐步回读。
+当前设计还把公开脱敏 plan 绑定到不可 Codable 的 private 内存 execution plan，并增加 recovery-first、
+准确 sequence 的 guarded bridge。macOS 27 的具体 debug-only gate 已证明 copy-first Text replacement、
+append-only Text insertion、有界 action delete 与有界全 move，包括 hash 回读、完整视觉顺序、剩余 action
+不变和原件不变。任意位置 insert 与混合 operation 仍不可用；全部 gate fixture 均已明确确认删除并验证零残留。
 
 详细开发计划请参阅：
 
@@ -109,6 +133,7 @@ gate 已通过，fixture/registry 零残留。两个可正常运行的导入对�
 - [Notes 0.6 可行性决策](docs/development/notes-adapter-feasibility_CN.md)
 - [Shortcuts 命令与安全边界](docs/usage_CN.md#shortcuts070-开发切片)
 - [Shortcuts 0.7.1 authoring 边界](docs/development/shortcuts-authoring_CN.md)
+- [Shortcuts 0.7.2 现有 Shortcut 编辑边界](docs/development/shortcuts-existing-editing_CN.md)
 
 ## 核心目标
 

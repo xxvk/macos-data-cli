@@ -564,34 +564,181 @@ currently exposes no public action-graph CRUD API, so this version must remain
 explicitly experimental, permission-gated, and fail closed, with no promise of
 cross-version stability.
 
-- [ ] Add safe acquisition and capability classification
-  - Prefer a user-supplied local unsigned `.shortcut` or Cherri source. An
-    iCloud share link may upload content and therefore needs separate
-    confirmation plus a privacy warning
+- [x] Add safe local acquisition and capability classification
+  - `shortcuts edit inspect --input <local.cherri|local.shortcut>` reads one
+    explicit non-symlink regular file through `O_NOFOLLOW`, caps input at
+    10 MiB, and returns only SHA-256, byte/count metadata, risk flags, and
+    stable capability/reason enums
   - Reject or require manual Shortcuts.app migration for signed files that
     cannot be decoded reliably, unknown actions, device-bound references,
     secrets, or unsupported structures. Never access SQLite, CloudKit, or a
     private framework
-- [ ] Design a semantic Accessibility editing backend
+  - Twelve focused tests and process-level no-apply CLI contracts cover bounded
+    unsigned input, opaque input, Cherri routing, redaction, symlinks, size,
+    unknown actions, secrets, device-bound references, and nested magic-variable
+    or attachment structures. Semantic apply remains disabled
+- [x] Add a redacted action-level edit-plan contract
+  - `shortcuts edit plan` requires an exact input SHA-256 and strict JSON, then
+    validates up to 64 sequential insert-text, replace-text, delete-action, and
+    move-action operations against an in-memory shadow graph
+  - Eight focused tests plus process-level contracts cover strict fields,
+    conflict detection, bounds, action-type safety, redaction, and zero input
+    mutation. No apply, Apple Event, Accessibility event, or artifact output is
+    reachable
+- [x] Evaluate iCloud share-link acquisition separately and keep it disabled
+  - Apple documents that creating an iCloud link sends Apple a copy for
+    validation and makes the link available through iCloud. Receiving a link is
+    a visible Get Shortcut/import flow, not a documented headless graph API
+  - 0.7.2 accepts only explicit local `.cherri`/`.shortcut` paths. It performs no
+    share-link request, download, redirect, clipboard read, or import
+  - The reader now requires `isFileURL`; a red/green regression proves an HTTPS
+    URL whose path aliases a real local fixture is rejected before reading. The
+    CLI also rejects URI syntax and never echoes the supplied link
+  - Reconsider only through a future opt-in command with an action-time privacy
+    confirmation, bounded download, redirect/domain policy, and separate visible-import contract
+- [x] Add bounded read-only semantic Accessibility discovery
   - Locate controls only by AX role, identifier, label, and hierarchy. Prohibit
     screen coordinates, image matching, and unbounded clicking
-  - Emit an action-level edit plan before mutation. Apply requires an exact
-    confirmation and verifies editor state after every step; ambiguity stops
-    the operation immediately
-- [ ] Support a constrained set of in-place edits
-  - Start with an allowlist of verified action insert/delete/reorder and
+  - `shortcuts edit ui-inspect` checks trust without prompting, does not launch
+    or activate Shortcuts.app, caps traversal at 2,000 nodes/depth 32, returns
+    counts only, and fails closed on generic, ambiguous, or unbounded trees
+  - Eight synthetic tests plus no-apply CLI contracts prove zero action API,
+    permission/target states, ambiguity, bounds, semantic-marker requirements,
+    and label/title/identifier redaction. Semantic apply remains disabled
+- [x] Validate read-only AX discovery with a disposable macOS 27 Beta 5 fixture
+  - The initial live run failed closed because Shortcuts 27 exposes the editor
+    marker as `editor.shortcutname`; a red test captured that compatibility gap
+    before the exact normalized marker was added to the allowlist
+  - The calibrated run returned one bounded editor candidate across two windows
+    and 373 nodes while keeping labels, titles, identifiers, and action text out
+    of JSON. After semantic UI deletion, unique-name search returned no results
+    and CLI discovery returned zero editor candidates across one window/139 nodes
+- [x] Calibrate exact Text/Comment semantic elements on macOS 27 Beta 5
+  - A second local-only fixture established the unique `editor.shortcutname`
+    field, the outer action canvas, direct Text/Comment titles, Close buttons,
+    nested scroll areas, and one settable text area per supported action
+  - A pure semantic resolver ignores the separate action-library scroll area,
+    hashes all private values, and fails closed on unknown actions, malformed
+    fields, ambiguity, or traversal bounds. Four focused tests cover this graph
+  - Read-only menu inspection recorded `duplicateShortcut:`,
+    `duplicateAction:`, `rearrangeItemUp:`, `rearrangeItemDown:`, and
+    `insertCommentAction:` as version-specific evidence only. No action was
+    invoked, and cleanup restored the original library count with zero name hit
+- [x] Design guarded semantic Accessibility mutation
+  - A pure coordinator consumes the implemented action-level edit plan, requires
+    exact `EDIT SHORTCUT COPY` confirmation before any editor read, and preflights
+    the complete operation sequence before creating a recovery object
+  - Mutation is copy-first: the recovery candidate must have a distinct hashed
+    identity and an exact initial semantic graph match. Every operation requires
+    exact read-back; errors or mismatches return `outcome_unknown`, preserve the
+    original, and prohibit automatic retry
+  - Ten focused tests cover preview isolation, confirmation, ambiguity,
+    concurrency, full-plan preflight, recovery-copy proof, sequential read-back,
+    unknown outcomes, and result redaction
+  - Strict patch parsing now produces a non-Codable, redacted-debug in-memory
+    execution plan beside the public plan. The coordinator verifies every
+    private text value against its byte count and SHA-256 before reading AX state;
+    a summary alone is never executable. Edit-plan and coordinator suites now
+    contain ten and eleven focused tests respectively
+  - A plan-bound guarded bridge exposes only inspect, duplicate, insert/replace
+    text, delete, and move session methods. It enforces recovery-first exact
+    sequence, rejects altered/extra operations, becomes permanently poisoned
+    after a session mutation error, and has five focused tests
+  - No generic AX action API is reachable; each public copy-first operation
+    remains separately gated below
+- [x] Pass the first concrete copy-first `replace_text` gate
+  - This first gate allowed only exact `duplicateShortcut:` and Text-area value
+    replacement; insert/delete/move were hard-disabled at that point. Five
+    focused tests covered the session and confirmed existing-copy recovery
+  - The bounded driver reads only the toolbar name and action canvas, selects
+    exactly one main/focused editor, and applies a five-second AX deadline
+  - A macOS 27 Beta 5 fixture proved copy identity, graph equality, replacement
+    hash read-back, unchanged Comment, and unchanged original. A fail-closed
+    two-window outcome resumed the already verified copy without duplicating it
+  - Both fixtures were permanently deleted after separate confirmation; the
+    library returned from four to two and exact-name search returned no results
+  - The fixture harness is debug-only; it is not a public recovery interface
+- [x] Expose the proven copy-first `replace_text` route through a guarded CLI contract
+  - `shortcuts edit copy` requires one local artifact, one strict patch, the
+    exact visible editor-name SHA-256, and exactly one of dry-run/apply
+  - Dry-run returns before constructing the system AX bridge. Apply requires
+    exact `EDIT SHORTCUT COPY` confirmation before bridge construction
+  - This gate initially enabled replace-text-only plans; the append-only gate
+    below subsequently extends the same contract. Other insert/delete/move
+    operations fail with a stable unsupported-capability error before mutation
+  - Six service tests plus process-level CLI contracts cover preview isolation,
+    confirmation, hash/mode validation, unsupported-operation rejection, and
+    output redaction. No additional live fixture was created for this wiring
+- [x] Prove and expose append-only `insert_text` on a verified copy
+  - The only enabled insertion index is the current action count, and the graph
+    must already contain a resolver-approved Text action. Middle insertion and
+    insertion into a graph without Text fail before mutation
+  - The bounded driver focuses only that known Text field and invokes the exact
+    `duplicateAction:` Edit menu identifier. It verifies one appended duplicate,
+    changes only its value, and reads back the complete semantic graph
+  - A macOS 27 Beta 5 fixture proved Text + Comment became Text + Comment + Text
+    only in the copy, while the original stayed unchanged. The result was
+    `readback_confirmed`, with three verified actions and no private values in JSON
+  - The delete gate, stale-read-back recovery, and mixed-family guard bring
+    ShortcutsTests to 105/105; focused coverage includes 12 acquisition,
+    13 edit-plan, 11 coordinator, 7 service,
+    5 guarded-bridge, 4 resolver, and 9 system-session tests
+  - After separate confirmation, both fixtures were deleted through Shortcuts UI;
+    All Shortcuts returned from four to two and both exact-name searches returned no results
+- [x] Prove and expose copy-first `delete_action` with disposable fixtures
+  - Synthetic implementation resolves exactly one `Close` AXButton per supported
+    action, rejects a graph that would become empty, presses only the bound path,
+    and relies on coordinator read-back of the complete post-delete graph
+  - Plan, public dry-run, and guarded apply are wired and redacted. Apply accepts
+    only all-delete plans that leave at least one action
+  - A debug-only `copy-delete` harness is ready to verify Text + Comment becomes
+    Text only in the copy while the original remains unchanged
+  - [x] An authorized macOS 27 Beta 5 Text + Comment fixture proved that only
+    the copy lost its Comment, the copy read back as one unchanged Text action,
+    and the original read back as the original Text + Comment graph
+  - [x] The first post-delete read-back exposed a real stale-graph window. The
+    command failed closed without retry; a read-only existing-copy recovery
+    confirmed the mutation, and a red/green test now requires delete to poll
+    until the exact smaller graph is stable
+  - [x] Both fixture objects were removed from All Shortcuts; the count returned
+    from four to two and exact-name search returned no results
+  - [x] A second disposable fixture passed the corrected uninterrupted gate in
+    one command, then original verification also passed
+  - [x] After explicit permanent-delete confirmation, both second-gate objects
+    were deleted; All Shortcuts returned from four to two and exact-name search
+    returned no results
+- [x] Support a constrained set of existing-object edits through a verified copy
+  - [x] Prove copy-first `move_action` with one disposable Text + Comment fixture:
+    duplicate, move Comment from index 1 to 0 through exact `rearrangeItemUp:`,
+    read back Comment + Text, then independently verify the original remains
+    Text + Comment. Synthetic adjacent-step polling and fail-closed equal-action
+    guards are complete. The gate exposed stale ordinary `AXChildren` ordering;
+    verified `AXChildrenInNavigationOrder` plus top-left-coordinate Y ordering
+    now provides complete visual-order read-back. The moved copy and unchanged
+    original both passed hash-bound read-back; public all-move apply is enabled
+  - [x] After separate action-time confirmation, permanently deleted the original
+    and recovery-copy move fixtures; All Shortcuts returned from four to two and
+    both exact-name searches returned no results
+  - Continue with an allowlist of verified action delete/reorder and additional
     parameter replacement operations. Control flow, magic variables,
     third-party actions, and device-bound references each require separate
     fixtures before enablement
   - Use shortcut ID, expected action count, and available metadata as concurrency
     guards. Since the public interface cannot read a complete action graph, do
     not claim full transactions or lossless round trips
-- [ ] Complete versioned UI fixtures and recovery gates
-  - Keep semantic UI fixtures and failure samples for every supported
-    macOS/Shortcuts version. Live tests may mutate only disposable shortcuts
-  - Create a recoverable candidate before apply and verify action count plus
-    black-box runtime behavior afterward. If the outcome cannot be proven,
-    return `outcome_unknown`, preserve the original object, and prohibit retries
+  - Re-evaluate the wording `in-place`: the approved coordinator edits only a
+    verified copy and preserves the original. Direct original-object mutation
+    stays disabled unless a separate rollback proof becomes possible
+- [x] Complete the macOS 27 Beta 5 UI fixture and recovery gates for the 0.7.2 surface
+  - Disposable fixtures proved copy-first replace-text, append-only insert,
+    bounded delete, and bounded all-move while preserving the original
+  - Every apply creates or resumes a distinct verified copy, reads back the
+    complete supported semantic graph, and returns `outcome_unknown` without
+    automatic retry when the result cannot be proved
+  - All disposable fixtures were permanently deleted after separate
+    action-time confirmation, and exact-name searches returned no results
+- [ ] Re-run the version-specific semantic fixture gate before claiming support
+  for a future macOS/Shortcuts version; 0.7.2 makes no cross-version guarantee
 
 ## Cross-cutting requirements for every release
 

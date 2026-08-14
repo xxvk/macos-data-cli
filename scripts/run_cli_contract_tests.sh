@@ -73,8 +73,12 @@ assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read commands and guarded 
 assert_contains "$TMP_DIR/shortcuts-help.out" 'Shortcuts 0\.7 commands'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'MOVE SHORTCUT'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'RUN SHORTCUT'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'EDIT SHORTCUT COPY'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'author validate'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'author build'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'edit inspect'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'edit plan'
+assert_contains "$TMP_DIR/shortcuts-help.out" 'edit ui-inspect'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'never uses HubSign'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'CREATE MANAGED SHORTCUT'
 assert_contains "$TMP_DIR/shortcuts-help.out" 'UPDATE MANAGED SHORTCUT'
@@ -176,6 +180,105 @@ run_expected_failure shortcuts-author-validate-missing-source 9 "$CLI" shortcuts
 run_expected_failure shortcuts-author-validate-wrong-extension 9 "$CLI" shortcuts author validate --source "$TMP_DIR/source.txt" --format json
 run_expected_failure shortcuts-author-build-missing-output 9 "$CLI" shortcuts author build --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json
 run_expected_failure shortcuts-author-build-invalid-signing-mode 9 "$CLI" shortcuts author build --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --output "$TMP_DIR/out.shortcut" --signing-mode remote --format json
+run_expected_failure shortcuts-edit-inspect-missing-input 9 "$CLI" shortcuts edit inspect --format json
+run_expected_failure shortcuts-edit-inspect-unknown-option 9 "$CLI" shortcuts edit inspect --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json
+private_share_link='https://www.icloud.com/shortcuts/private-fixture-token.shortcut'
+run_expected_failure shortcuts-edit-inspect-share-link-disabled 9 "$CLI" shortcuts edit inspect --input "$private_share_link" --format json
+if rg -q 'private-fixture-token|icloud\.com/shortcuts' "$TMP_DIR/shortcuts-edit-inspect-share-link-disabled.out"; then
+  echo "Shortcuts disabled share-link acquisition leaked the supplied URL" >&2
+  exit 1
+fi
+run_expected_failure shortcuts-edit-plan-missing-patch 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --format json
+run_expected_failure shortcuts-edit-plan-conflicting-source 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --stdin --format json
+run_expected_failure shortcuts-edit-plan-unknown-option 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --apply --stdin --format json
+run_expected_failure shortcuts-edit-ui-inspect-rejects-options 9 "$CLI" shortcuts edit ui-inspect --request --format json
+"$CLI" shortcuts edit inspect --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json >"$TMP_DIR/shortcuts-edit-inspect-cherri.out"
+assert_contains "$TMP_DIR/shortcuts-edit-inspect-cherri.out" '"capability"[[:space:]]*:[[:space:]]*"managed_source_route"'
+assert_contains "$TMP_DIR/shortcuts-edit-inspect-cherri.out" '"canApplySemanticEdit"[[:space:]]*:[[:space:]]*false'
+if rg -qi 'Macos Data 071 Fixture|macos-data-071-sentinel|#define|WFWorkflowAction' "$TMP_DIR/shortcuts-edit-inspect-cherri.out"; then
+  echo "Shortcuts acquisition result leaked source, name, or action data" >&2
+  exit 1
+fi
+printf '%s' 'opaque signed payload' >"$TMP_DIR/opaque.shortcut"
+"$CLI" shortcuts edit inspect --input "$TMP_DIR/opaque.shortcut" --format json >"$TMP_DIR/shortcuts-edit-inspect-opaque.out"
+assert_contains "$TMP_DIR/shortcuts-edit-inspect-opaque.out" '"capability"[[:space:]]*:[[:space:]]*"manual_migration_required"'
+assert_contains "$TMP_DIR/shortcuts-edit-inspect-opaque.out" '"opaque_or_signed_artifact"'
+if rg -q 'opaque signed payload' "$TMP_DIR/shortcuts-edit-inspect-opaque.out"; then
+  echo "Shortcuts acquisition result leaked opaque input bytes" >&2
+  exit 1
+fi
+shortcut_hash="$(shasum -a 256 "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" | awk '{print $1}')"
+private_edit_value='macos-data-072-private-edit-value'
+printf '{"expectedInputSHA256":"%s","operations":[{"operation":"replace_text","index":0,"value":"%s"}]}' "$shortcut_hash" "$private_edit_value" >"$TMP_DIR/plan.json"
+"$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --format json >"$TMP_DIR/shortcuts-edit-plan.out"
+assert_contains "$TMP_DIR/shortcuts-edit-plan.out" '"operation"[[:space:]]*:[[:space:]]*"edit_plan"'
+assert_contains "$TMP_DIR/shortcuts-edit-plan.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
+assert_contains "$TMP_DIR/shortcuts-edit-plan.out" '"canApplySemanticEdit"[[:space:]]*:[[:space:]]*true'
+if rg -q "$private_edit_value|is\.workflow\.actions|WFTextActionText" "$TMP_DIR/shortcuts-edit-plan.out"; then
+  echo "Shortcuts edit plan leaked value or action data" >&2
+  exit 1
+fi
+run_expected_failure shortcuts-edit-plan-unknown-field 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --stdin --format json <<EOF
+{"expectedInputSHA256":"$shortcut_hash","operations":[],"unknown":true}
+EOF
+editor_name_hash='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+run_expected_failure shortcuts-edit-copy-missing-mode 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --format json
+run_expected_failure shortcuts-edit-copy-conflicting-mode 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --dry-run --apply --format json
+run_expected_failure shortcuts-edit-copy-missing-editor-hash 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --dry-run --format json
+run_expected_failure shortcuts-edit-copy-apply-missing-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --apply --format json
+run_expected_failure shortcuts-edit-copy-apply-wrong-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --apply --confirm "EDIT SHORTCUT" --format json
+run_expected_failure shortcuts-edit-copy-dry-run-rejects-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --dry-run --confirm "EDIT SHORTCUT COPY" --format json
+printf '{"expectedInputSHA256":"%s","operations":[{"operation":"insert_text","index":0,"value":"private unsupported value"}]}' "$shortcut_hash" \
+  | run_expected_failure shortcuts-edit-copy-rejects-unsupported-before-ax 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json
+"$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-preview.out"
+assert_contains "$TMP_DIR/shortcuts-edit-copy-preview.out" '"operation"[[:space:]]*:[[:space:]]*"semantic_edit_copy"'
+assert_contains "$TMP_DIR/shortcuts-edit-copy-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
+assert_contains "$TMP_DIR/shortcuts-edit-copy-preview.out" '"originalPreserved"[[:space:]]*:[[:space:]]*true'
+if rg -q "$private_edit_value|private unsupported value|is\.workflow\.actions|WFTextActionText" "$TMP_DIR/shortcuts-edit-copy-preview.out"; then
+  echo "Shortcuts edit copy preview leaked value or action data" >&2
+  exit 1
+fi
+text_comment_hash="$(shasum -a 256 "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" | awk '{print $1}')"
+printf '{"expectedInputSHA256":"%s","operations":[{"operation":"insert_text","index":2,"value":"private append value"}]}' "$text_comment_hash" \
+  | "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-append-preview.out"
+assert_contains "$TMP_DIR/shortcuts-edit-copy-append-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
+assert_contains "$TMP_DIR/shortcuts-edit-copy-append-preview.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
+if rg -q 'private append value|is\.workflow\.actions|WFTextActionText' "$TMP_DIR/shortcuts-edit-copy-append-preview.out"; then
+  echo "Shortcuts append preview leaked value or action data" >&2
+  exit 1
+fi
+printf '{"expectedInputSHA256":"%s","operations":[{"operation":"delete_action","index":1}]}' "$text_comment_hash" \
+  | "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-delete-preview.out"
+assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
+assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-preview.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
+assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-preview.out" '"finalActionCount"[[:space:]]*:[[:space:]]*2'
+if rg -q 'is\.workflow\.actions|WFTextActionText|WFCommentActionText' "$TMP_DIR/shortcuts-edit-copy-delete-preview.out"; then
+  echo "Shortcuts delete preview leaked action data" >&2
+  exit 1
+fi
+printf '{"expectedInputSHA256":"%s","operations":[{"operation":"delete_action","index":1}]}' "$text_comment_hash" \
+  | run_expected_failure shortcuts-edit-copy-delete-apply-missing-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --apply --format json
+assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-apply-missing-confirmation.out" 'SHORTCUTS_EDIT_CONFIRMATION_REQUIRED'
+printf '{"expectedInputSHA256":"%s","operations":[{"operation":"move_action","fromIndex":1,"toIndex":0}]}' "$text_comment_hash" \
+  | "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-move-preview.out"
+assert_contains "$TMP_DIR/shortcuts-edit-copy-move-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
+assert_contains "$TMP_DIR/shortcuts-edit-copy-move-preview.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
+assert_contains "$TMP_DIR/shortcuts-edit-copy-move-preview.out" '"finalActionCount"[[:space:]]*:[[:space:]]*2'
+if rg -q 'is\.workflow\.actions|WFTextActionText|WFCommentActionText' "$TMP_DIR/shortcuts-edit-copy-move-preview.out"; then
+  echo "Shortcuts move preview leaked action data" >&2
+  exit 1
+fi
+printf '{"expectedInputSHA256":"%s","operations":[{"operation":"move_action","fromIndex":1,"toIndex":0}]}' "$text_comment_hash" \
+  | run_expected_failure shortcuts-edit-copy-move-apply-missing-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --apply --format json
+assert_contains "$TMP_DIR/shortcuts-edit-copy-move-apply-missing-confirmation.out" 'SHORTCUTS_EDIT_CONFIRMATION_REQUIRED'
+"$CLI" shortcuts edit ui-inspect --format json >"$TMP_DIR/shortcuts-edit-ui-inspect.out"
+assert_contains "$TMP_DIR/shortcuts-edit-ui-inspect.out" '"operation"[[:space:]]*:[[:space:]]*"ui_inspect"'
+assert_contains "$TMP_DIR/shortcuts-edit-ui-inspect.out" '"status"[[:space:]]*:[[:space:]]*"(permission_required|target_not_running|no_candidate|candidate_found|ambiguous|unbounded)"'
+assert_contains "$TMP_DIR/shortcuts-edit-ui-inspect.out" '"canApplySemanticEdit"[[:space:]]*:[[:space:]]*false'
+if rg -q 'AXWindow|AXGroup|AXToolbar|AXScrollArea|workflow-editor|Shortcut Editor' "$TMP_DIR/shortcuts-edit-ui-inspect.out"; then
+  echo "Shortcuts Accessibility inspection leaked AX labels or identifiers" >&2
+  exit 1
+fi
 run_expected_failure shortcuts-create-missing-source 9 "$CLI" shortcuts create --dry-run --format json
 run_expected_failure shortcuts-create-conflicting-mode 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --dry-run --apply --format json
 run_expected_failure shortcuts-create-apply-missing-confirmation 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --apply --format json

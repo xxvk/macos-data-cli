@@ -7,7 +7,7 @@ import CalendarAdapter
 import RemindersAdapter
 import PhotosAdapter
 import NotesAdapter
-import ShortcutsAdapter
+@_spi(ShortcutsFixtureGate) import ShortcutsAdapter
 
 @main
 struct MacosDataCLI {
@@ -70,6 +70,10 @@ struct MacosDataCLI {
             let shortcutsStore = ShortcutsStore(permission: shortcutsPermission)
             let shortcutsAuthoring = CherriAuthoringBridge()
             let shortcutsAuthoringService = ShortcutsAuthoringService(builder: shortcutsAuthoring)
+            let shortcutsAcquisition = ShortcutAcquisitionClassifier()
+            let shortcutsEditPlan = ShortcutEditPlanService()
+            let shortcutsSemanticEdit = ShortcutSemanticEditService()
+            let shortcutsAccessibilityDiscovery = ShortcutAccessibilityDiscoveryService()
             switch arguments {
             case ["resources"]:
                 emitJSONSuccess(makeResourcesResult(
@@ -90,6 +94,140 @@ struct MacosDataCLI {
                 let result = shortcutsPermission.check(requestConsent: true)
                 emitJSONSuccess(result)
                 if !result.readable { Foundation.exit(CLIExitCode.shortcutsFailure.rawValue) }
+            case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "edit" && args[2] == "inspect":
+                let inputURL = try parseShortcutAcquisitionArguments(Array(args.dropFirst(3)))
+                emitJSONSuccess(try shortcutsAcquisition.inspect(inputURL: inputURL))
+            case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "edit" && args[2] == "plan":
+                let request = try parseShortcutEditPlanArguments(Array(args.dropFirst(3)))
+                let result = request.patchURL != nil
+                    ? try shortcutsEditPlan.plan(inputURL: request.inputURL, patchURL: request.patchURL!)
+                    : try shortcutsEditPlan.plan(inputURL: request.inputURL, patchData: FileHandle.standardInput.readDataToEndOfFile())
+                emitJSONSuccess(result)
+            case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "edit" && args[2] == "copy":
+                let request = try parseShortcutSemanticEditArguments(Array(args.dropFirst(3)))
+                let result = request.patchURL != nil
+                    ? try shortcutsSemanticEdit.execute(
+                        inputURL: request.inputURL,
+                        patchURL: request.patchURL!,
+                        expectedEditorNameSHA256: request.expectedEditorNameSHA256,
+                        apply: request.apply,
+                        confirmation: request.confirmation
+                    )
+                    : try shortcutsSemanticEdit.execute(
+                        inputURL: request.inputURL,
+                        patchData: FileHandle.standardInput.readDataToEndOfFile(),
+                        expectedEditorNameSHA256: request.expectedEditorNameSHA256,
+                        apply: request.apply,
+                        confirmation: request.confirmation
+                    )
+                emitJSONSuccess(result)
+            case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "edit" && args[2] == "ui-inspect":
+                guard args.count == 3 else { throw ShortcutsError.editPlanInvalid }
+                emitJSONSuccess(shortcutsAccessibilityDiscovery.inspect())
+#if DEBUG
+            case ["shortcuts", "edit", "_ax-fixture-gate"]:
+                let environment = ProcessInfo.processInfo.environment
+                guard let mode = environment["MACOS_DATA_SHORTCUTS_AX_FIXTURE_GATE"],
+                      let nameHash = environment["MACOS_DATA_SHORTCUTS_AX_NAME_SHA256"],
+                      let textHash = environment["MACOS_DATA_SHORTCUTS_AX_TEXT_SHA256"],
+                      let commentHash = environment["MACOS_DATA_SHORTCUTS_AX_COMMENT_SHA256"],
+                      let confirmation = environment["MACOS_DATA_SHORTCUTS_AX_CONFIRM"] else {
+                    throw ShortcutsError.editConfirmationRequired
+                }
+                if mode == "copy-delete" {
+                    emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().deleteCommentFromCopy(
+                        expectedNameSHA256: nameHash,
+                        expectedTextSHA256: textHash,
+                        expectedCommentSHA256: commentHash,
+                        confirmation: confirmation
+                    ))
+                } else if mode == "copy-move" {
+                    emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().moveCommentBeforeTextFromCopy(
+                        expectedNameSHA256: nameHash,
+                        expectedTextSHA256: textHash,
+                        expectedCommentSHA256: commentHash,
+                        confirmation: confirmation
+                    ))
+                } else if mode == "copy-delete-readback" {
+                    guard let copyNameHash = environment["MACOS_DATA_SHORTCUTS_AX_COPY_NAME_SHA256"] else {
+                        throw ShortcutsError.editConfirmationRequired
+                    }
+                    emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().verifyExistingDeletedCopy(
+                        expectedOriginalNameSHA256: nameHash,
+                        expectedCopyNameSHA256: copyNameHash,
+                        expectedTextSHA256: textHash,
+                        confirmation: confirmation
+                    ))
+                } else if mode == "copy-move-readback" {
+                    guard let copyNameHash = environment["MACOS_DATA_SHORTCUTS_AX_COPY_NAME_SHA256"] else {
+                        throw ShortcutsError.editConfirmationRequired
+                    }
+                    emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().verifyExistingMovedCopy(
+                        expectedOriginalNameSHA256: nameHash,
+                        expectedCopyNameSHA256: copyNameHash,
+                        expectedTextSHA256: textHash,
+                        expectedCommentSHA256: commentHash,
+                        confirmation: confirmation
+                    ))
+                } else {
+                    guard mode == "copy-replace",
+                          let replacement = environment["MACOS_DATA_SHORTCUTS_AX_REPLACEMENT"] else {
+                        throw ShortcutsError.editConfirmationRequired
+                    }
+                    emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().mutateCopy(
+                        expectedNameSHA256: nameHash,
+                        expectedTextSHA256: textHash,
+                        expectedCommentSHA256: commentHash,
+                        replacement: replacement,
+                        confirmation: confirmation
+                    ))
+                }
+            case ["shortcuts", "edit", "_ax-fixture-verify-original"]:
+                let environment = ProcessInfo.processInfo.environment
+                guard environment["MACOS_DATA_SHORTCUTS_AX_FIXTURE_GATE"] == "verify-original",
+                      let nameHash = environment["MACOS_DATA_SHORTCUTS_AX_NAME_SHA256"],
+                      let textHash = environment["MACOS_DATA_SHORTCUTS_AX_TEXT_SHA256"],
+                      let commentHash = environment["MACOS_DATA_SHORTCUTS_AX_COMMENT_SHA256"] else {
+                    throw ShortcutsError.editConfirmationRequired
+                }
+                emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().verifyOriginal(
+                    expectedNameSHA256: nameHash,
+                    expectedTextSHA256: textHash,
+                    expectedCommentSHA256: commentHash
+                ))
+            case ["shortcuts", "edit", "_ax-fixture-resume-copy"]:
+                let environment = ProcessInfo.processInfo.environment
+                guard let mode = environment["MACOS_DATA_SHORTCUTS_AX_FIXTURE_GATE"],
+                      let originalNameHash = environment["MACOS_DATA_SHORTCUTS_AX_NAME_SHA256"],
+                      let copyNameHash = environment["MACOS_DATA_SHORTCUTS_AX_COPY_NAME_SHA256"],
+                      let textHash = environment["MACOS_DATA_SHORTCUTS_AX_TEXT_SHA256"],
+                      let commentHash = environment["MACOS_DATA_SHORTCUTS_AX_COMMENT_SHA256"],
+                      let confirmation = environment["MACOS_DATA_SHORTCUTS_AX_CONFIRM"] else {
+                    throw ShortcutsError.editConfirmationRequired
+                }
+                if mode == "resume-copy-move" {
+                    emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().resumeExistingCopyMove(
+                        expectedOriginalNameSHA256: originalNameHash,
+                        expectedCopyNameSHA256: copyNameHash,
+                        expectedTextSHA256: textHash,
+                        expectedCommentSHA256: commentHash,
+                        confirmation: confirmation
+                    ))
+                } else {
+                    guard mode == "resume-copy-replace",
+                          let replacement = environment["MACOS_DATA_SHORTCUTS_AX_REPLACEMENT"] else {
+                        throw ShortcutsError.editConfirmationRequired
+                    }
+                    emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().resumeExistingCopy(
+                        expectedOriginalNameSHA256: originalNameHash,
+                        expectedCopyNameSHA256: copyNameHash,
+                        expectedTextSHA256: textHash,
+                        expectedCommentSHA256: commentHash,
+                        replacement: replacement,
+                        confirmation: confirmation
+                    ))
+                }
+#endif
             case let args where args.count >= 3 && args[0] == "shortcuts" && args[1] == "author" && args[2] == "validate":
                 let request = try parseShortcutAuthorArguments(Array(args.dropFirst(3)), build: false)
                 emitJSONSuccess(try shortcutsAuthoring.validate(sourceURL: request.sourceURL))
@@ -1854,6 +1992,118 @@ struct MacosDataCLI {
         let signingMode: ShortcutSigningMode
     }
 
+    private static func parseShortcutAcquisitionArguments(_ arguments: [String]) throws -> URL {
+        guard arguments.count == 2,
+              arguments[0] == "--input",
+              !arguments[1].contains("://") else {
+            throw ShortcutsError.acquisitionInputInvalid
+        }
+        let inputURL = URL(fileURLWithPath: arguments[1])
+        guard ["cherri", "shortcut"].contains(inputURL.pathExtension.lowercased()) else {
+            throw ShortcutsError.acquisitionInputInvalid
+        }
+        return inputURL
+    }
+
+    private struct ShortcutEditPlanArguments {
+        let inputURL: URL
+        let patchURL: URL?
+    }
+
+    private static func parseShortcutEditPlanArguments(_ arguments: [String]) throws -> ShortcutEditPlanArguments {
+        var inputURL: URL?
+        var patchURL: URL?
+        var usesStdin = false
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--input", "--patch", "--stdin"].contains(option), seen.insert(option).inserted else {
+                throw ShortcutsError.editPlanInvalid
+            }
+            if option == "--stdin" {
+                usesStdin = true
+                index += 1
+                continue
+            }
+            guard index + 1 < arguments.count else { throw ShortcutsError.editPlanInvalid }
+            let url = URL(fileURLWithPath: arguments[index + 1])
+            if option == "--input" { inputURL = url }
+            else { patchURL = url }
+            index += 2
+        }
+        guard let inputURL,
+              inputURL.pathExtension.lowercased() == "shortcut",
+              usesStdin != (patchURL != nil),
+              patchURL?.pathExtension.lowercased() == "json" || patchURL == nil else {
+            throw ShortcutsError.editPlanInvalid
+        }
+        return ShortcutEditPlanArguments(inputURL: inputURL, patchURL: patchURL)
+    }
+
+    private struct ShortcutSemanticEditArguments {
+        let inputURL: URL
+        let patchURL: URL?
+        let expectedEditorNameSHA256: String
+        let apply: Bool
+        let confirmation: String?
+    }
+
+    private static func parseShortcutSemanticEditArguments(_ arguments: [String]) throws -> ShortcutSemanticEditArguments {
+        var inputURL: URL?
+        var patchURL: URL?
+        var usesStdin = false
+        var expectedEditorNameSHA256: String?
+        var apply = false
+        var dryRun = false
+        var confirmation: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--input", "--patch", "--stdin", "--expected-editor-name-sha256", "--dry-run", "--apply", "--confirm"].contains(option),
+                  seen.insert(option).inserted else {
+                throw ShortcutsError.editPlanInvalid
+            }
+            switch option {
+            case "--stdin":
+                usesStdin = true
+                index += 1
+            case "--dry-run":
+                dryRun = true
+                index += 1
+            case "--apply":
+                apply = true
+                index += 1
+            default:
+                guard index + 1 < arguments.count else { throw ShortcutsError.editPlanInvalid }
+                let value = arguments[index + 1]
+                if option == "--input" { inputURL = URL(fileURLWithPath: value) }
+                else if option == "--patch" { patchURL = URL(fileURLWithPath: value) }
+                else if option == "--expected-editor-name-sha256" { expectedEditorNameSHA256 = value }
+                else { confirmation = value }
+                index += 2
+            }
+        }
+        guard let inputURL,
+              inputURL.pathExtension.lowercased() == "shortcut",
+              let expectedEditorNameSHA256,
+              expectedEditorNameSHA256.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil,
+              usesStdin != (patchURL != nil),
+              patchURL?.pathExtension.lowercased() == "json" || patchURL == nil,
+              apply != dryRun,
+              apply || confirmation == nil else {
+            throw ShortcutsError.editPlanInvalid
+        }
+        return ShortcutSemanticEditArguments(
+            inputURL: inputURL,
+            patchURL: patchURL,
+            expectedEditorNameSHA256: expectedEditorNameSHA256,
+            apply: apply,
+            confirmation: confirmation
+        )
+    }
+
     private struct ShortcutCreateArguments {
         let sourceURL: URL
         let signingMode: ShortcutSigningMode
@@ -2141,6 +2391,25 @@ struct MacosDataCLI {
             --confirm "FORGET MANAGED SHORTCUT" --format json
                                              Remove registry/receipt only; never deletes
                                              the Shortcut from Shortcuts.app
+          edit inspect --input <local.cherri|local.shortcut> --format json
+                                             Classify one bounded local input without
+                                             importing, opening, storing, or echoing it
+          edit plan --input <local.shortcut> --patch <plan.json>|--stdin --format json
+                                             Validate four bounded semantic operations
+                                             against an exact input SHA-256; read-only
+          edit copy --input <local.shortcut> --patch <plan.json>|--stdin
+            --expected-editor-name-sha256 <sha256> --dry-run --format json
+                                             Preview replace_text or append-only
+                                             insert_text on a verified copy;
+                                             does not read or change Accessibility state
+          edit copy --input <local.shortcut> --patch <plan.json>|--stdin
+            --expected-editor-name-sha256 <sha256> --apply
+            --confirm "EDIT SHORTCUT COPY" --format json
+                                             Duplicate the exact visible editor, change
+                                             only allowlisted semantic actions, and verify
+                                             every step without modifying the original
+          edit ui-inspect --format json      Inspect bounded Shortcuts AX structure without
+                                             prompting, activating, clicking, or typing
 
         Shortcuts boundary:
           Uses only the system shortcuts CLI and public Shortcuts Events
@@ -2150,6 +2419,22 @@ struct MacosDataCLI {
           Authoring is experimental, requires optional Cherri 2.3.x, forbids
           packages/references/file embedding/raw actions/inline secrets, and
           never uses HubSign or another remote signing service.
+          Experimental 0.7.2 inspection follows no symlinks and reads no private
+          database. It accepts local files only; iCloud share links and other
+          URI inputs are rejected without network, redirect, clipboard, or import.
+          Opaque/signed artifacts,
+          unsupported actions, secrets, and device-bound references require
+          manual migration. Edit planning supports insert_text, replace_text,
+          delete_action, and move_action. Public apply accepts replace_text,
+          append-only insert_text when the graph already contains a Text action,
+          bounded all-delete plans that leave at least one action, and bounded
+          all-move plans; it always edits a verified duplicate. Move uses exact
+          reorder identifiers and complete visual-order read-back. Middle/no-source
+          insert, mixed-operation plans, same-index moves, and equal-neighbor
+          moves are rejected.
+          Planning never writes.
+          UI inspection returns only counts/status and never labels, titles, or
+          identifiers. It cannot perform an Accessibility action.
 
         Calendar commands:
           permission                         Request full Calendar access

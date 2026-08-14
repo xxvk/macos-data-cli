@@ -44,7 +44,7 @@ operations require an additional confirmation phrase. See the full
 
 ## Project status
 
-The current source release is 0.7.1. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.7.2. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -112,6 +112,43 @@ update/run/cleanup gate passed on macOS 27 Beta 5 with Cherri 2.3.0 and left
 zero fixture/registry residue. Public action counts were `0` for both working
 imports, so compiled and observed counts are separate and same-name replace
 fails closed when they differ.
+The development tree now also includes guarded 0.7.2 existing-object editing:
+`shortcuts edit inspect` safely classifies one local `.cherri` or `.shortcut`
+without importing, opening, storing, or echoing its content. Opaque/signed
+artifacts, unknown actions, nested magic-variable/attachment structures,
+suspected secrets, and device-bound references fail closed to manual migration.
+Input is local-file-only: iCloud share links and other URI inputs are rejected
+before reading, with no download, redirect, clipboard, or import path.
+For eligible unsigned artifacts, `shortcuts edit plan` validates a strict,
+SHA-256-guarded sequence of `insert_text`, `replace_text`, `delete_action`, and
+`move_action` operations against an in-memory shadow graph. It returns only a
+redacted plan and never writes Shortcuts.app. A replace-only plan, or an
+append-only `insert_text` plan whose graph already contains a Text action, or a
+bounded all-`delete_action` plan that leaves at least one action, may use
+`shortcuts edit copy`: dry-run performs no AX read, while apply requires the
+exact visible editor-name SHA-256 and `EDIT SHORTCUT COPY`, duplicates the
+original, changes only resolver-approved Text values, and verifies every step.
+Append insertion uses exact `duplicateAction:` and is allowed only at the graph
+end. Delete presses only the resolver-bound Close button and waits for the exact
+smaller graph. A bounded all-`move_action` plan is now copy-first apply-capable:
+each adjacent reorder uses an exact menu identifier and complete visual-order
+read-back. Middle/no-source insert, mixed-operation plans, same-index moves, and
+semantically indistinguishable adjacent actions remain rejected.
+`shortcuts edit ui-inspect` adds bounded,
+read-only AX structure discovery: it does not prompt, activate, click, type, or
+return labels/titles/identifiers, and it always reports apply as disabled.
+Its disposable macOS 27 Beta 5 gate calibrated the exact
+`editor.shortcutname` marker, found one redacted candidate, then deleted the
+fixture and confirmed zero search/candidate residue.
+An internal copy-first mutation coordinator is TDD-covered as a design
+boundary: it requires exact confirmation, preflights the whole plan, proves a
+distinct graph-identical recovery copy, and reads back every step.
+The design now also binds the redacted plan to a non-Codable private in-memory
+execution plan and a recovery-first, exact-sequence guarded bridge. Concrete
+debug-only macOS 27 gates have proved copy-first Text replacement, append-only
+Text insertion, and bounded action deletion, including hash read-back, unchanged
+remaining actions, and unchanged originals. Arbitrary-position insert and move
+remain unavailable. All gate fixtures were explicitly deleted with zero residue.
 
 See the detailed roadmaps:
 
@@ -125,6 +162,7 @@ User documentation:
 - [Installation](INSTALL.md)
 - [Agent integration guide](AGENTS.md)
 - [Shortcuts 0.7.1 authoring boundary](docs/development/shortcuts-authoring.md)
+- [Shortcuts 0.7.2 existing-editing boundary](docs/development/shortcuts-existing-editing.md)
 - [Changelog](CHANGELOG.md)
 - [Distribution Signing TODO](docs/development/distribution-signing.md)
 - [Calendar 0.3 architecture](docs/development/calendar-adapter-architecture.md)

@@ -42,6 +42,8 @@ For Shortcuts 0.7.1 authoring, also read:
 
 12. `docs/development/shortcuts-authoring.md` or the Chinese version before
     compiling, signing, importing, registering, or updating a Shortcut
+13. `docs/development/shortcuts-existing-editing.md` or the Chinese version
+    before inspecting or planning edits for an arbitrary existing Shortcut
 
 Shortcuts authoring rules:
 
@@ -61,6 +63,74 @@ Shortcuts authoring rules:
   requires explicit current-task authorization in addition to its exact outer
   confirmation. Cleanup is semantic UI deletion of the unique fixture followed
   by zero-residue read-back.
+- `shortcuts edit inspect` is read-only classification, not graph proof or edit
+  authorization. It accepts only one bounded non-symlink local `.cherri` or
+  `.shortcut`; never echo input names, source, action identifiers, parameters,
+  or embedded values. Classification alone never authorizes apply.
+- iCloud share-link acquisition is disabled in 0.7.2. Do not download links,
+  follow redirects, read the clipboard, or reinterpret a URL path as a local
+  file. The reader must require `isFileURL`; only a future separately confirmed
+  opt-in network contract may revisit this boundary.
+- `shortcuts edit plan` is also read-only. Require the exact inspected input
+  SHA-256 and strict JSON; evaluate indexes sequentially against the in-memory
+  visible-action shadow graph. Never log or return text values, action IDs, or
+  parameters. Apply capability is limited to replace-text-only plans,
+  append-only insert-text plans whose graph already contains a Text action,
+  bounded all-delete plans that leave at least one action, or bounded all-move
+  plans; all
+  must still pass the separate `edit copy` guards.
+- All-delete apply must use the exact resolver-bound `Close` button, complete
+  graph read-back, and an unchanged original. Never substitute a generic button
+  press or mix delete with another operation family.
+- After pressing a resolver-bound action Close button, wait for the exact
+  smaller semantic graph; Shortcuts may briefly expose the stale pre-delete
+  graph. A stale or unknown read-back is fail-closed and must never trigger an
+  automatic duplicate or delete retry.
+- `shortcuts edit ui-inspect` may read only bounded AX attributes. It must not
+  prompt, launch/activate Shortcuts.app, perform AX actions, use coordinates or
+  image matching, or emit labels/titles/identifiers. Generic or ambiguous UI
+  structure is not a candidate, and discovery never authorizes apply.
+- The 0.7.2 semantic mutation coordinator underpins the public guarded
+  `edit copy` replace-text, append-only insert, bounded delete, and bounded
+  all-move routes. It must require exact `EDIT SHORTCUT COPY` confirmation,
+  preflight the complete plan, prove a distinct graph-identical recovery copy,
+  and read back every operation. Any bridge error or mismatch is
+  `outcome_unknown` with no automatic retry. The concrete system session may
+  perform only the proven copy-first Text replacement, append-only Text
+  insertion, resolver-bound delete, or resolver-bound all-move plan. Append
+  requires an existing resolver-approved Text action, exact `duplicateAction:`,
+  and an index equal to the current action count. Move requires an all-move plan,
+  exact resolver-bound reorder identifiers, and complete visual-order read-back
+  after every adjacent step. Same-index moves, semantically indistinguishable
+  adjacent actions, and plans mixed with another operation family fail closed
+  before mutation.
+- `shortcuts edit copy --dry-run` must return before constructing the concrete
+  system AX bridge. Apply requires the exact visible editor-name SHA-256 plus
+  the confirmation phrase; output must remain value/title/path redacted and
+  `outcome_unknown` must never be retried automatically.
+- A semantic edit is executable only from the non-Codable in-memory execution
+  plan produced by the same strict patch parse as the public redacted plan.
+  Verify private value bytes/SHA-256 before any AX read. The guarded bridge must
+  be bound to that exact plan, require recovery first, enforce exact operation
+  sequence, and permanently reject retries after any session mutation error.
+  Do not add generic AX click/type/coordinate APIs. A concrete Shortcuts 27 AX
+  session requires fresh disposable-fixture authorization. Read-only calibration
+  established the exact `editor.shortcutname` field and Text/Comment structure:
+  direct action title plus Close button plus one nested settable text area. The
+  action-library scroll area is always a decoy. Unknown titles, malformed value
+  fields, ambiguity, and traversal overflow must fail closed. Recorded menu IDs
+  are version-specific evidence only and never authorize invocation.
+- Concrete AX selection must inspect only the exact toolbar name field and
+  action canvas, never the complete action library. After duplication, select
+  exactly one main/focused editor because the original editor remains open in
+  the background. A confirmed existing-copy recovery may complete only a
+  proven-not-yet-run replacement and must never duplicate again. Keep a
+  five-second AX messaging deadline. Middle/no-source insert remains unsupported;
+  same-index and semantically indistinguishable adjacent moves remain unsupported.
+- Opaque/signed files, unknown actions, nested parameter structures (including
+  magic variables and attachments), suspected secrets, and device-bound
+  references require manual migration. Never inspect Shortcuts SQLite,
+  CloudKit, or private frameworks to bypass that result.
 
 ## Current development executable
 

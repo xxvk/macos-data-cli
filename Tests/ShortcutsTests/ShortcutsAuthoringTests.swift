@@ -80,6 +80,8 @@ final class ShortcutsAuthoringTests: XCTestCase {
             "rawAction(\"com.example.private\", {})",
             "action 'com.example.private' custom()\ncustom()",
             "const apiToken = \"literal-value\"\noutput(apiToken)",
+            "output(\"https://example.invalid/?access_token=literal-value\")",
+            "output(\"Bearer abcdefghijklmnopqrstuvwxyz\")",
         ]
 
         for source in rejected {
