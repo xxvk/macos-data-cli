@@ -1,7 +1,7 @@
 import Core
 
 public enum NotesResourceMapper {
-    public static func map(status: NotesAutomationStatus) -> DataResource {
+    public static func map(status: NotesAutomationStatus, writable: Bool = false) -> DataResource {
         let permission: DataPermissionState = switch status {
         case .available: .available
         case .denied: .denied
@@ -17,7 +17,7 @@ public enum NotesResourceMapper {
             displayName: "Apple Notes",
             capabilities: DataResourceCapabilities(
                 readable: status.readable,
-                writable: false,
+                writable: status == .available && writable,
                 selected: true,
                 permission: permission
             )

@@ -7,9 +7,40 @@ GUI 自动化、特定平台集成，或直接接触不稳定的内部数据格�
 本地、可脚本化、可测试的访问层：优先采用 Apple 公共 Framework；仅当公共 Framework
 无法暴露所需数据时，才允许范围明确、有文档、严格只读的本地 adapter。
 
+## 快速开始
+
+从源码构建，并获取第一个只读 JSON 资源快照：
+
+```bash
+git clone https://github.com/xxvk/macos-data-cli.git
+cd macos-data-cli
+export DEVELOPER_DIR="$(xcode-select -p)"
+swift build
+.build/debug/macos-data resources --format json
+```
+
+环境要求：macOS 26 或更新版本、Apple Silicon，以及支持 Swift 6.2 的 Xcode。
+公开二进制目前尚未经过 Developer ID 签名和公证。安装 Release 二进制或配置 macOS 权限前，
+请先阅读[安装说明](INSTALL.md)。
+
+## 使用方法
+
+建议从 capability 与权限状态检查开始；以下命令不会修改用户数据。示例使用已经安装的
+`macos-data`；在源码 checkout 中请改用 `.build/debug/macos-data`：
+
+```bash
+macos-data resources --format json
+macos-data contacts permission
+macos-data mail doctor --format json
+```
+
+可能写入数据的命令均提供显式 dry-run/apply 路径，破坏性操作还需要额外确认短语。
+完整说明请参阅[命令指南](docs/usage_CN.md)、[安全规则](docs/development/rules_CN.md)和
+[稳定 JSON contract](docs/development/cli-contract_CN.md)。
+
 ## 项目状态
 
-当前源码版本为 0.6.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.6.2。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -32,7 +63,21 @@ limited library 语义，以及默认禁网和禁止覆盖的单资源安全 exp
 
 Notes 0.6 增加有界、只读的 Notes.app Automation adapter：权限状态、account 和
 嵌套 folder 发现、metadata query、显式 plaintext/HTML 读取与 attachment metadata。
-它不访问 Notes 私有 store；受保护写入单独归入 0.6.1。
+它不访问 Notes 私有 store。Notes 0.6.1 增加受保护 create/rename/move：必须绑定用户确认的
+iCloud account，支持 dry-run/apply、乐观并发、隐私安全 hash 和立即回读；仍不支持现有正文替换、
+attachment mutation、delete 或 folder CRUD（这是已发布 0.6.1 的边界）。Notes 0.6.2 已增加
+面向无 attachment 简单正文的受保护 `notes edit-body`，以及使用 opaque selector、名称 hash/current
+parent 前置条件、cycle 防护和隐私安全输出的 folder create/rename、move 与空 folder 删除 preview。一次性签名 app
+正文修改 gate 已通过 hash 回读验证并确认 fixture 零残留；folder gate 的 create/rename 已通过，
+Notes 4.13 move apply 因 identity 不安全而使用稳定错误 fail closed。
+签名 app 的一次性 iCloud
+create/rename/move/read-back gate 已通过，并确认测试 note 零残留。
+空 folder 删除 preview 会重新核对名称、parent 与空状态，但 Notes 4.13 真实 gate 导致 metadata graph
+失效，child 随后以新 opaque ID 再次出现。因此 apply 已禁用并 fail closed。
+当前源码也已加入单条 Note 的受保护 soft delete：必须提供最新 modification date 与准确
+`DELETE NOTE` 确认，只移动到 Notes Recently Deleted。永久删除仍只允许 UI 操作；签名 app
+soft-delete gate 已通过：取得 action-time 明确确认后，仅通过 Notes UI 永久删除一次性 fixture，
+保留一条无关的 Recently Deleted note，最终签名 app 查询确认 sentinel 零匹配。
 
 详细开发计划请参阅：
 
@@ -237,6 +282,12 @@ Mail 0.2 采用
 详见 [Mail 架构决策](docs/development/mail-adapter-architecture_CN.md)。vCard、批量操作和
 变更检测属于 Contacts 的后续工作。每个 adapter 都应独立定义权限要求、数据映射、
 错误格式和测试策略。
+
+## 社区参与
+
+- 提出行为或 contract 变更前，请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- 安全问题请使用 [SECURITY.md](SECURITY.md) 说明的私密报告路径。
+- 参与本项目时请遵守 [Code of Conduct](CODE_OF_CONDUCT.md)。
 
 ## 许可证
 

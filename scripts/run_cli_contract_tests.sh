@@ -62,7 +62,7 @@ assert_contains "$TMP_DIR/notes-permission.out" '"access"[[:space:]]*:[[:space:]
 assert_contains "$TMP_DIR/notes-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
 
 "$CLI" notes --help >"$TMP_DIR/notes-help.out"
-assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read-only'
+assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read commands and guarded 0\.6\.1/0\.6\.2 writes'
 
 "$CLI" --help >"$TMP_DIR/global-help.out"
 assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error'
@@ -114,12 +114,41 @@ run_expected_failure photos-export-invalid-variant 7 "$CLI" photos export --id p
 run_expected_failure photos-export-stdout-forbidden 7 "$CLI" photos export --id photo_invalid --output - --format json
 run_expected_failure notes-folders-invalid-limit 8 "$CLI" notes folders --limit 0 --format json
 run_expected_failure notes-folders-missing-value 8 "$CLI" notes folders --account-id --format json
+run_expected_failure notes-folder-create-missing-input 8 "$CLI" notes folder create --dry-run --format json
+run_expected_failure notes-folder-create-missing-parent 8 "$CLI" notes folder create --stdin --dry-run --format json <<<'{"name":"Projects"}'
+run_expected_failure notes-folder-create-unknown-field 8 "$CLI" notes folder create --stdin --dry-run --format json <<<'{"name":"Projects","parentFolderID":null,"unknown":true}'
+run_expected_failure notes-folder-rename-missing-id 8 "$CLI" notes folder rename --stdin --dry-run --format json <<<'{"name":"Projects","expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
+run_expected_failure notes-folder-rename-invalid-hash 8 "$CLI" notes folder rename --id notesfolder_invalid --stdin --dry-run --format json <<<'{"name":"Projects","expectedNameSHA256":"bad"}'
+run_expected_failure notes-folder-delete-missing-confirmation 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --apply --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+run_expected_failure notes-folder-delete-wrong-confirmation 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --apply --confirm "DELETE NOTES FOLDER" --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+run_expected_failure notes-folder-delete-unknown-field 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --dry-run --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","unknown":true}'
+run_expected_failure notes-folder-delete-apply-unsupported 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --apply --confirm "DELETE EMPTY NOTES FOLDER" --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+assert_contains "$TMP_DIR/notes-folder-delete-apply-unsupported.out" 'NOTES_FOLDER_DELETE_UNSUPPORTED'
+run_expected_failure notes-folder-move-missing-expected-parent 8 "$CLI" notes folder move --id notesfolder_invalid --stdin --dry-run --format json <<<'{"destinationParentFolderID":null,"expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
+run_expected_failure notes-folder-move-conflicting-mode 8 "$CLI" notes folder move --id notesfolder_invalid --stdin --dry-run --apply --format json <<<'{"destinationParentFolderID":null,"expectedParentFolderID":null,"expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
+run_expected_failure notes-folder-move-apply-unsupported 8 "$CLI" notes folder move --id notesfolder_invalid --stdin --apply --format json <<<'{"destinationParentFolderID":null,"expectedParentFolderID":null,"expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
+assert_contains "$TMP_DIR/notes-folder-move-apply-unsupported.out" 'NOTES_FOLDER_MOVE_UNSUPPORTED'
 run_expected_failure notes-query-invalid-limit 8 "$CLI" notes query --limit 0 --format json
 run_expected_failure notes-query-invalid-date 8 "$CLI" notes query --modified-after not-a-date --format json
 run_expected_failure notes-query-missing-value 8 "$CLI" notes query --title --format json
 run_expected_failure notes-get-missing-id 8 "$CLI" notes get --format json
 run_expected_failure notes-get-invalid-body 8 "$CLI" notes get --id note_invalid --body markdown --format json
 run_expected_failure notes-get-duplicate-attachments 8 "$CLI" notes get --id note_invalid --include-attachments --include-attachments --format json
+run_expected_failure notes-create-missing-input 8 "$CLI" notes create --dry-run --format json
+run_expected_failure notes-create-conflicting-mode 8 "$CLI" notes create --stdin --dry-run --apply --format json <<<'{"folderID":"x","title":"x","bodyFormat":"plaintext","body":""}'
+run_expected_failure notes-create-unknown-field 8 "$CLI" notes create --stdin --dry-run --format json <<<'{"folderID":"x","title":"x","bodyFormat":"plaintext","body":"","unknown":true}'
+run_expected_failure notes-rename-missing-id 8 "$CLI" notes rename --stdin --dry-run --format json <<<'{"title":"x","expectedModificationDate":"2026-08-14T00:00:00Z"}'
+run_expected_failure notes-move-missing-input 8 "$CLI" notes move --id note_invalid --dry-run --format json
+run_expected_failure notes-delete-missing-id 8 "$CLI" notes delete --stdin --dry-run --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
+run_expected_failure notes-delete-missing-confirmation 8 "$CLI" notes delete --id note_invalid --stdin --apply --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
+run_expected_failure notes-delete-wrong-confirmation 8 "$CLI" notes delete --id note_invalid --stdin --apply --confirm "DELETE NOTES" --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
+run_expected_failure notes-delete-valid-confirmation-invalid-id 8 "$CLI" notes delete --id note_invalid --stdin --apply --confirm "DELETE NOTE" --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
+run_expected_failure notes-delete-unknown-field 8 "$CLI" notes delete --id note_invalid --stdin --dry-run --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z","unknown":true}'
+run_expected_failure notes-edit-body-missing-id 8 "$CLI" notes edit-body --stdin --dry-run --format json <<<'{"bodyFormat":"plaintext","body":"x","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
+run_expected_failure notes-edit-body-unknown-field 8 "$CLI" notes edit-body --id note_invalid --stdin --dry-run --format json <<<'{"bodyFormat":"plaintext","body":"x","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"0000000000000000000000000000000000000000000000000000000000000000","unknown":true}'
+run_expected_failure notes-edit-body-invalid-hash 8 "$CLI" notes edit-body --id note_invalid --stdin --dry-run --format json <<<'{"bodyFormat":"plaintext","body":"x","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"bad"}'
+run_expected_failure notes-bind-wrong-confirmation 8 "$CLI" notes write-account bind --account-id notesaccount_invalid --apply --confirm "BIND NOTES" --format json
+run_expected_failure notes-clear-wrong-confirmation 8 "$CLI" notes write-account clear --apply --confirm "CLEAR NOTES" --format json
 
 set +e
 printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1

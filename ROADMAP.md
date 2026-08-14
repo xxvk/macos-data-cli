@@ -280,47 +280,177 @@ Architecture draft: [Reminders adapter 0.4](docs/development/reminders-adapter-a
     never reads attachment contents or invokes save/export. Synthetic mapping
     and script-boundary tests pass; the live zero-attachment path returned an
     empty complete list
-- [ ] Complete the stable-app Automation and disposable-note live gates
+- [x] Complete the stable-app Automation and disposable-note live gates
   - Query, metadata-only get, plaintext, HTML, and zero-attachment read paths
-    passed through the stable app. The disposable note is recoverably stored in
-    Recently Deleted; permanent cleanup and a final zero-match check still need
-    explicit action-time approval
+    passed through the stable app. The disposable note was permanently removed
+    through Notes UI after explicit action-time approval; the final signed-app
+    title query confirmed zero matches
 
 ### 0.6.1: Notes guarded writes
 
 Version decision: 0.6.0 remains the bounded read-only Notes release. Notes
-write support is developed and released separately as 0.6.1; the source version
-must not change until the implementation and release gates pass.
+write support is developed and released separately as 0.6.1. All mandatory
+implementation and local release gates passed before the version was changed.
 
-- [ ] Define fail-closed write contracts and stable write/read-back states
+- [x] Define fail-closed write contracts and stable write/read-back states
   - Every mutation defaults to `--dry-run`; persistence requires `--apply` and
     structured JSON. Return `readback_confirmed` or
-    `save_accepted_readback_pending`; Agents must not retry the latter
-- [ ] Implement note creation in one explicitly selected folder
+    `save_accepted_readback_pending`, or `outcome_unknown`; Agents must not retry
+    pending or unknown outcomes
+- [x] Implement note creation in one explicitly selected folder
   - Accept input file/stdin, never body text as a CLI argument. Support
     plaintext converted to escaped HTML and explicit HTML, cap UTF-8 input at
     256 KiB, reject unknown fields, locked/shared targets, and ambiguous folder
     selection, and add a private short-lived idempotency receipt
-- [ ] Implement note rename with optimistic concurrency
+- [x] Implement note rename with optimistic concurrency
   - Require one opaque note ID plus expected `modificationDate`; return a dry-run
     metadata diff without logging title/body content, save once, and read back
-- [ ] Implement note move with explicit destination and identity verification
+- [x] Implement note move with explicit destination and identity verification
   - Require one opaque destination folder, fail closed across ambiguous account
     scope, verify the moved note and whether its opaque ID changed, and never
     infer a destination from a folder title
-- [ ] Keep existing-note body replacement outside the initial 0.6.1 release gate
+- [x] Keep existing-note body replacement outside the initial 0.6.1 release gate
   - Whole-body HTML replacement can destroy unsupported rich structures and
     attachment references. It needs a separate expected-modification token,
     body hash preview, complex-content rejection, and disposable rich-note gate
-- [ ] Keep attachment mutation and note deletion outside the initial 0.6.1 gate
+- [x] Keep attachment mutation and note deletion outside the initial 0.6.1 gate
   - Attachment add/remove needs independent file-size, local-file, cleanup, and
     read-back rules. Delete remains soft-delete only and needs exact
     confirmation plus documented Recently Deleted visibility; permanent delete
     and empty-trash operations are not supported
-- [ ] Complete synthetic TDD, CLI negative contracts, and a disposable iCloud
+- [x] Complete synthetic TDD, CLI negative contracts, and a disposable iCloud
   create/rename/move/read-back/cleanup integration gate with zero active residue
-- [ ] Update `notesLibrary` writable capability, help, README, usage, CHANGELOG,
+  - 28 Notes tests and 204 total Swift tests pass. CLI negative contracts cover
+    missing input, strict unknown-field rejection, conflicting modes, missing
+    IDs, and binding confirmation phrases
+  - The stable signed app completed create, rename, move, and immediate read-back
+    in two explicit non-shared iCloud folders. A generated-script newline bug and
+    HTML-normalization false pending were found and fixed with compile-only and
+    canonical-plaintext hash tests. Four explicitly audited test notes were
+    permanently removed through Notes UI, the unrelated Recently Deleted note
+    was preserved, and a signed-app title query confirmed zero fixture matches
+- [x] Update `notesLibrary` writable capability, help, README, usage, CHANGELOG,
   and version metadata only after all mandatory 0.6.1 gates pass
+
+### 0.6.2: Notes body and folder lifecycle
+
+Version decision: development remained at 0.6.1 until all mandatory tests,
+signed-app mutation gates, and cleanup checks passed. Source version metadata
+was then updated together to 0.6.2.
+
+Current forward-compatibility baseline: Xcode 27.0 Beta 5 (`27A5237l`), Swift
+6.4, and macOS SDK 27.0 compile the Release/debug app and pass all 222 Swift
+tests. Standard tests use `scripts/run_swift_tests.sh` to keep generated XCTest
+bundles outside this iCloud/File Provider checkout.
+
+- [x] Add guarded replacement of an existing note body
+  - Introduce a dedicated `notes edit-body` command; do not overload `rename`
+  - Accept strict JSON from file/stdin with `bodyFormat`, `body`,
+    `expectedModificationDate`, and `expectedBodySHA256`
+  - Preserve the 256 KiB input limit, default dry-run, explicit apply, private
+    hashes/byte counts, serialized Apple Events, and immediate read-back states
+  - Reject shared/password-protected notes and notes containing attachments or
+    unsupported rich structures. The first release replaces only a body proven
+    safe for the supported plaintext/HTML subset; it does not promise lossless
+    editing of checklists, tables, drawings, scans, or collaboration content
+  - Implementation, strict CLI parsing, generated-script compilation, dry-run
+    no-write proof, hash/concurrency checks, attachment/rich-content rejection,
+    timeout handling, and synthetic read-back tests are complete. All 32 Notes
+    tests, 208 total Swift tests, CLI no-apply contracts, and the release build
+    pass. The disposable signed-app gate completed create, body edit,
+    hash-confirmed read-back, rename, and move across two explicit non-shared
+    iCloud folders. After action-time confirmation, only the fixture was
+    permanently removed through Notes UI; the unrelated Recently Deleted note
+    was preserved and the final signed-app sentinel query returned zero matches
+  - The first gate attempt safely stopped before mutation because the wrapper's
+    eight-second output wait was shorter than Notes plus LaunchServices startup.
+    Read-back proved the original body was unchanged. The wrapper now waits up
+    first to 20 seconds and now to 40 seconds after Xcode 27 app startup/output
+    exceeded 20 seconds; it reports the exact stage while the Apple Event
+    deadline remains five seconds
+- [x] Add explicit Notes folder create and rename operations; reassess move
+  - Operate only in the locally bound iCloud account and select parents and
+    destinations by opaque folder ID; never infer a folder from its display name
+  - Require strict file/stdin JSON, default dry-run, explicit apply, read-back,
+    and privacy-safe output. Create should support a short-lived idempotency
+    receipt and reject ambiguous duplicate outcomes
+  - Before implementation, verify the Notes 4.13 scripting behavior for nested
+    create/rename/move, identity changes, shared folders, duplicate names, and
+    moving a folder into itself or one of its descendants. Fail closed wherever
+    the public dictionary cannot provide a stable precondition or read-back
+  - Create/rename implementation, strict JSON parsing, privacy-safe output, name-hash/current-
+    parent guards, default/shared/cross-account/duplicate/cycle rejection,
+    idempotency receipts, timeout states, generated-script compilation, targeted
+    Store tests, and CLI no-apply contracts are complete
+  - The signed-app gate proved nested create, duplicate rejection, rename, hash
+    read-back, and cleanup. Notes 4.13 folder move did not preserve a confirmable
+    folder identity: the empty child disappeared from the enumerable graph and
+    metadata was temporarily invalid. Apply is now disabled with
+    `NOTES_FOLDER_MOVE_UNSUPPORTED`; a future move implementation requires a new
+    design and separate gate rather than retrying the public AppleScript command
+  - The live gate also exposed duplicate scripting IDs when account-level folder
+    enumeration was recursively collected. Discovery now starts from true root
+    folders and validates graph uniqueness, failing closed instead of crashing
+  - After explicit cleanup authorization, all three disposable folders were
+    permanently removed in Notes UI. A final signed-app query returned
+    `complete=true`, zero matches for all three opaque IDs, and zero
+    `macos-data-folder-gate-*` sentinel matches
+- [x] Assess guarded empty-folder deletion and fail closed
+  - Delete only an explicitly selected, non-shared, non-default empty folder in
+    the bound account; reject recursive deletion and folders containing notes or
+    child folders
+  - Require `--apply`, the exact confirmation phrase
+    `DELETE EMPTY NOTES FOLDER`, a fresh pre-delete emptiness check, and a final
+    absence read-back. Permanent trash clearing is outside this command
+  - Preview implementation and synthetic TDD cover strict parent/name-hash input,
+    non-recursive child/note rejection, stable `NOTES_FOLDER_NOT_EMPTY`, CLI
+    negative contracts, and privacy-safe output
+  - The signed-app apply gate invalidated the metadata graph after deleting the
+    renamed child. After restarting Notes, that child reappeared with its old
+    name and a new opaque ID. A short-lived absence therefore cannot prove a
+    durable iCloud deletion
+  - Apply now returns `NOTES_FOLDER_DELETE_UNSUPPORTED` before any write Apple
+    Event. Future enablement requires a different public mechanism and a new gate
+  - After explicit action-time confirmation, the three disposable fixtures were
+    removed leaf-first through Notes UI. A post-restart signed-app query returned
+    `complete=true`, zero matches for all four known pre/post-resurrection opaque
+    IDs, and zero `macos-data-folder-gate-*` sentinel matches
+- [x] Add guarded single-note deletion
+  - Implement recoverable soft deletion to Notes Recently Deleted only; do not
+    expose permanent deletion or empty-trash operations
+  - Require one opaque note ID, `expectedModificationDate`, `--apply`, and the
+    exact confirmation phrase `DELETE NOTE`; reject shared/locked notes and
+    verify that the note is absent from its former active folder
+  - Return an explicit pending/unknown state when Recently Deleted visibility
+    cannot be proven, with a `nextAction` that forbids automatic Agent retry
+  - Implementation and synthetic TDD are complete: strict date-only mutation
+    JSON, fresh direct read, shared/locked/stale rejection, exact `DELETE NOTE`
+    confirmation, privacy-safe output, generated-script compilation, timeout
+    unknown handling, and no-apply CLI contracts pass
+  - The authorized signed-app gate completed create, body edit, rename, and move.
+    Its wrapper stopped after 20 seconds during move output, so the command was
+    not retried; a read-only get proved the move had succeeded. Continuing from
+    that confirmed state, one dry-run and one delete apply returned
+    `readback_confirmed`, zero matches in the former folder, and one recoverable
+    match in another system-managed folder. After explicit action-time approval,
+    only the fixture was permanently removed through Notes UI; one unrelated
+    Recently Deleted note was preserved, and the final signed-app sentinel query
+    returned `complete=true` with zero matches
+- [x] Complete 0.6.2 TDD, signed-app integration, and cleanup gates
+  - Final synthetic baseline: 222 Swift tests plus CLI no-apply contracts pass,
+    covering strict JSON, concurrency/hash conflicts, rich-content rejection,
+    folder-cycle prevention, non-empty delete rejection, confirmation phrases,
+    timeout unknown outcomes, no-op behavior, and diagnostic redaction
+  - Disposable simple/rich notes and an isolated nested folder tree verified body
+    edit, folder create/rename, move and folder-delete fail-closed behavior, and note
+    soft deletion. Action-time-confirmed UI cleanup preserved unrelated Recently
+    Deleted data and final signed-app sentinel queries returned zero matches
+  - The final local release gate passed version consistency, Release/signed-debug
+    builds, CLI and Calendar contracts, Mail read-only smokes, and `git diff --check`.
+    This host currently has two matching iCloud Calendar sources, so Calendar live
+    smoke verified the stable ambiguity error and skipped rather than guessing
+  - Help, README, usage, architecture notes, CHANGELOG, capability output, and all
+    version entry points were updated together to 0.6.2 only after these gates passed
 
 ## Cross-cutting requirements for every release
 

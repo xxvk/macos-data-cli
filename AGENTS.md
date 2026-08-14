@@ -278,13 +278,47 @@ not assume a Homebrew or Release binary while development is in progress.
 - Real write verification may use only a disposable test note with explicit
   authorization and proven zero-residue cleanup. Existing notes are never
   mutation fixtures.
+- Notes writes require a valid local user-confirmed iCloud write-account binding,
+  an explicit non-shared opaque folder, dry-run/apply, and immediate read-back.
+- Supply create/rename/move JSON through stdin or a file. Never put note titles or
+  bodies in CLI arguments, diagnostics, idempotency receipts, or integration logs.
+- Never automatically retry `save_accepted_readback_pending` or `outcome_unknown`.
+- Released 0.6.1 does not support existing-body replacement. The 0.6.2
+  `notes edit-body` path is limited to simple, attachment-free content and
+  additionally requires the exact current plaintext SHA-256. Its disposable
+  signed-app apply/read-back/cleanup gate is recorded as passed.
+- The 0.6.2 folder create/rename and move-preview commands require strict
+  stdin/file JSON and opaque selectors. JSON null explicitly selects the bound
+  account root. Rename/move require the exact current folder-name SHA-256, and
+  move also requires the exact current parent ID or null. Never infer a folder
+  from its name.
+- Reject default/shared folders, duplicate sibling names, cycles, incomplete
+  folder graphs, and cross-account moves. A safe no-op must not send a write
+  Apple Event. Folder names must never enter result JSON, diagnostics, receipts,
+  or integration logs.
+- Never apply folder move through Notes 4.13 scripting. Runtime evidence showed
+  identity loss and a temporarily invalid metadata graph; apply must return
+  `NOTES_FOLDER_MOVE_UNSUPPORTED` without sending a write Apple Event.
+- Empty-folder deletion preview in the 0.6.2 path must require the exact
+  current name SHA-256 and explicit parent ID or null. Reject default/shared,
+  non-empty, recursive, stale, incomplete-graph, and cross-account targets.
+  Runtime testing showed metadata invalidation and iCloud resurrection under a
+  new opaque ID. Apply must return `NOTES_FOLDER_DELETE_UNSUPPORTED` before any
+  write Apple Event and must not be retried automatically.
+- The 0.6.2 single-note delete path is recoverable soft deletion only.
+  It requires the latest modification date, exact `DELETE NOTE` confirmation,
+  a fresh direct read, and bound-account/non-shared/non-locked scope. Never
+  automatically retry pending or unknown outcomes. Permanent deletion and
+  emptying Recently Deleted remain UI-only and require action-time confirmation.
+- Attachment mutation, shared/locked writes, and cross-account moves remain
+  unsupported.
 
 ## Local verification
 
 These checks are local-only and do not require CI:
 
 ```bash
-swift test
+bash scripts/run_swift_tests.sh
 swift build
 bash scripts/run_cli_contract_tests.sh
 bash scripts/run_mail_doctor_smoke.sh --require-fast-path
@@ -301,6 +335,9 @@ bash scripts/run_calendar_dry_run_smoke.sh
 bash scripts/run_photos_read_smoke.sh
 bash scripts/run_photos_metadata_smoke.sh
 bash scripts/run_photos_export_smoke.sh
+bash scripts/run_notes_write_integration.sh
+bash scripts/run_notes_folder_integration.sh
+# Add --apply only for an explicitly authorized disposable signed-app gate.
 bash scripts/run_local_calendar_integration.sh
 bash scripts/run_installed_release_smoke.sh
 bash scripts/check_public_release_prerequisites.sh
@@ -308,6 +345,11 @@ bash scripts/check_public_release_prerequisites.sh
 
 The ordinary `run_release_gate.sh` must call `run_cli_contract_tests.sh --no-apply`.
 Do not put any real Contacts or Calendar apply fixture in the default release gate.
+
+Use `scripts/run_swift_tests.sh` for the standard local Swift suite. It keeps
+XCTest products in a local scratch directory because Xcode 27 can attach iCloud
+File Provider/Finder metadata to test bundles built inside this synced checkout,
+which causes ad-hoc codesign to reject otherwise valid generated products.
 
 Use `scripts/run_mail_release_gate.sh --with-automation` only for an attended
 check: it performs a visible reveal and intentionally fails without retry when

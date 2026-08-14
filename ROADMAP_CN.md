@@ -248,38 +248,130 @@
 - [x] 加入 attachment metadata；binary export 延后到独立安全 gate
   - 显式 opt-in 最多返回 100 条 opaque attachment metadata，绝不读取 contents 或调用
     save/export；synthetic mapping 与脚本边界测试通过，真实零附件路径返回空且 complete 的列表
-- [ ] 完成稳定 App Automation 与一次性 note live gate
+- [x] 完成稳定 App Automation 与一次性 note live gate
   - query、metadata-only get、plaintext、HTML 和零附件读取均已通过稳定 App；一次性 note 当前
-    可恢复地位于 Recently Deleted，永久清理和最终零匹配仍需要 action-time 明确批准
+    已在 action-time 明确批准后通过 Notes UI 永久删除，签名 app 最终标题查询确认零匹配
 
 ### 0.6.1：Notes 受保护写入
 
 版本决策：0.6.0 保持为有界只读 Notes release；Notes 写入作为独立的 0.6.1 开发和发布。
-在实现与 release gate 全部通过前，不修改源码版本号。
+全部必做实现与本机 release gate 通过后，才修改源码版本号。
 
-- [ ] 定义 fail-closed 写 contract 和稳定 write/read-back 状态
+- [x] 定义 fail-closed 写 contract 和稳定 write/read-back 状态
   - 所有 mutation 默认 `--dry-run`，只有 `--apply` 才持久化；返回
-    `readback_confirmed` 或 `save_accepted_readback_pending`，Agent 不得自动重试后者
-- [ ] 在一个显式 folder 中创建 note
+    `readback_confirmed`、`save_accepted_readback_pending` 或 `outcome_unknown`；后两者 Agent
+    均不得自动重试
+- [x] 在一个显式 folder 中创建 note
   - 正文只接受 input file/stdin，不允许作为 CLI 参数进入 shell history；支持 plaintext 安全
     转义为 HTML 和显式 HTML，UTF-8 输入上限 256 KiB；拒绝未知字段、locked/shared target 和
     folder 歧义，并使用私有短期 idempotency receipt
-- [ ] 使用乐观并发控制实现 note rename
+- [x] 使用乐观并发控制实现 note rename
   - 必须提供一个 opaque note ID 和预期 `modificationDate`；dry-run 只返回不泄露 title/body 的
     metadata diff；apply 只 save 一次并立即回读
-- [ ] 使用显式目标 folder 实现 note move，并验证 identity
+- [x] 使用显式目标 folder 实现 note move，并验证 identity
   - 必须提供一个 opaque destination folder；account scope 有歧义时 fail closed；验证移动后的
     note 以及 opaque ID 是否变化；绝不通过 folder title 猜测目标
-- [ ] 现有 note 的 body replacement 不进入首个 0.6.1 release gate
+- [x] 现有 note 的 body replacement 不进入首个 0.6.1 release gate
   - 整体替换 HTML 可能破坏未支持的富内容和 attachment reference；以后必须单独实现 expected
     modification token、body hash preview、复杂内容拒绝和一次性 rich-note gate
-- [ ] attachment mutation 和 note delete 不进入首个 0.6.1 release gate
+- [x] attachment mutation 和 note delete 不进入首个 0.6.1 release gate
   - attachment add/remove 需要独立的文件大小、本地文件、清理和回读规则；delete 只允许软删除，
     需要准确确认短语并记录 Recently Deleted 可见性；不支持永久删除或清空废纸篓
-- [ ] 完成 synthetic TDD、CLI 负向 contract，以及一次性 iCloud
+- [x] 完成 synthetic TDD、CLI 负向 contract，以及一次性 iCloud
   create/rename/move/read-back/cleanup 集成 gate，并确认 active residue 为 0
-- [ ] 只有全部 0.6.1 必做 gate 通过后，才更新 `notesLibrary` writable capability、help、README、
+  - 28 项 Notes test 与 204 项 Swift 总测试通过；CLI 负向 contract 覆盖缺失输入、未知字段、
+    mode 冲突、缺失 ID 和绑定确认短语
+  - 稳定签名 app 已在两个显式非 shared iCloud folder 中完成 create、rename、move 和立即回读。
+    真实 gate 发现并修复生成脚本缺少换行以及 HTML 规范化导致的假 pending，并加入只编译测试与
+    canonical plaintext hash 测试。经逐条核对，4 条测试 note 已通过 Notes UI 永久删除，原本的
+    非测试 Recently Deleted note 被保留；签名 app 标题查询确认 fixture 为零匹配
+- [x] 只有全部 0.6.1 必做 gate 通过后，才更新 `notesLibrary` writable capability、help、README、
   usage、CHANGELOG 和版本 metadata
+
+### 0.6.2：Notes 正文与 folder 生命周期
+
+版本决策：开发期间源码保持 0.6.1；全部必做测试、签名 app 真实 mutation gate 和清理验证通过后，
+所有版本入口已统一更新为 0.6.2。
+
+当前前向兼容基线：Xcode 27.0 Beta 5（`27A5237l`）、Swift 6.4、macOS SDK 27.0 已完成
+Release/debug app 编译并通过全部 222 个 Swift tests。标准测试使用
+`scripts/run_swift_tests.sh`，避免在本 iCloud/File Provider checkout 内生成 XCTest bundle。
+
+- [x] 受保护地替换已有 Note 正文
+  - 新增独立 `notes edit-body` 命令，不把正文修改混入 `rename`
+  - 只接受 file/stdin strict JSON，字段包括 `bodyFormat`、`body`、
+    `expectedModificationDate` 和 `expectedBodySHA256`
+  - 保持 256 KiB 输入上限、默认 dry-run、显式 apply、只输出 hash/byte 数、串行 Apple Events
+    和立即回读状态
+  - 拒绝 shared、password-protected、含 attachment 或未支持富内容结构的 note；首版只替换能够
+    证明属于受支持 plaintext/HTML 子集的正文，不承诺无损修改 checklist、table、drawing、scan
+    或 collaboration 内容
+  - 实现、strict CLI 解析、生成脚本编译、dry-run 零写入证明、hash/并发检查、attachment/富内容
+    拒绝、timeout 和 synthetic 回读测试已完成；32 项 Notes test、208 项 Swift 总测试、CLI
+    no-apply contract 和 release build 均通过。一次性签名 app gate 已在两个显式非 shared iCloud
+    folder 间完成 create、正文修改、hash 回读确认、rename 和 move。取得 action-time 确认后，
+    只永久删除该 fixture，保留无关 Recently Deleted note；最终签名 app sentinel 查询为零匹配
+  - 首次 gate 在 mutation 前安全停止，因为 wrapper 的 8 秒输出等待短于 Notes 与 LaunchServices
+    启动耗时；回读证明原正文未变化。wrapper 曾改为 20 秒；Xcode 27 app 的启动/输出又超过该上限，
+    因此现改为最多等待 40 秒并报告准确 stage，Apple Event deadline 仍保持 5 秒
+- [x] 创建、重命名 Notes folder，并重新评估 move
+  - 只允许在本机已绑定的 iCloud account 内操作；parent 和 destination 必须使用 opaque folder
+    ID，绝不通过显示名称推断 folder
+  - 只接受 file/stdin strict JSON，默认 dry-run、显式 apply、立即回读并保持隐私安全输出；create
+    使用短期 idempotency receipt，并拒绝无法判断的重复创建结果
+  - 实现前先验证 Notes 4.13 scripting dictionary 对嵌套 create/rename/move、identity 变化、shared
+    folder、同名 folder，以及移动到自身或子孙节点的实际行为；无法提供稳定前置条件或回读时
+    fail closed
+  - create/rename 实现、strict JSON、隐私安全输出、名称 hash/current parent 前置条件、default/shared/跨账户/重名/
+    cycle 拒绝、idempotency receipt、timeout 状态、生成脚本编译、定向 Store test 和 CLI no-apply
+    contract 已完成
+  - 签名 app gate 已证明 nested create、重名拒绝、rename、hash 回读和清理。Notes 4.13 folder move
+    无法保持可确认 identity：空 child 从可枚举图中消失，metadata 暂时失效。apply 现使用
+    `NOTES_FOLDER_MOVE_UNSUPPORTED` 禁用；未来 move 必须采用新设计和独立 gate，不得重试当前公开
+    AppleScript 命令
+  - live gate 还发现 account-level folder 枚举与递归组合时会产生重复 scripting ID。discovery 现只从
+    真正 root folder 开始，并验证 graph 唯一性；异常时 fail closed，不再触发 Swift fatal crash
+  - 取得明确清理授权后，三个一次性 folder 已通过 Notes UI 永久删除。最终签名 app 查询返回
+    `complete=true`，三个 opaque ID 均为零匹配，`macos-data-folder-gate-*` sentinel 也为零匹配
+- [x] 评估受保护空 folder 删除并 fail closed
+  - 只删除绑定账户中显式选择的非 shared、非 default 空 folder；含 note、含子 folder 或要求
+    recursive delete 时一律拒绝
+  - 必须使用 `--apply`、准确确认短语 `DELETE EMPTY NOTES FOLDER`、删除前重新检查为空，并在
+    删除后回读确认不存在；不提供永久清空废纸篓
+  - preview 实现与 synthetic TDD 已覆盖 strict parent/name-hash 输入、非递归 note/child 拒绝、
+    稳定错误 `NOTES_FOLDER_NOT_EMPTY`、CLI negative contract 和隐私安全输出
+  - 签名 app apply gate 删除 renamed child 后导致 metadata graph 失效；重启 Notes 后，child 以旧名称
+    和新的 opaque ID 再次出现。短时间消失无法证明 iCloud 持久删除
+  - apply 现于任何写 Apple Event 前返回 `NOTES_FOLDER_DELETE_UNSUPPORTED`。未来启用必须采用不同
+    的公开机制并重新执行独立 gate
+  - 取得 action-time 明确确认后，三个一次性 fixture 已通过 Notes UI 按叶节点优先删除。重启后
+    签名 app 查询返回 `complete=true`，删除前后四个已知 opaque ID 均为零匹配，
+    `macos-data-folder-gate-*` sentinel 也为零匹配
+- [x] 受保护地删除单条 Note
+  - 只实现可恢复的 soft delete，目标是 Notes Recently Deleted；不提供永久删除或清空废纸篓
+  - 必须提供 opaque note ID、`expectedModificationDate`、`--apply` 和准确确认短语
+    `DELETE NOTE`；拒绝 shared/locked note，并确认 note 已从原 active folder 消失
+  - 无法证明 Recently Deleted 状态时返回明确 pending/unknown 与 `nextAction`，禁止 Agent 自动重试
+  - 实现与 synthetic TDD 已完成：strict modification-date JSON、mutation 前直接回读、shared/locked/
+    stale 拒绝、准确 `DELETE NOTE` 确认、隐私安全输出、生成脚本编译、timeout unknown 和 no-apply
+    CLI contract 均通过
+  - 经授权的签名 app gate 已完成 create、正文修改、rename 和 move。wrapper 在等待 move 输出 20 秒后
+    停止，因此没有重试；只读 get 证明 move 已实际成功。流程从该确认状态继续，只执行一次 dry-run
+    与一次 delete apply，返回 `readback_confirmed`、原 folder 零匹配和另一 system-managed folder
+    一条可恢复匹配。取得 action-time 明确确认后，仅通过 Notes UI 永久删除该 fixture，保留一条
+    无关的 Recently Deleted note；最终签名 app sentinel 查询返回 `complete=true` 且零匹配
+- [x] 完成 0.6.2 TDD、签名 app 集成和清理 gate
+  - 最终 synthetic 基线为 222 个 Swift tests 与 CLI no-apply contracts 全部通过，覆盖 strict JSON、
+    并发/hash 冲突、富内容拒绝、folder cycle 防护、非空 folder 删除拒绝、确认
+    短语、timeout unknown、safe no-op 和诊断脱敏
+  - 一次性 simple/rich note 与隔离嵌套 folder tree 已验证正文修改、folder create/rename、move 和
+    folder-delete fail closed、note soft delete；经 action-time 确认的 UI 清理保留无关 Recently
+    Deleted 数据，最终签名 app sentinel 查询均为零匹配
+  - 最终本机 release gate 已通过版本一致性、Release/签名 debug 构建、CLI/Calendar contracts、Mail
+    只读 smoke 与 `git diff --check`。本机当前有两个符合条件的 iCloud Calendar source，因此 Calendar
+    live smoke 验证稳定歧义错误后跳过，未擅自选择账户
+  - 全部 gate 通过后，help、README、usage、架构文档、CHANGELOG、capability 与所有版本入口才统一
+    更新为 0.6.2
 
 ## 每个版本的横向完成条件
 

@@ -102,6 +102,128 @@ or exports binary data. `attachmentsComplete: false` means the per-note cap was
 reached. Binary export remains deferred behind its own destination, byte-limit,
 no-overwrite, and cleanup gate.
 
+### Guarded Notes writes
+
+Writes are disabled until the user binds one opaque account ID as the local
+iCloud write account. This is a user attestation because the Notes scripting
+dictionary exposes no stable account-type field:
+
+```text
+macos-data notes write-account status --format json
+macos-data notes write-account bind --account-id <notesaccount-id> --dry-run --format json
+macos-data notes write-account bind --account-id <notesaccount-id> --apply \
+  --confirm "BIND ICLOUD NOTES" --format json
+```
+
+The private binding contains no account name or raw scripting ID. Every write
+revalidates it and requires an explicit non-shared folder in that account.
+
+Create JSON is supplied only through a file or stdin:
+
+```json
+{"folderID":"notesfolder_...","title":"Title","bodyFormat":"plaintext","body":"Body"}
+```
+
+```text
+macos-data notes create --stdin --dry-run --format json
+macos-data notes create --stdin --apply --idempotent --format json
+```
+
+Rename and move require the exact ISO-8601 `modificationDate` returned by the
+latest query/get:
+
+```text
+macos-data notes rename --id <note-id> --stdin --dry-run --format json
+# stdin: {"title":"New title","expectedModificationDate":"2026-08-14T00:00:00Z"}
+
+macos-data notes move --id <note-id> --stdin --apply --format json
+# stdin: {"destinationFolderID":"notesfolder_...","expectedModificationDate":"2026-08-14T00:00:00Z"}
+```
+
+The in-development recoverable delete requires the latest whole-second
+modification date and an exact confirmation phrase:
+
+```text
+macos-data notes delete --id <note-id> --stdin --dry-run --format json
+macos-data notes delete --id <note-id> --stdin --apply --confirm "DELETE NOTE" --format json
+# stdin: {"expectedModificationDate":"2026-08-14T00:00:00Z"}
+```
+
+It only requests Notes soft deletion into Recently Deleted. Permanent deletion
+and emptying Recently Deleted are unsupported. A pending or unknown result must
+not be retried automatically.
+
+The 0.6.2 body replacement command additionally requires the
+SHA-256 of the complete current plaintext returned by `notes get --body
+plaintext`. This second precondition detects body drift independently of the
+whole-second modification date:
+
+```text
+macos-data notes edit-body --id <note-id> --stdin --dry-run --format json
+# stdin: {"bodyFormat":"plaintext","body":"Replacement body","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"<64-lowercase-hex>"}
+```
+
+`edit-body` preserves the existing title by constructing it as the first line,
+then replaces the remaining body. It refuses shared/locked notes, any detected
+attachment, incomplete attachment inspection, or HTML outside the bounded
+simple-text whitelist. It does not promise lossless checklist, table, drawing,
+scan, link, or collaboration editing. Dry-run returns old/new hashes and byte
+counts without echoing either body; pending and unknown apply results must not
+be retried automatically.
+
+The 0.6.2 folder lifecycle commands use strict JSON and opaque
+folder IDs. JSON `null` explicitly means the bound account root; omitting a
+parent field is an error:
+
+```text
+macos-data notes folder create --stdin --dry-run --format json
+# stdin: {"name":"Projects","parentFolderID":null}
+
+macos-data notes folder rename --id <folder-id> --stdin --dry-run --format json
+# stdin: {"name":"Archive","expectedNameSHA256":"<64-lowercase-hex>"}
+
+macos-data notes folder move --id <folder-id> --stdin --dry-run --format json
+# stdin: {"destinationParentFolderID":null,"expectedParentFolderID":"notesfolder_...","expectedNameSHA256":"<64-lowercase-hex>"}
+
+macos-data notes folder delete --id <folder-id> --stdin --dry-run --format json
+# stdin: {"expectedParentFolderID":null,"expectedNameSHA256":"<64-lowercase-hex>"}
+
+macos-data notes folder delete --id <folder-id> --stdin --apply \
+  --confirm "DELETE EMPTY NOTES FOLDER" --format json
+# apply returns NOTES_FOLDER_DELETE_UNSUPPORTED on Notes 4.13
+```
+
+Use `--idempotent` for apply-mode folder creation. Folder rename and move preview use
+the current name hash because the public Notes folder dictionary exposes no
+modification date; move additionally requires the exact current parent, with
+`null` meaning the account root. Operations fail closed for stale hashes or
+parents, duplicate sibling names, default/shared folders, cross-account moves,
+cycles, or an incomplete bounded folder graph. Safe no-ops do not send a write
+Apple Event. Preview, result, diagnostics, and receipts never contain folder
+names; they use opaque IDs and SHA-256 values. Pending or unknown outcomes must
+not be retried automatically. Notes 4.13 runtime testing showed that its public
+folder `move` command cannot preserve and confirm folder identity safely: an
+empty nested fixture disappeared from the enumerable graph and metadata became
+temporarily invalid. Folder move apply therefore fails closed with
+`NOTES_FOLDER_MOVE_UNSUPPORTED`; no write Apple Event is sent.
+
+Folder delete preview never recurses. It accepts only a bound-account,
+non-default, non-shared folder whose current name hash and parent still match,
+and performs a fresh direct count; any note or child folder returns
+`NOTES_FOLDER_NOT_EMPTY`. The real Notes 4.13 apply gate invalidated the metadata
+graph and the child later reappeared under a new opaque ID after Notes restarted.
+Apply therefore returns `NOTES_FOLDER_DELETE_UNSUPPORTED` before any write Apple
+Event. Do not retry it automatically.
+
+No mode means dry-run. Preview/result JSON contains hashes and byte counts, not
+title or body content. `save_accepted_readback_pending` and `outcome_unknown`
+must never be retried automatically. The `edit-body` command is a released
+0.6.2 source capability whose disposable signed-app gate has passed. Folder
+create/rename and guarded empty-folder-delete preview are implemented;
+the create/rename signed-app gate passed, while move and folder-delete apply are
+disabled from runtime evidence. Attachment mutation, note deletion,
+shared/locked writes, and cross-account moves are unsupported.
+
 ## Photos (0.5 development slice)
 
 Inspect authorization without triggering a prompt:

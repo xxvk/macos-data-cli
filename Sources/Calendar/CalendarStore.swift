@@ -63,16 +63,16 @@ public final class CalendarStore: @unchecked Sendable {
 
     public func previewCreate(_ input: CalendarEventInput) throws -> CalendarEventPayload {
         try requireFullAccess()
-        let source = try selectedSource()
         let event = try mapper.makeEvent(from: input, eventStore: eventStore)
+        let source = try selectedSource()
         event.calendar = try calendarForWrite(in: source, selector: input.calendarID)
         return mapForOutput(event)
     }
 
     public func create(_ input: CalendarEventInput) throws -> CalendarEventPayload {
         try requireFullAccess()
-        let source = try selectedSource()
         let event = try mapper.makeEvent(from: input, eventStore: eventStore)
+        let source = try selectedSource()
         event.calendar = try calendarForWrite(in: source, selector: input.calendarID)
         do { try eventStore.save(event, span: .thisEvent, commit: true) }
         catch { throw CalendarError.writeFailed(error.localizedDescription) }

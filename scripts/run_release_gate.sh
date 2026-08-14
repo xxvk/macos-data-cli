@@ -15,7 +15,7 @@ done
 
 cd "$ROOT_DIR"
 BUILD_CACHE_DIR="$ROOT_DIR/.build/local-cache"
-DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 export DEVELOPER_DIR
 export SWIFTPM_CONFIG_DIR="$BUILD_CACHE_DIR/swiftpm-config"
 export XDG_CACHE_HOME="$BUILD_CACHE_DIR/swiftpm-cache"
@@ -24,17 +24,17 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
-[[ "$EXPECTED_VERSION" == "0.6.0" ]] || {
-  echo "0.6 release gate requires VERSION=0.6.0; observed=$EXPECTED_VERSION" >&2
+[[ "$EXPECTED_VERSION" == "0.6.2" ]] || {
+  echo "0.6.2 release gate requires VERSION=0.6.2; observed=$EXPECTED_VERSION" >&2
   exit 1
 }
 
 plutil -lint Sources/macos-data/Info.plist scripts/macos-data-app-Info.plist scripts/macos-data.entitlements >/dev/null
-rg -q '^## 0\.6\.0 — ' CHANGELOG.md
-rg -q 'current source release is 0\.6\.0' README.md
-rg -q '当前源码版本为 0\.6\.0' README_CN.md
+rg -q '^## 0\.6\.2 — ' CHANGELOG.md
+rg -q 'current source release is 0\.6\.2' README.md
+rg -q '当前源码版本为 0\.6\.2' README_CN.md
 
-swift test --quiet
+bash scripts/run_swift_tests.sh --quiet
 swift build -c release
 
 RELEASE_CLI="$ROOT_DIR/.build/release/macos-data"
@@ -79,8 +79,22 @@ PHOTOS_ENTITLEMENT="$(
 
 MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_cli_contract_tests.sh --no-apply
 MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_calendar_contract_tests.sh
-MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_calendar_read_smoke.sh
-MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_calendar_dry_run_smoke.sh
+CALENDAR_PREFLIGHT="$DEBUG_APP_TEMP_ROOT/calendar-sources.json"
+set +e
+"$DEBUG_CLI" calendar sources --format json >"$CALENDAR_PREFLIGHT" 2>&1
+CALENDAR_PREFLIGHT_EXIT=$?
+set -e
+if [[ "$CALENDAR_PREFLIGHT_EXIT" -eq 0 ]]; then
+  MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_calendar_read_smoke.sh
+  MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_calendar_dry_run_smoke.sh
+elif [[ "$CALENDAR_PREFLIGHT_EXIT" -eq 5 ]] \
+  && jq -e '.ok == false and .error.code == "CALENDAR_SOURCE_AMBIGUOUS"' "$CALENDAR_PREFLIGHT" >/dev/null; then
+  echo "Calendar live smoke skipped: the host has multiple matching iCloud sources and the CLI failed closed as required."
+else
+  echo "Calendar live smoke preflight failed with an unexpected result." >&2
+  jq -c '{ok,errorCode:.error.code}' "$CALENDAR_PREFLIGHT" >&2 2>/dev/null || true
+  exit 1
+fi
 
 MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_mail_doctor_smoke.sh --require-fast-path
 MACOS_DATA_CLI="$DEBUG_CLI" bash scripts/run_mail_metadata_smoke.sh

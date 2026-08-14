@@ -85,6 +85,108 @@ attachment ID，以及名称、创建/修改时间、content identifier、URL �
 attachment `contents`，也不执行 save 或 binary export。`attachmentsComplete: false` 表示达到
 单 note 上限。binary export 继续延后，必须另行定义目标文件、byte 上限、禁止覆盖和清理 gate。
 
+### Notes 受保护写入
+
+写入默认关闭。用户必须先把一个 opaque account ID 绑定为本机 iCloud 写账户；这是用户确认，
+因为 Notes scripting dictionary 没有稳定的 account type 字段：
+
+```text
+macos-data notes write-account status --format json
+macos-data notes write-account bind --account-id <notesaccount-id> --dry-run --format json
+macos-data notes write-account bind --account-id <notesaccount-id> --apply \
+  --confirm "BIND ICLOUD NOTES" --format json
+```
+
+私有配置不保存 account name 或原始 scripting ID。每次写入都会重新验证绑定，且目标必须是该
+account 下显式指定的非 shared folder。
+
+create JSON 只能通过文件或 stdin 提供：
+
+```json
+{"folderID":"notesfolder_...","title":"标题","bodyFormat":"plaintext","body":"正文"}
+```
+
+```text
+macos-data notes create --stdin --dry-run --format json
+macos-data notes create --stdin --apply --idempotent --format json
+```
+
+rename/move 必须使用最近一次 query/get 返回的准确 ISO-8601 `modificationDate`：
+
+```text
+macos-data notes rename --id <note-id> --stdin --dry-run --format json
+# stdin: {"title":"新标题","expectedModificationDate":"2026-08-14T00:00:00Z"}
+
+macos-data notes move --id <note-id> --stdin --apply --format json
+# stdin: {"destinationFolderID":"notesfolder_...","expectedModificationDate":"2026-08-14T00:00:00Z"}
+```
+
+开发中的可恢复删除必须提供最新的整秒 modification date 与准确确认短语：
+
+```text
+macos-data notes delete --id <note-id> --stdin --dry-run --format json
+macos-data notes delete --id <note-id> --stdin --apply --confirm "DELETE NOTE" --format json
+# stdin: {"expectedModificationDate":"2026-08-14T00:00:00Z"}
+```
+
+该命令只请求 Notes 将 Note 移入 Recently Deleted；不支持永久删除或清空 Recently Deleted。
+pending 或 unknown 结果禁止 Agent 自动重试。
+
+0.6.2 正文替换还必须提供当前完整 plaintext 的 SHA-256；plaintext 由
+`notes get --body plaintext` 返回。这个第二前置条件独立于整秒精度 modification date，用来发现
+正文已经变化：
+
+```text
+macos-data notes edit-body --id <note-id> --stdin --dry-run --format json
+# stdin: {"bodyFormat":"plaintext","body":"替换后的正文","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"<64位小写十六进制>"}
+```
+
+`edit-body` 把现有标题保留为第一行，只替换后续正文。shared/locked note、检测到任何 attachment、
+attachment 检查不完整，或 HTML 超出有界简单文本白名单时均拒绝。它不承诺无损修改 checklist、
+table、drawing、scan、link 或 collaboration 内容。dry-run 只返回新旧 hash 和 byte 数，不回显正文；
+apply 返回 pending/unknown 时禁止自动重试。
+
+0.6.2 folder 生命周期命令只接受 strict JSON 与 opaque folder ID。JSON `null`
+明确表示已绑定 account 的根目录；省略 parent 字段属于错误：
+
+```text
+macos-data notes folder create --stdin --dry-run --format json
+# stdin: {"name":"Projects","parentFolderID":null}
+
+macos-data notes folder rename --id <folder-id> --stdin --dry-run --format json
+# stdin: {"name":"Archive","expectedNameSHA256":"<64位小写十六进制>"}
+
+macos-data notes folder move --id <folder-id> --stdin --dry-run --format json
+# stdin: {"destinationParentFolderID":null,"expectedParentFolderID":"notesfolder_...","expectedNameSHA256":"<64位小写十六进制>"}
+
+macos-data notes folder delete --id <folder-id> --stdin --dry-run --format json
+# stdin: {"expectedParentFolderID":null,"expectedNameSHA256":"<64位小写十六进制>"}
+
+macos-data notes folder delete --id <folder-id> --stdin --apply \
+  --confirm "DELETE EMPTY NOTES FOLDER" --format json
+# Notes 4.13 上 apply 返回 NOTES_FOLDER_DELETE_UNSUPPORTED
+```
+
+folder create 的 apply 可使用 `--idempotent`。Notes 公开 folder dictionary 没有
+modification date，因此 rename 与 move preview 使用当前名称 hash 作为并发前置条件；move 还必须提供准确的
+当前 parent，`null` 表示 account 根目录。hash 或 parent 过期、同级重名、default/shared folder、
+跨账户 move、循环或有界 folder 图不完整时均 fail closed。安全 no-op 不发送写 Apple Event。
+preview、result、诊断和 receipt 均不记录 folder 名称，只使用 opaque ID 与 SHA-256；pending/unknown
+结果不得自动重试。Notes 4.13 真实测试表明公开 folder `move` 命令无法安全保持并确认 folder
+identity：空的嵌套 fixture 从可枚举图中消失，metadata 也暂时失效。因此 folder move apply 使用
+`NOTES_FOLDER_MOVE_UNSUPPORTED` fail closed，不发送写 Apple Event。
+
+folder delete preview 绝不递归，只接受绑定账户内非 default、非 shared，且当前名称 hash 与 parent
+仍匹配的 folder，并重新读取直接 note/child folder 数量；任一非零时返回
+`NOTES_FOLDER_NOT_EMPTY`。Notes 4.13 真实 apply gate 导致 metadata graph 失效，重启 Notes 后 child
+又以新的 opaque ID 出现。因此 apply 在任何写 Apple Event 前返回
+`NOTES_FOLDER_DELETE_UNSUPPORTED`，禁止自动重试。
+
+未指定 mode 时默认 dry-run。preview/result 只返回 hash 和 byte 数，不回显 title/body。
+`save_accepted_readback_pending` 与 `outcome_unknown` 均不得自动重试。0.6.2 源码已实现 folder
+create/rename 和受保护空 folder 删除 preview；create/rename 签名 app gate 已通过，move 与 folder-delete
+apply 根据真实 runtime 证据被禁用。attachment mutation、note delete、shared/locked 写入和跨账户 move 均不支持。
+
 ## Photos（0.5 开发切片）
 
 不触发弹窗地读取当前权限：

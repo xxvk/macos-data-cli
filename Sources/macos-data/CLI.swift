@@ -75,7 +75,8 @@ struct MacosDataCLI {
                     remindersPermission: remindersPermission,
                     remindersStore: remindersStore,
                     photosPermission: photosPermission,
-                    notesPermission: notesPermission
+                    notesPermission: notesPermission,
+                    notesStore: notesStore
                 ))
             case ["notes", "permission"]:
                 emitJSONSuccess(notesPermission.check(requestConsent: false))
@@ -85,6 +86,26 @@ struct MacosDataCLI {
                 if !result.readable { Foundation.exit(CLIExitCode.notesFailure.rawValue) }
             case ["notes", "accounts"]:
                 emitJSONSuccess(try notesStore.accounts())
+            case let args where args.count >= 3 && args[0] == "notes" && args[1] == "folder" && args[2] == "create":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(3)), command: "create", requiresID: false)
+                let input: NotesFolderCreateInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.createFolder(input, idempotent: request.idempotent)) }
+                else { emitNotesJSONSuccess(try notesStore.previewCreateFolder(input)) }
+            case let args where args.count >= 3 && args[0] == "notes" && args[1] == "folder" && args[2] == "rename":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(3)), command: "rename", requiresID: true)
+                let input: NotesFolderRenameInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.renameFolder(id: request.id!, input: input)) }
+                else { emitNotesJSONSuccess(try notesStore.previewRenameFolder(id: request.id!, input: input)) }
+            case let args where args.count >= 3 && args[0] == "notes" && args[1] == "folder" && args[2] == "move":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(3)), command: "move", requiresID: true)
+                let input: NotesFolderMoveInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.moveFolder(id: request.id!, input: input)) }
+                else { emitNotesJSONSuccess(try notesStore.previewMoveFolder(id: request.id!, input: input)) }
+            case let args where args.count >= 3 && args[0] == "notes" && args[1] == "folder" && args[2] == "delete":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(3)), command: "folder-delete", requiresID: true)
+                let input: NotesFolderDeleteInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.deleteFolder(id: request.id!, input: input)) }
+                else { emitNotesJSONSuccess(try notesStore.previewDeleteFolder(id: request.id!, input: input)) }
             case let args where args.count >= 2 && args[0] == "notes" && args[1] == "folders":
                 let request = try parseNotesFolderArguments(Array(args.dropFirst(2)))
                 emitJSONSuccess(try notesStore.folders(
@@ -98,6 +119,39 @@ struct MacosDataCLI {
             case let args where args.count >= 2 && args[0] == "notes" && args[1] == "get":
                 let request = try parseNotesGetArguments(Array(args.dropFirst(2)))
                 emitNotesJSONSuccess(try notesStore.get(id: request.id, bodyFormat: request.bodyFormat, includeAttachments: request.includeAttachments))
+            case ["notes", "write-account", "status"]:
+                emitNotesJSONSuccess(notesStore.writeAccountStatus())
+            case let args where args.count >= 3 && args[0] == "notes" && args[1] == "write-account" && args[2] == "bind":
+                let request = try parseNotesWriteAccountArguments(Array(args.dropFirst(3)), clear: false)
+                emitNotesJSONSuccess(try notesStore.changeWriteAccount(accountID: request.accountID, clear: false, apply: request.apply))
+            case let args where args.count >= 3 && args[0] == "notes" && args[1] == "write-account" && args[2] == "clear":
+                let request = try parseNotesWriteAccountArguments(Array(args.dropFirst(3)), clear: true)
+                emitNotesJSONSuccess(try notesStore.changeWriteAccount(accountID: nil, clear: true, apply: request.apply))
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "create":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(2)), command: "create", requiresID: false)
+                let input: NotesCreateInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.create(input, idempotent: request.idempotent)) }
+                else { emitNotesJSONSuccess(try notesStore.previewCreate(input)) }
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "rename":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(2)), command: "rename", requiresID: true)
+                let input: NotesRenameInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.rename(id: request.id!, input: input)) }
+                else { emitNotesJSONSuccess(try notesStore.previewRename(id: request.id!, input: input)) }
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "move":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(2)), command: "move", requiresID: true)
+                let input: NotesMoveInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.move(id: request.id!, input: input)) }
+                else { emitNotesJSONSuccess(try notesStore.previewMove(id: request.id!, input: input)) }
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "delete":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(2)), command: "delete", requiresID: true)
+                let input: NotesDeleteInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.delete(id: request.id!, input: input)) }
+                else { emitNotesJSONSuccess(try notesStore.previewDelete(id: request.id!, input: input)) }
+            case let args where args.count >= 2 && args[0] == "notes" && args[1] == "edit-body":
+                let request = try parseNotesMutationArguments(Array(args.dropFirst(2)), command: "edit-body", requiresID: true)
+                let input: NotesEditBodyInput = try decodeNotesWrite(request.data)
+                if request.apply { emitNotesJSONSuccess(try notesStore.editBody(id: request.id!, input: input)) }
+                else { emitNotesJSONSuccess(try notesStore.previewEditBody(id: request.id!, input: input)) }
             case ["photos", "permission"]:
                 emitJSONSuccess(PhotosPermissionResult(
                     access: photosPermission.status.rawValue,
@@ -509,6 +563,9 @@ struct MacosDataCLI {
         let includeAttachments: Bool
     }
 
+    private struct NotesWriteAccountArguments { let accountID: String?; let apply: Bool }
+    private struct NotesMutationArguments { let id: String?; let data: Data; let apply: Bool; let idempotent: Bool }
+
     private static func emitJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) { print(text) }
@@ -530,6 +587,94 @@ struct MacosDataCLI {
         if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) {
             print(text)
         }
+    }
+
+    private static func parseNotesWriteAccountArguments(_ arguments: [String], clear: Bool) throws -> NotesWriteAccountArguments {
+        var accountID: String?
+        var apply = false
+        var modeSeen = false
+        var confirmation: String?
+        var index = 0
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--account-id":
+                guard !clear, accountID == nil, index + 1 < arguments.count else { throw NotesError.invalidWriteInput }
+                accountID = arguments[index + 1]; index += 2
+            case "--dry-run":
+                guard !modeSeen else { throw NotesError.invalidWriteInput }
+                modeSeen = true; index += 1
+            case "--apply":
+                guard !modeSeen else { throw NotesError.invalidWriteInput }
+                modeSeen = true; apply = true; index += 1
+            case "--confirm":
+                guard confirmation == nil, index + 1 < arguments.count else { throw NotesError.invalidWriteInput }
+                confirmation = arguments[index + 1]; index += 2
+            default: throw NotesError.invalidWriteInput
+            }
+        }
+        if clear { guard accountID == nil else { throw NotesError.invalidWriteInput } }
+        else { guard let accountID, !accountID.isEmpty else { throw NotesError.invalidWriteInput } }
+        if apply {
+            let expected = clear ? "CLEAR ICLOUD NOTES" : "BIND ICLOUD NOTES"
+            guard confirmation == expected else { throw NotesError.invalidWriteInput }
+        }
+        return NotesWriteAccountArguments(accountID: accountID, apply: apply)
+    }
+
+    private static func parseNotesMutationArguments(_ arguments: [String], command: String, requiresID: Bool) throws -> NotesMutationArguments {
+        var id: String?
+        var source: String?
+        var apply = false
+        var modeSeen = false
+        var idempotent = false
+        var confirmation: String?
+        var index = 0
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--id":
+                guard requiresID, id == nil, index + 1 < arguments.count else { throw NotesError.invalidWriteInput }
+                id = arguments[index + 1]; index += 2
+            case "--input":
+                guard source == nil, index + 1 < arguments.count else { throw NotesError.invalidWriteInput }
+                source = arguments[index + 1]; index += 2
+            case "--stdin":
+                guard source == nil else { throw NotesError.invalidWriteInput }
+                source = "-"; index += 1
+            case "--dry-run":
+                guard !modeSeen else { throw NotesError.invalidWriteInput }
+                modeSeen = true; index += 1
+            case "--apply":
+                guard !modeSeen else { throw NotesError.invalidWriteInput }
+                modeSeen = true; apply = true; index += 1
+            case "--idempotent":
+                guard command == "create", !idempotent else { throw NotesError.invalidWriteInput }
+                idempotent = true; index += 1
+            case "--confirm":
+                guard ["delete", "folder-delete"].contains(command), confirmation == nil, index + 1 < arguments.count else { throw NotesError.invalidWriteInput }
+                confirmation = arguments[index + 1]; index += 2
+            default: throw NotesError.invalidWriteInput
+            }
+        }
+        guard let source, !source.isEmpty, !requiresID || !(id ?? "").isEmpty else { throw NotesError.invalidWriteInput }
+        if command == "delete", apply {
+            guard confirmation == "DELETE NOTE" else { throw NotesError.invalidWriteInput }
+        } else if command == "folder-delete", apply {
+            guard confirmation == "DELETE EMPTY NOTES FOLDER" else { throw NotesError.invalidWriteInput }
+        } else if confirmation != nil {
+            throw NotesError.invalidWriteInput
+        }
+        do {
+            let data = source == "-" ? FileHandle.standardInput.readDataToEndOfFile() : try Data(contentsOf: URL(fileURLWithPath: source))
+            guard !data.isEmpty else { throw NotesError.invalidWriteInput }
+            return NotesMutationArguments(id: id, data: data, apply: apply, idempotent: idempotent)
+        } catch let error as NotesError { throw error }
+        catch { throw NotesError.invalidWriteInput }
+    }
+
+    private static func decodeNotesWrite<T: Decodable>(_ data: Data) throws -> T {
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        do { return try decoder.decode(T.self, from: data) }
+        catch { throw NotesError.invalidWriteInput }
     }
 
     private static func parseNotesFolderArguments(_ arguments: [String]) throws -> NotesFolderArguments {
@@ -1353,7 +1498,8 @@ struct MacosDataCLI {
         remindersPermission: RemindersPermission,
         remindersStore: RemindersStore,
         photosPermission: PhotosPermission,
-        notesPermission: NotesPermissionService
+        notesPermission: NotesPermissionService,
+        notesStore: NotesStore
     ) -> DataResourcesResult {
         var resources: [DataResource] = []
         var limitations: [String] = []
@@ -1443,10 +1589,12 @@ struct MacosDataCLI {
             limitations.append("photos_permission_restricted")
         }
         let notesResult = notesPermission.check(requestConsent: false)
-        resources.append(NotesResourceMapper.map(status: notesResult.access))
+        let notesWriteStatus = notesStore.writeAccountStatus()
+        resources.append(NotesResourceMapper.map(status: notesResult.access, writable: notesWriteStatus.valid))
         switch notesResult.access {
         case .available:
-            break
+            if !notesWriteStatus.bound { limitations.append("notes_icloud_write_account_not_bound") }
+            else if !notesWriteStatus.valid { limitations.append("notes_icloud_write_account_stale") }
         case .requiresConsent:
             limitations.append("notes_automation_requires_consent")
         case .denied:
@@ -1694,19 +1842,51 @@ struct MacosDataCLI {
           complete=false. Asset query range is limited to 366 days. Export
           defaults to original, offline-only, no overwrite, and private output.
 
-        Notes 0.6 read-only commands:
+        Notes 0.6 read commands and guarded 0.6.1/0.6.2 writes:
           permission --format json           Report Notes.app Automation status without prompting
           permission --request --format json Explicitly request Notes.app Automation consent
           accounts --format json             List bounded Notes accounts with opaque IDs
           folders [--account-id <id>] [--parent-id <id>]
             [--limit <1...200>] [--cursor <cursor>] --format json
                                              List bounded nested-folder metadata
+          folder create --input <file>|--stdin [--dry-run|--apply] [--idempotent]
+            --format json                    Create under an explicit opaque parent
+                                             or account root expressed as JSON null
+          folder rename --id <opaque-id> --input <file>|--stdin
+            [--dry-run|--apply] --format json Rename with current-name hash guard
+          folder move --id <opaque-id> --input <file>|--stdin
+            [--dry-run|--apply] --format json Preview with name-hash and parent guards;
+                                             apply fails closed on Notes 4.13
+          folder delete --id <opaque-id> --input <file>|--stdin
+            [--dry-run|--apply] [--confirm "DELETE EMPTY NOTES FOLDER"]
+            --format json                    Delete only an empty, non-default,
+                                             non-shared folder after fresh checks
           query [--account-id <id>] [--folder-id <id>] [--title <text>]
             [--modified-after <iso8601>] [--limit <1...200>]
             [--cursor <cursor>] --format json List metadata-only note records
           get --id <opaque-id> [--body none|plaintext|html]
             [--include-attachments] --format json
                                              Read one note; body defaults to none
+          write-account status --format json  Show the bound iCloud write account
+          write-account bind --account-id <id> [--dry-run|--apply]
+            [--confirm "BIND ICLOUD NOTES"] --format json
+                                             Bind a user-confirmed iCloud account
+          write-account clear [--dry-run|--apply]
+            [--confirm "CLEAR ICLOUD NOTES"] --format json
+                                             Clear the local write-account binding
+          create --input <file>|--stdin [--dry-run|--apply] [--idempotent]
+            --format json                    Create in one explicit bound folder
+          rename --id <opaque-id> --input <file>|--stdin
+            [--dry-run|--apply] --format json Rename with modification-date guard
+          move --id <opaque-id> --input <file>|--stdin
+            [--dry-run|--apply] --format json Move to one explicit bound folder
+          delete --id <opaque-id> --input <file>|--stdin
+            [--dry-run|--apply] [--confirm "DELETE NOTE"] --format json
+                                             Move one note to Notes Recently Deleted;
+                                             permanent deletion remains UI-only
+          edit-body --id <opaque-id> --input <file>|--stdin
+            [--dry-run|--apply] --format json Replace a proven-simple body with
+                                             modification-date and body-hash guards
 
         Notes boundary:
           Notes uses the public Notes.app scripting dictionary through Apple
@@ -1717,6 +1897,16 @@ struct MacosDataCLI {
           seconds and returns complete=false if that bound is reached. It
           never reads private Notes databases,
           CloudKit containers, caches, or GUI coordinates.
+          Writes require a locally bound, user-confirmed iCloud account and
+          explicit non-shared opaque folder IDs. Note rename and move require an
+          expected modification date. Folder rename/move use current-name SHA-256
+          and explicit current/destination parents because Notes exposes no folder
+          modification date; default/shared/cross-account/cyclic or ambiguous
+          duplicate-name operations fail closed. Body replacement additionally requires
+          the current plaintext SHA-256 and rejects attachments or unsupported
+          rich structures. Attachment mutation remains unsupported. Folder move
+          and folder-delete apply fail closed on Notes 4.13; note deletion is
+          recoverable soft deletion only, while permanent deletion remains UI-only.
 
         Mail commands:
           doctor --format json               Inspect Mail store, schema, and permissions

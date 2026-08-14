@@ -85,6 +85,41 @@ metadata 枚举和 body get 分离；timeout 后启动 circuit breaker。
 4. 隐私安全 live gate 只输出授权状态与 account/folder/note 聚合数量。
 5. 一次性测试 note 验证 get/read，并零残留清理；不得修改现有用户 note。
 
+## 受保护写入实现边界
+
+已发布 0.6.1 只增加 create、rename 和同账户 move。本机私有配置保存由用户确认属于 iCloud 的 opaque
+account ID；scripting dictionary 没有可靠 account type 字段。写入还必须指定该账户下的非 shared
+opaque folder ID。rename/move 使用最近 modification date 作为乐观并发 token。
+
+所有 Notes Apple Event 共用一个串行锁和 5 秒 deadline。默认 dry-run；apply 明确区分回读确认、
+保存成功但回读 pending，以及结果未知，Agent 不得自动重试后两者。输出和诊断使用 hash/byte 数，
+不回显 title/body。0.6.2 开发切片增加受保护的整体正文替换，但只允许经检查无 attachment 且属于
+有界简单 HTML 子集的 note；必须同时提供最新 modification date 和当前 plaintext SHA-256，保留
+第一行标题，并在保存后验证新 plaintext hash。0.6.2 也通过公开 `delete note` 命令加入受保护、可恢复的单 Note
+soft delete：要求最新整秒 modification date、准确 `DELETE NOTE` 确认、mutation 前直接回读，且
+只能操作绑定账户内非 shared、非 locked note。回读确认仅证明相同标题 hash 的 note 已离开原 folder；
+dictionary 没有稳定、与语言无关的 Recently Deleted 标志。pending/unknown 禁止重试，永久删除仍只
+允许 UI 操作。attachment mutation、跨账户 move 与 shared/locked 写入仍不可用。
+
+Notes 4.13 scripting dictionary 将 folder `name` 标为可写，提供 folder `id`、`shared`、
+`container`，并包含 Cocoa Standard 的 `make`、`move` 和 `delete` 命令，但不提供 folder
+modification date。因此 0.6.2 开发源码对 folder create/rename、受保护空 folder 删除 preview 和 move preview 使用准确的当前名称
+SHA-256；move preview 还要求准确的当前 parent。JSON null 明确表示 account 根目录。default/shared 目标、同级重名、
+跨账户 move、循环和不完整的有界 folder 图均 fail closed。目前只证明了生成脚本可编译以及 synthetic
+签名 app gate 已证明 nested create、重名拒绝和 rename。Notes 4.13 folder move 无法保持可确认
+identity：空 child 从可枚举图中消失，metadata 暂时失效。因此 apply 会在发送 Apple Event 前返回
+`NOTES_FOLDER_MOVE_UNSUPPORTED`。
+空 folder 删除 preview 必须提供准确名称 hash 与显式 parent，只允许非 default、非 shared 目标，并
+重新确认直接 note 数与 child folder 数均为零。真实 apply gate 导致 metadata graph 失效；重启 Notes
+后 child 以旧名称和新 opaque ID 再次出现。因此 apply 在任何写 Apple Event 前返回
+`NOTES_FOLDER_DELETE_UNSUPPORTED`。
+审计入口为 `scripts/run_notes_folder_integration.sh`。默认模式只检查权限、绑定与 create preview；
+只有显式 `--apply` 才创建隔离的 root/destination/child tree，验证 create/rename 与 move/delete
+fail-closed。UI 清理需要单独的 action-time 明确授权和最终零残留查询。
+
+2026-08-14，取得确认后的 UI 清理按 child、root、destination 顺序完成。重启 Notes 后，签名 app
+返回完整 graph；删除前后四个已知 opaque ID 均为零匹配，gate sentinel 前缀名称也为零匹配。
+
 ## 证据基线
 
 - 开发机：macOS 27.0 build `26A5388g`。
@@ -101,6 +136,26 @@ metadata 枚举和 body get 分离；timeout 后启动 circuit breaker。
   修改时间。gate 只打印聚合统计，并在退出时删除临时 JSON。
 - 2026-08-14，一条一次性 note 已通过唯一标题 query、metadata-only get、显式 plaintext
   （116 UTF-8 bytes）和显式 HTML（159 UTF-8 bytes）的 sentinel/markup 验证。attachment
-  metadata 路径返回空且 complete 的列表，没有读取 binary contents。该 note 已移入 Notes
-  Recently Deleted；Notes 公共 scripting dictionary 没有稳定、与语言无关的 deleted-folder
-  标志，因此在永久删除前，普通有界 Apple Events query 仍可能看见这条可恢复数据。
+  metadata 路径返回空且 complete 的列表，没有读取 binary contents。该 note 先移入 Notes
+  Recently Deleted，之后在 action-time 明确批准后通过 Notes UI 永久删除。Notes 公共 scripting
+  dictionary 没有稳定、与语言无关的 deleted-folder 标志，因此清理 gate 必须采用 UI 永久删除，
+  再通过签名 app 查询确认零匹配。
+- 2026-08-14，第二条一次性 fixture 完成签名 app 正文修改端到端 gate：提供准确当前 plaintext
+  SHA-256 与 modification date，dry-run 零写入，只执行一次 apply，立即 hash 回读确认，并在两个
+  显式非 shared iCloud folder 间完成 rename 和 move。首次 wrapper 运行在 mutation 前安全停止，
+  原因是 8 秒输出等待短于 Notes 与 LaunchServices 启动耗时；直接回读证明原正文未变化。wrapper
+  后续先使用 20 秒进程输出等待；Xcode 27 app 的完整输出超过该上限，因此现在使用 40 秒并报告准确
+  stage，而单次 Apple Event deadline 仍为 5 秒。取得
+  action-time 确认后，只通过 Notes UI 永久删除该 fixture，保留无关 Recently Deleted note；
+  签名 app sentinel 查询返回零匹配。
+- 2026-08-14，单 Note soft-delete gate 经授权执行。wrapper 在 move 输出阶段达到 20 秒上限后
+  fail closed，没有重试；只读 get 证明 move 已成功。随后从该已确认状态执行一次 delete dry-run 和
+  一次 `DELETE NOTE` apply，返回 `readback_confirmed`；原 folder 零匹配，system-managed folder
+  存在唯一可恢复匹配。取得 action-time 明确确认后，仅通过 Notes UI 永久删除本 fixture，并保留
+  一条无关的 Recently Deleted note；最终签名 app sentinel 查询返回 `complete=true` 且零匹配。
+- 2026-08-14，固定路径签名 debug app 先通过 folder gate 的 permission、有效 write-account 绑定与
+  create preview 检查且没有写入；后续经授权的 apply 证据记录如下。
+- 2026-08-14，经授权的 folder apply gate 已证明 nested create、重名拒绝、rename 和 UI 清理，并以
+  sentinel 零匹配回读结束。gate 同时发现 account 递归枚举会产生重复 folder ID，以及 folder move
+  会破坏可确认 identity。现通过 root-only 枚举与 graph validation 防止 crash；folder move apply
+  在采用不同设计前保持禁用。

@@ -1,8 +1,6 @@
 import AppKit
 import Foundation
 
-private let systemNotesAttachmentExecutionLock = NSLock()
-
 public struct NotesAttachmentDescriptor: Equatable, Sendable {
     public let scriptingID: String
     public let name: String
@@ -125,8 +123,8 @@ public struct SystemNotesAttachmentBridge: NotesAttachmentBridging {
     }
 
     private func execute(_ source: String) throws -> NSAppleEventDescriptor {
-        systemNotesAttachmentExecutionLock.lock()
-        defer { systemNotesAttachmentExecutionLock.unlock() }
+        notesAppleEventExecutionLock.lock()
+        defer { notesAppleEventExecutionLock.unlock() }
         guard let script = NSAppleScript(source: source) else { throw NotesMetadataBridgeError.executionFailed }
         var details: NSDictionary?
         let result = script.executeAndReturnError(&details)

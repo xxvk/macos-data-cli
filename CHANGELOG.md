@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.6.2 — 2026-08-14
+
+### Added
+
+- Added Xcode 27-compatible local test orchestration using a non-iCloud SwiftPM
+  scratch path, avoiding File Provider/Finder metadata rejection during XCTest
+  bundle signing. Xcode 27.0 Beta 5, Swift 6.4, and SDK 27.0 pass all 222 tests
+  and both Release and signed-debug builds.
+- Added a guarded single-note soft-delete command with strict
+  optimistic concurrency, exact confirmation, fresh preflight read, privacy-safe
+  output, and explicit no-retry pending/unknown states. Permanent deletion is
+  still unsupported. The signed-app gate returned read-back confirmation, zero
+  matches in the former folder, and one recoverable match. After explicit
+  action-time approval, only the disposable fixture was permanently removed
+  through Notes UI, an unrelated Recently Deleted note was preserved, and the
+  final signed-app sentinel query returned zero matches.
+- Added guarded non-recursive empty-folder-delete preview with strict
+  parent/name-hash preconditions, fresh direct note/child counts, stable
+  `NOTES_FOLDER_NOT_EMPTY`, privacy-safe output, and CLI negative contracts.
+- The signed-app apply gate exposed metadata invalidation and iCloud folder
+  resurrection under a new opaque ID. Apply now fails before mutation with
+  `NOTES_FOLDER_DELETE_UNSUPPORTED`.
+
+### Fixed
+
+- Made the Xcode 27 test runner self-contained by assigning writable SwiftPM and
+  compiler-module caches in addition to the non-iCloud scratch directory.
+- Validate Calendar create payloads before source selection, so malformed input
+  retains its stable input error even when the host has multiple iCloud sources.
+- Made the local release gate recognize the exact fail-closed
+  `CALENDAR_SOURCE_AMBIGUOUS` environment state and skip Calendar live smoke
+  instead of guessing a source; all other Calendar preflight failures still fail
+  the gate.
+
+## 0.6.1 — 2026-08-14
+
+### Added
+
+- Added guarded Notes create, rename, and move commands with default dry-run,
+  explicit apply, strict file/stdin JSON, privacy-safe previews, and immediate
+  read-back states.
+- Added a user-confirmed iCloud Notes write-account binding, fail-closed
+  account/folder scope, shared and locked-note rejection, optimistic concurrency,
+  safe no-op behavior, and a private 60-second idempotency receipt for create.
+- Added serialized Notes mutation Apple Events, stable write errors, strict
+  plaintext/HTML input handling, SHA-256 verification, and writable resource
+  capability reporting only when Automation and the binding are valid.
+- Added 28 Notes tests within a 204-test Swift suite, CLI negative contracts,
+  generated-AppleScript compile checks, and a signed-app disposable iCloud
+  create/rename/move/read-back gate. All four audited test notes were permanently
+  cleaned up and the final signed-app query confirmed zero fixture matches.
+
+### Limitations
+
+- Existing-note body replacement, attachment mutation, note deletion, and
+  folder CRUD remain outside 0.6.1.
+
 ## 0.6.0 — 2026-08-14
 
 ### Added

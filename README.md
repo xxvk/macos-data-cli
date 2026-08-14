@@ -8,9 +8,43 @@ platform-specific integrations, or private and unstable data formats.
 Apple public frameworks and permits narrowly scoped, documented read-only local
 adapters when no public framework exposes the required data.
 
+## Quick Start
+
+Build from source and request the first read-only JSON snapshot:
+
+```bash
+git clone https://github.com/xxvk/macos-data-cli.git
+cd macos-data-cli
+export DEVELOPER_DIR="$(xcode-select -p)"
+swift build
+.build/debug/macos-data resources --format json
+```
+
+Requirements: macOS 26 or newer, Apple Silicon, and Xcode with Swift 6.2.
+The public binary is not yet Developer ID signed or notarized. See
+[Installation](INSTALL.md) before installing a Release binary or configuring
+macOS permissions.
+
+## Usage
+
+Start with capability and permission checks; these commands do not modify user
+data. The examples use an installed `macos-data`; from the source checkout, use
+`.build/debug/macos-data` instead:
+
+```bash
+macos-data resources --format json
+macos-data contacts permission
+macos-data mail doctor --format json
+```
+
+Commands that can write use explicit dry-run/apply paths, and destructive
+operations require an additional confirmation phrase. See the full
+[command guide](docs/usage.md), [safety rules](docs/development/rules.md), and
+[stable JSON contract](docs/development/cli-contract.md).
+
 ## Project status
 
-The current source release is 0.6.0. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.6.2. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -40,7 +74,27 @@ single-resource export with offline and no-overwrite defaults.
 Notes 0.6 adds a bounded, read-only Notes.app Automation adapter for permission
 status, account and nested-folder discovery, metadata query, explicit
 plaintext/HTML reads, and attachment metadata. It does not access private Notes
-stores. Guarded write operations remain planned separately for 0.6.1.
+stores. Notes 0.6.1 adds guarded create/rename/move behind a
+locally bound, user-confirmed iCloud account, dry-run/apply, concurrency checks,
+privacy-safe hashes, and immediate read-back. Body replacement, attachment
+mutation, delete, and folder CRUD remain unsupported in released 0.6.1. Notes
+0.6.2 adds guarded `notes edit-body` for simple,
+attachment-free content plus folder create/rename and guarded move/empty-folder-delete previews with opaque selectors,
+hash/parent guards, cycle protection, and privacy-safe output. The disposable
+signed-app body-edit gate passed with hash-confirmed read-back and zero fixture
+residue. The folder gate passed create/rename; Notes 4.13 move apply proved
+identity-unsafe and is disabled with a stable fail-closed error. The signed-app disposable
+iCloud note create/rename/move/read-back gate passed with zero test-note residue.
+Empty-folder delete preview validates fresh name/parent/emptiness state, but its
+real Notes 4.13 gate invalidated the metadata graph and the child later
+reappeared under a new opaque ID. Apply is therefore disabled fail-closed.
+The current source also includes guarded single-note soft deletion to
+Notes Recently Deleted, requiring the latest modification date and exact
+`DELETE NOTE` confirmation. Permanent deletion remains UI-only, and the
+signed-app soft-delete gate passed: after explicit action-time approval, only
+the disposable fixture was permanently removed through Notes UI, an unrelated
+Recently Deleted note was preserved, and the final signed-app query returned
+zero sentinel matches.
 
 See the detailed roadmaps:
 
@@ -256,6 +310,12 @@ fallback and visual verification. See the
 vCard support, batch operations, and change detection remain Contacts-related
 follow-up work. Each adapter should define its own authorization requirements,
 data mapping, error format, and tests.
+
+## Community
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing behavior or contract changes.
+- Report vulnerabilities through the private path described in [SECURITY.md](SECURITY.md).
+- Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

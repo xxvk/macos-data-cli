@@ -6,7 +6,7 @@ macOS 26 项目应使用完整 Xcode，而不是可能版本不匹配的
 `/Library/Developer/CommandLineTools`：
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+export DEVELOPER_DIR="$(xcode-select -p)"
 ```
 
 如果 SwiftPM 因用户目录权限无法写入缓存，使用项目内缓存。仓库脚本
@@ -88,11 +88,21 @@ open -W .build/debug/macos-data.app --args \
 
 ```bash
 bash scripts/build_debug_app.sh
-swift test
+bash scripts/run_swift_tests.sh
 ```
 
-`swift test` 只验证纯逻辑和 Contacts adapter 单元测试，不代替真实 TCC
+`scripts/run_swift_tests.sh` 只验证纯逻辑和 adapter 单元测试，不代替真实 TCC
 授权或真实 Contacts CRUD 验证。
+
+Xcode 27 在 iCloud/File Provider 工作区中可能给新生成的 `.xctest` bundle 附加
+`com.apple.FinderInfo`，随后被 codesign 以 `resource fork, Finder information, or similar
+detritus not allowed` 拒绝。标准脚本把 SwiftPM test scratch 放到本机临时目录，从流程上避免该问题；
+不修改源码，也不要求清空整个 `.build`。
+
+2026-08-14 已验证：active developer directory 为
+`/Applications/Xcode-27.0.0-Beta.5.app/Contents/Developer`，Xcode build
+`27A5237l`、Swift 6.4、macOS SDK 27.0；222 个 tests、Release build 与签名 debug app
+均通过。构建脚本默认跟随 `xcode-select -p`，仍可通过显式 `DEVELOPER_DIR` 覆盖。
 
 Mail release gate 还会检查 Info.plist、entitlement plist、签名完整性，以及签名后
 Automation entitlement 的实际值；任一项漂移都会立即失败。

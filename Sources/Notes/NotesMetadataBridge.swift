@@ -1,15 +1,15 @@
 import AppKit
 import Foundation
 
-private let systemNotesAppleEventExecutionLock = NSLock()
-
 public struct NotesAccountDescriptor: Equatable, Sendable {
     public let scriptingID: String
     public let name: String
+    public let defaultFolderScriptingID: String?
 
-    public init(scriptingID: String, name: String) {
+    public init(scriptingID: String, name: String, defaultFolderScriptingID: String? = nil) {
         self.scriptingID = scriptingID
         self.name = name
+        self.defaultFolderScriptingID = defaultFolderScriptingID
     }
 }
 
@@ -120,8 +120,20 @@ public struct SystemNotesMetadataBridge: NotesMetadataBridging {
                         set accountCounter to accountCounter + 1
                         set accountKey to (id of accountItem) as text
                         set accountName to (name of accountItem) as text
-                        copy {accountKey, accountName} to end of accountRows
-                        set folderResult to my collectFolders(every folder of accountItem, accountKey, "", 0, folderRows, folderCounter, \(maximumFolders), \(maximumDepth))
+                        set defaultFolderKey to ""
+                        try
+                            set defaultFolderKey to (id of default folder of accountItem) as text
+                        end try
+                        copy {accountKey, accountName, defaultFolderKey} to end of accountRows
+                        set rootFolders to {}
+                        repeat with candidateFolder in every folder of accountItem
+                            set containerKey to ""
+                            try
+                                set containerKey to (id of container of candidateFolder) as text
+                            end try
+                            if containerKey is accountKey then copy contents of candidateFolder to end of rootFolders
+                        end repeat
+                        set folderResult to my collectFolders(rootFolders, accountKey, "", 0, folderRows, folderCounter, \(maximumFolders), \(maximumDepth))
                         set folderRows to item 1 of folderResult
                         set folderCounter to item 2 of folderResult
                         if item 3 of folderResult then set folderLimitReached to true
@@ -178,9 +190,14 @@ public struct SystemNotesMetadataBridge: NotesMetadataBridging {
         }
         var accounts: [NotesAccountDescriptor] = []
         for offset in 0..<accountRows.numberOfItems {
-            guard let row = accountRows.atIndex(offset + 1), row.numberOfItems == 2,
+            guard let row = accountRows.atIndex(offset + 1), row.numberOfItems == 3,
                   let id = row.atIndex(1)?.stringValue, !id.isEmpty else { continue }
-            accounts.append(NotesAccountDescriptor(scriptingID: id, name: row.atIndex(2)?.stringValue ?? ""))
+            let defaultFolder = row.atIndex(3)?.stringValue
+            accounts.append(NotesAccountDescriptor(
+                scriptingID: id,
+                name: row.atIndex(2)?.stringValue ?? "",
+                defaultFolderScriptingID: defaultFolder.flatMap { $0.isEmpty ? nil : $0 }
+            ))
         }
         var folders: [NotesFolderDescriptor] = []
         for offset in 0..<folderRows.numberOfItems {
@@ -201,17 +218,41 @@ public struct SystemNotesMetadataBridge: NotesMetadataBridging {
         let limited = (descriptor.atIndex(4)?.booleanValue ?? false)
             || (descriptor.atIndex(5)?.booleanValue ?? false)
             || (descriptor.atIndex(6)?.booleanValue ?? false)
-        return NotesMetadataSnapshot(
+        return try validateSnapshot(NotesMetadataSnapshot(
             accounts: accounts,
             folders: folders,
             defaultAccountScriptingID: defaultValue.flatMap { $0.isEmpty ? nil : $0 },
             complete: !limited
-        )
+        ))
+    }
+
+    static func validateSnapshot(_ snapshot: NotesMetadataSnapshot) throws -> NotesMetadataSnapshot {
+        var accountIDs = Set<String>()
+        guard snapshot.accounts.allSatisfy({ accountIDs.insert($0.scriptingID).inserted }) else {
+            throw NotesMetadataBridgeError.executionFailed
+        }
+        var folderIDs = Set<String>()
+        guard snapshot.folders.allSatisfy({ folderIDs.insert($0.scriptingID).inserted }) else {
+            throw NotesMetadataBridgeError.executionFailed
+        }
+        let accountByID = Dictionary(uniqueKeysWithValues: snapshot.accounts.map { ($0.scriptingID, $0) })
+        let folderByID = Dictionary(uniqueKeysWithValues: snapshot.folders.map { ($0.scriptingID, $0) })
+        for folder in snapshot.folders {
+            guard accountByID[folder.accountScriptingID] != nil else {
+                throw NotesMetadataBridgeError.executionFailed
+            }
+            if let parentID = folder.parentScriptingID {
+                guard let parent = folderByID[parentID], parent.accountScriptingID == folder.accountScriptingID else {
+                    throw NotesMetadataBridgeError.executionFailed
+                }
+            }
+        }
+        return snapshot
     }
 
     private func execute(_ source: String) throws -> NSAppleEventDescriptor {
-        systemNotesAppleEventExecutionLock.lock()
-        defer { systemNotesAppleEventExecutionLock.unlock() }
+        notesAppleEventExecutionLock.lock()
+        defer { notesAppleEventExecutionLock.unlock() }
         guard let script = NSAppleScript(source: source) else { throw NotesMetadataBridgeError.executionFailed }
         var details: NSDictionary?
         let result = script.executeAndReturnError(&details)

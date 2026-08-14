@@ -15,7 +15,7 @@ fi
 
 cd "$ROOT_DIR"
 BUILD_CACHE_DIR="$ROOT_DIR/.build/local-cache"
-DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 export DEVELOPER_DIR
 export SWIFTPM_CONFIG_DIR="$BUILD_CACHE_DIR/swiftpm-config"
 export XDG_CACHE_HOME="$BUILD_CACHE_DIR/swiftpm-cache"
@@ -30,7 +30,7 @@ if [[ -z "$expected_version" ]]; then
   exit 1
 fi
 
-swift test
+bash scripts/run_swift_tests.sh
 swift build -c release
 release_version="$(.build/release/macos-data --version)"
 source_bundle_version="$(plutil -extract CFBundleShortVersionString raw -o - Sources/macos-data/Info.plist)"

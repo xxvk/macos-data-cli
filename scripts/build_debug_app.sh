@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="$ROOT_DIR/.build/debug/macos-data.app"
 BUILD_CACHE_DIR="$ROOT_DIR/.build/local-cache"
 
-DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 export DEVELOPER_DIR
 export SWIFTPM_CONFIG_DIR="$BUILD_CACHE_DIR/swiftpm-config"
 export XDG_CACHE_HOME="$BUILD_CACHE_DIR/swiftpm-cache"

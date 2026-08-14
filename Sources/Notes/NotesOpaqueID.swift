@@ -18,6 +18,10 @@ public enum NotesOpaqueID {
         value.hasPrefix("note_") && value.count == "note_".count + 64
     }
 
+    public static func isFolder(_ value: String) -> Bool {
+        value.hasPrefix("notesfolder_") && value.count == "notesfolder_".count + 64
+    }
+
     public static func attachment(noteScriptingID: String, scriptingID: String) -> String {
         "noteattachment_" + digest("notes-attachment-v1:\(noteScriptingID):\(scriptingID)")
     }

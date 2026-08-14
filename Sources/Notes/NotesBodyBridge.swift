@@ -2,8 +2,6 @@ import AppKit
 import Core
 import Foundation
 
-private let systemNotesBodyExecutionLock = NSLock()
-
 public enum NotesBodyPolicy {
     public static let maximumBytes = 256 * 1024
 }
@@ -45,8 +43,8 @@ public struct SystemNotesBodyBridge: NotesBodyBridging {
     }
 
     private func execute(_ source: String) throws -> NSAppleEventDescriptor {
-        systemNotesBodyExecutionLock.lock()
-        defer { systemNotesBodyExecutionLock.unlock() }
+        notesAppleEventExecutionLock.lock()
+        defer { notesAppleEventExecutionLock.unlock() }
         guard let script = NSAppleScript(source: source) else { throw NotesMetadataBridgeError.executionFailed }
         var details: NSDictionary?
         let result = script.executeAndReturnError(&details)

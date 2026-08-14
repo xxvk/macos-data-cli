@@ -1,8 +1,6 @@
 import AppKit
 import Foundation
 
-private let systemNotesQueryExecutionLock = NSLock()
-
 public struct NotesNoteDescriptor: Equatable, Sendable {
     public let scriptingID: String
     public let accountScriptingID: String
@@ -181,8 +179,8 @@ public struct SystemNotesQueryBridge: NotesQueryBridging {
     }
 
     private func execute(_ source: String) throws -> NSAppleEventDescriptor {
-        systemNotesQueryExecutionLock.lock()
-        defer { systemNotesQueryExecutionLock.unlock() }
+        notesAppleEventExecutionLock.lock()
+        defer { notesAppleEventExecutionLock.unlock() }
         guard let script = NSAppleScript(source: source) else { throw NotesMetadataBridgeError.executionFailed }
         var details: NSDictionary?
         let result = script.executeAndReturnError(&details)
