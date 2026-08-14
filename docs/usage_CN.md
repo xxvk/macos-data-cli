@@ -4,7 +4,7 @@
 
 ## 统一资源查询
 
-使用一个机器可读响应查看当前可发现的 Contacts、Mail 和 Calendar 资源作用域：
+使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar 和 Reminders 资源作用域：
 
 ```text
 macos-data resources --format json
@@ -115,6 +115,97 @@ macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" --span thi
 ```
 
 详细边界参阅 [Calendar adapter 架构](development/calendar-adapter-architecture_CN.md)。
+
+## Reminders（0.4 开发切片）
+
+当前源码实现权限、iCloud reminder list 发现，以及只读 query/get：
+
+```text
+macos-data reminders permission --format json
+macos-data reminders sources --format json
+macos-data reminders lists --format json
+macos-data reminders query [--status incomplete|completed|all] \
+  [--due-start <iso8601>] [--due-end <iso8601>] \
+  [--list <id|unique-title>] [--title <text>] \
+  [--limit <1...200>] [--cursor <cursor>] --format json
+macos-data reminders get --id <opaque-reminder-id> --format json
+macos-data reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+macos-data reminders edit --id <opaque-reminder-id> --input <file>|--stdin --dry-run|--apply --format json
+macos-data reminders complete --id <opaque-reminder-id> --dry-run|--apply --format json
+macos-data reminders reopen --id <opaque-reminder-id> --dry-run|--apply --format json
+macos-data reminders delete --id <opaque-reminder-id> --dry-run --format json
+macos-data reminders delete --id <opaque-reminder-id> --apply --confirm "DELETE REMINDER" --format json
+```
+
+需要显式选择时可以添加 `--source iCloud` 或准确 source identifier。只有唯一验证通过、
+包含 reminder lists 的 iCloud CalDAV source 才能被选择，否则 fail closed。query 默认只查
+未完成 reminder；due 边界必须是带明确 offset 的 ISO 8601 timestamp。结果采用按实际时刻的
+确定性排序；anchor cursor 绑定经过隐私哈希的查询条件和已选 list 集合。修改查询/list，或
+anchor 已被删除、修改后继续分页会被拒绝。未完成 reminder 的 due 范围会在 fetch 前下推到
+EventKit。fetch 超时为 10 秒并传递调用方取消；结果超过 5,000 条会失败并提示缩小范围。
+但 EventKit 会先生成结果数组，所以该上限是响应安全边界，不是严格的峰值内存上限。
+
+start/due 通过 `value`、`hasTime`、`floating` 和 `timeZone` 区分仅日期、floating timed
+和 IANA-zone timed。只读 contract 同时返回兼容性字段 `hasAlarms`、
+`hasRecurrenceRules` 以及详细 `alarms`、`recurrenceRules` 数组；相对、绝对和地点 alarm
+均可读取，但地点 alarm 写入仍不支持。create、partial edit、complete/reopen 和单条 delete
+均已实现。
+
+`create --dry-run` 会验证并标准化未保存 draft，不调用 `EKEventStore.save`。目标可写 list
+依次通过 JSON `listID`、所选 iCloud source 内的可写系统默认 list、唯一可写 iCloud list
+确定；存在歧义时 fail closed。preview 故意不返回 `id`。顶层未知 JSON 字段也会被拒绝，
+避免 Agent 拼写错误被静默忽略。
+
+`create --apply` 通过 EventKit 保存一次，并立即使用返回的 opaque ID 回读。
+`verification: "readback_confirmed"` 是强成功状态；`save_accepted_readback_pending` 表示
+EventKit 已接受保存但立即回读尚不可见，调用方必须保留 ID 且不得自动重试。
+`--idempotent` 使用私有 60 秒本地 receipt，只保存 SHA-256 输入指纹、opaque
+Reminder/list ID 和创建时间，不保存 title、notes、URL、alarm 或 recurrence。
+
+edit JSON 使用 partial patch：省略字段保持不变；`notes`、`url`、`start`、`due`、
+`alarms`、`recurrenceRules` 传 `null` 会清空；传值会替换。`title`、`priority`、`listID`
+不能为 null。完成状态由独立 complete/reopen 命令处理，edit 会拒绝该字段。若原 reminder
+包含只读地点 alarm，修改 alarms 会失败，避免静默丢失数据。apply 只 save 一次，并沿用
+create 的 no-auto-retry 回读状态。真实 edit apply 已在一次性 gate 中通过，最终残留为 0。
+
+`complete` 设置完成状态和明确 completion timestamp；`reopen` 同时清除两者。重复目标状态
+返回 `already_completed` 或 `already_incomplete`，不再次 save。周期 reminder 完成后若下一
+未完成 occurrence 可见，会单独通过 `nextOccurrence` 返回。真实 complete/reopen apply
+和重复 no-op 验证已通过。
+独立周期完成 gate 也已在本机 iCloud 通过并确认零残留。EventKit 在 due 日期向后推进时
+复用了同一个 opaque reminder ID，因此调用方不能用 ID 是否变化判断 occurrence 是否推进：
+
+```text
+bash scripts/run_reminders_recurrence_integration.sh --confirm "REMINDERS RECURRENCE TEST"
+```
+
+删除必须先 dry-run，或为 apply 提供准确确认短语。`absence_confirmed` 表示 opaque ID 已无法
+解析；`remove_accepted_readback_pending` 表示 EventKit 已接受删除但立即 absence verification
+仍不确定，调用方不得自动重试，应使用相同 ID 调用 `get`。
+
+一次性真实 iCloud create/get/edit/complete/reopen/delete gate 已在本机通过，并确认最终
+同名匹配数量为 0。
+unit、release、read 和 dry-run gate 均不写入 reminder。再次运行仍须获得明确授权：
+
+```text
+bash scripts/run_local_reminders_integration.sh --with-writes --confirm "REMINDERS CRUD TEST"
+```
+
+```json
+{
+  "title": "Prepare weekly report",
+  "listID": null,
+  "notes": null,
+  "url": null,
+  "priority": "high",
+  "start": null,
+  "due": {"value":"2026-08-17","timeZone":null,"hasTime":false,"floating":true},
+  "alarms": [{"relativeMinutes":-10}],
+  "recurrenceRules": []
+}
+```
+
+参阅 [Reminders 0.4 架构草案](development/reminders-adapter-architecture_CN.md)。
 
 ## Mail（0.2）
 

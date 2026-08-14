@@ -27,6 +27,12 @@ For Calendar 0.3 planning, implementation, or invocation, also read:
    for EventKit permissions, iCloud source selection, recurrence scope, opaque
    occurrence IDs, JSON fields, and the local smoke-test boundary
 
+For Reminders 0.4 planning or implementation, also read:
+
+10. `docs/development/reminders-adapter-architecture.md` and the Chinese version
+    before changing Reminders contracts or runtime code
+
+
 ## Current development executable
 
 During local development, use the Debug app workflow described in
@@ -165,6 +171,50 @@ not assume a Homebrew or Release binary while development is in progress.
 - The default dry-run smoke must not select an arbitrary user event for edit or
   delete preview. Those paths use separately authorized disposable-event gates;
   a recurring occurrence may legitimately receive a new opaque ID in preview.
+
+## Non-negotiable Reminders rules
+
+- Reminders access requires EventKit full access and targets only the uniquely
+  verified iCloud CalDAV source; never fall back to Local, Exchange, or Google.
+- Treat source/list/`reminder_` IDs and cursors as opaque local values. Reminders
+  0.4 does not define a custom external ID.
+- `create --dry-run` resolves only a writable list in the selected iCloud source,
+  returns an ID-less draft, and never calls `EKEventStore.save`.
+- `create --apply` saves exactly once and returns an opaque reminder ID. It must
+  distinguish `readback_confirmed` from `save_accepted_readback_pending`; the
+  latter is not a retry signal and must direct the caller to use `get`.
+- Optional `create --idempotent` uses a private 60-second local receipt. The
+  receipt may contain only a SHA-256 input fingerprint, opaque reminder/list
+  IDs, and timestamp metadata; it must never contain reminder content.
+- `resources` reports Reminders as writable because guarded create apply exists;
+  this does not imply every future Reminders mutation or list-management feature exists.
+- Unknown top-level create fields fail closed. Date-only, floating-time, IANA-time,
+  alarm, and recurrence validation must run before constructing a draft.
+- Location alarms are readable but not writable. Do not silently drop or convert them.
+- `edit` is a partial patch: omitted fields are preserved, `null` clears only
+  nullable fields, and a value replaces the field. `title`, `priority`, and
+  `listID` cannot be null; completion state is reserved for complete/reopen.
+- Editing `alarms` on a reminder that already contains a location alarm must
+  fail rather than silently removing that read-only alarm.
+- Edit apply saves exactly once and uses the same read-back-confirmed versus
+  save-accepted/read-back-pending no-auto-retry contract as create.
+- `complete` sets `isCompleted` and an explicit completion date; `reopen` clears
+  both. Repeating either target state is a safe no-op and must not save again.
+- A completed recurring reminder may expose its next incomplete occurrence on
+  read-back; return it separately as `nextOccurrence` rather than pretending the
+  completed occurrence stayed current.
+- Recurring completion real-write verification uses only
+  `scripts/run_reminders_recurrence_integration.sh --confirm "REMINDERS RECURRENCE TEST"`
+  after explicit current-task authorization. It must verify occurrence advance
+  and delete every disposable series item before reporting zero residue.
+- Use `scripts/run_reminders_read_smoke.sh` for privacy-minimized reads and
+  `scripts/run_reminders_dry_run_smoke.sh` for create preview. The latter must
+  verify no reminder was created and must never invoke `--apply`.
+- Do not use a user's existing reminder as an apply fixture. Real create/delete
+  verification must use one explicitly authorized disposable reminder and
+  finish by proving it absent. The only write gate is
+  `scripts/run_local_reminders_integration.sh --with-writes --confirm "REMINDERS CRUD TEST"`;
+  its confirmation argument does not replace explicit current-task authorization.
 
 ## Local verification
 

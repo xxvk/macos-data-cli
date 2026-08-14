@@ -5,6 +5,7 @@ public enum CLIExitCode: Int32 {
     case queryFailure = 3
     case mailFailure = 4
     case calendarFailure = 5
+    case remindersFailure = 6
     case usage = 64
 }
 
@@ -13,6 +14,7 @@ public enum CLIErrorCode: String {
     case query = "CONTACT_QUERY_ERROR"
     case mail = "MAIL_ERROR"
     case calendar = "CALENDAR_ERROR"
+    case reminders = "REMINDERS_ERROR"
     case invalidQuery = "INVALID_QUERY"
     case cli = "CLI_ERROR"
 }

@@ -24,6 +24,10 @@ let package = Package(
             name: "CalendarAdapter",
             targets: ["CalendarAdapter"]
         ),
+        .library(
+            name: "RemindersAdapter",
+            targets: ["RemindersAdapter"]
+        ),
         .executable(
             name: "macos-data",
             targets: ["macos-data"]
@@ -63,9 +67,17 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        .target(
+            name: "RemindersAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Reminders",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
         .executableTarget(
             name: "macos-data",
-            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -107,6 +119,13 @@ let package = Package(
         .testTarget(
             name: "CalendarTests",
             dependencies: ["CalendarAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "RemindersTests",
+            dependencies: ["RemindersAdapter"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

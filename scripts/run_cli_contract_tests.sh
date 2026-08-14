@@ -79,6 +79,14 @@ run_expected_failure calendar-query-missing-range 5 "$CLI" calendar query --form
 run_expected_failure calendar-query-invalid-range 5 "$CLI" calendar query --start 2026-08-15T00:00:00Z --end 2026-08-14T00:00:00Z --format json
 run_expected_failure calendar-delete-missing-confirmation 5 "$CLI" calendar delete --id calevent_invalid --apply --format json
 run_expected_failure calendar-delete-invalid-span 5 "$CLI" calendar delete --id calevent_invalid --dry-run --span all --format json
+run_expected_failure reminders-delete-missing-confirmation 6 "$CLI" reminders delete --id reminder_invalid --apply --format json
+run_expected_failure reminders-delete-wrong-confirmation 6 "$CLI" reminders delete --id reminder_invalid --apply --confirm "DELETE EVENT" --format json
+run_expected_failure reminders-edit-missing-input 6 "$CLI" reminders edit --id reminder_invalid --dry-run --format json
+run_expected_failure reminders-edit-missing-mode 6 "$CLI" reminders edit --id reminder_invalid --stdin --format json <<<'{"title":"Updated"}'
+run_expected_failure reminders-edit-empty-patch 6 "$CLI" reminders edit --id reminder_invalid --stdin --dry-run --format json <<<'{}'
+run_expected_failure reminders-edit-completion-is-separate 6 "$CLI" reminders edit --id reminder_invalid --stdin --dry-run --format json <<<'{"completed":true}'
+run_expected_failure reminders-complete-missing-mode 6 "$CLI" reminders complete --id reminder_invalid --format json
+run_expected_failure reminders-reopen-invalid-mode 6 "$CLI" reminders reopen --id reminder_invalid --apply --dry-run --format json
 
 set +e
 printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1

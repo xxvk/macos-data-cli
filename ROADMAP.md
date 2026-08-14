@@ -1,6 +1,6 @@
 # macos-data-cli Roadmap
 
-The project is preparing the Calendar adapter source release `0.3.0`.
+The Calendar adapter release `0.3.0` is published.
 The Contacts, read-only Mail, and Calendar workflows are implemented and locally verified;
 this roadmap distinguishes released behavior from later adapters and distribution work.
 

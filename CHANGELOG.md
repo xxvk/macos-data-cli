@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 — 2026-08-14
+
+### Added
+
+- Added the EventKit Reminders adapter with full-access authorization, unique
+  iCloud source selection, reminder-list discovery, bounded query/get, opaque
+  identifiers, filter-bound pagination, alarms, recurrence, and date-component
+  semantics.
+- Added guarded create/edit/delete and complete/reopen operations with dry-run,
+  exact delete confirmation, idempotent create receipts, explicit read-back
+  states, and fail-closed handling for location alarms.
+- Added synthetic tests, CLI negative contracts, privacy-minimized read and
+  dry-run smoke tests, plus disposable basic and recurring iCloud integration
+  gates that completed with zero fixture residue.
+
 ## 0.3.0 — 2026-08-14
 
 ### Added

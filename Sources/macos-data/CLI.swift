@@ -4,6 +4,7 @@ import Contacts
 import ContactsAdapter
 import MailAdapter
 import CalendarAdapter
+import RemindersAdapter
 
 @main
 struct MacosDataCLI {
@@ -31,7 +32,17 @@ struct MacosDataCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] {
+        var remindersSourceSelector: String?
+        if arguments.first == "reminders", let index = arguments.firstIndex(of: "--source") {
+            guard index + 1 < arguments.count else {
+                report(error: "--source requires iCloud or a source identifier", code: CLIErrorCode.reminders.rawValue, arguments: rawArguments, exitCode: CLIExitCode.usage.rawValue)
+                Foundation.exit(CLIExitCode.usage.rawValue)
+            }
+            remindersSourceSelector = arguments[index + 1]
+            arguments.removeSubrange(index...(index + 1))
+        }
+
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] {
             printHelp()
             return
         }
@@ -46,9 +57,18 @@ struct MacosDataCLI {
             let store = ContactsStore(permission: permission, containerSelector: containerSelector)
             let calendarPermission = CalendarPermission()
             let calendarStore = CalendarStore(permission: calendarPermission, sourceSelector: calendarSourceSelector)
+            let remindersPermission = RemindersPermission()
+            let remindersStore = RemindersStore(permission: remindersPermission, sourceSelector: remindersSourceSelector)
             switch arguments {
             case ["resources"]:
-                emitJSONSuccess(makeResourcesResult(permission: permission, store: store, calendarPermission: calendarPermission, calendarStore: calendarStore))
+                emitJSONSuccess(makeResourcesResult(
+                    permission: permission,
+                    store: store,
+                    calendarPermission: calendarPermission,
+                    calendarStore: calendarStore,
+                    remindersPermission: remindersPermission,
+                    remindersStore: remindersStore,
+                ))
             case ["calendar", "permission"]:
                 let granted = try await calendarPermission.requestFullAccess()
                 if jsonRequested { emitJSONSuccess(CalendarPermissionResult(granted: granted, access: calendarPermission.status.rawValue)) }
@@ -96,6 +116,53 @@ struct MacosDataCLI {
                     emitCalendarJSONSuccess(CalendarWriteResult(operation: "deleted", dryRun: false, event: try calendarStore.delete(id: args[3], span: request.span)))
                 } else {
                     emitCalendarJSONSuccess(CalendarWriteResult(operation: "delete_preview", dryRun: true, event: try calendarStore.previewDelete(id: args[3], span: request.span)))
+                }
+            case ["reminders", "permission"]:
+                let granted = try await remindersPermission.requestFullAccess()
+                if jsonRequested {
+                    emitJSONSuccess(RemindersPermissionResult(granted: granted, access: remindersPermission.status.rawValue))
+                } else {
+                    print(granted ? "Reminders full access granted." : "Reminders full access not granted.")
+                }
+                if !granted { Foundation.exit(CLIExitCode.remindersFailure.rawValue) }
+            case ["reminders", "sources"]:
+                emitJSONSuccess(try remindersStore.sourceDescriptions())
+            case ["reminders", "lists"]:
+                emitJSONSuccess(try remindersStore.listDescriptions())
+            case let args where args.count >= 2 && args[0] == "reminders" && args[1] == "query":
+                emitRemindersJSONSuccess(try await remindersStore.query(parseReminderQuery(Array(args.dropFirst(2)))))
+            case let args where args.count == 4 && args[0] == "reminders" && args[1] == "get" && args[2] == "--id":
+                emitRemindersJSONSuccess(try remindersStore.get(id: args[3]))
+            case let args where args.count >= 3 && args[0] == "reminders" && args[1] == "create":
+                let request = try parseReminderCreateArguments(Array(args.dropFirst(2)))
+                let input: ReminderInput = try decodeReminder(request.data)
+                if request.mode == "--dry-run" {
+                    emitRemindersJSONSuccess(try remindersStore.previewCreate(input))
+                } else {
+                    emitRemindersJSONSuccess(try remindersStore.create(input, idempotent: request.idempotent))
+                }
+            case let args where args.count >= 5 && args[0] == "reminders" && args[1] == "edit" && args[2] == "--id":
+                let request = try parseReminderEditArguments(Array(args.dropFirst(4)))
+                let patch: ReminderPatch = try decodeReminder(request.data)
+                if request.mode == "--dry-run" {
+                    emitRemindersJSONSuccess(try remindersStore.previewUpdate(id: args[3], patch: patch))
+                } else {
+                    emitRemindersJSONSuccess(try remindersStore.update(id: args[3], patch: patch))
+                }
+            case let args where args.count >= 4 && args[0] == "reminders" && ["complete", "reopen"].contains(args[1]) && args[2] == "--id":
+                let action: ReminderStateAction = args[1] == "complete" ? .complete : .reopen
+                let apply = try parseReminderStateArguments(Array(args.dropFirst(4)), command: args[1])
+                if apply {
+                    emitRemindersJSONSuccess(try remindersStore.changeState(id: args[3], action: action))
+                } else {
+                    emitRemindersJSONSuccess(try remindersStore.previewStateChange(id: args[3], action: action))
+                }
+            case let args where args.count >= 4 && args[0] == "reminders" && args[1] == "delete" && args[2] == "--id":
+                let apply = try parseReminderDeleteArguments(Array(args.dropFirst(4)))
+                if apply {
+                    emitRemindersJSONSuccess(try remindersStore.delete(id: args[3]))
+                } else {
+                    emitRemindersJSONSuccess(try remindersStore.previewDelete(id: args[3]))
                 }
             case ["mail", "doctor"]:
                 emitJSONSuccess(MailDoctor().run())
@@ -297,9 +364,17 @@ struct MacosDataCLI {
         } catch let error as CalendarError {
             report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
             Foundation.exit(CLIExitCode.calendarFailure.rawValue)
+        } catch let error as ReminderError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
+            Foundation.exit(CLIExitCode.remindersFailure.rawValue)
         } catch let error as PaginationError {
-            report(error: error == .invalidLimit ? "Calendar limit must be between 1 and 200." : "Calendar cursor is invalid or stale.", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
-            Foundation.exit(CLIExitCode.calendarFailure.rawValue)
+            if rawArguments.first == "reminders" {
+                report(error: error == .invalidLimit ? "Reminder limit must be between 1 and 200." : "Reminder cursor is invalid or stale.", code: CLIErrorCode.reminders.rawValue, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
+                Foundation.exit(CLIExitCode.remindersFailure.rawValue)
+            } else {
+                report(error: error == .invalidLimit ? "Calendar limit must be between 1 and 200." : "Calendar cursor is invalid or stale.", code: CLIErrorCode.calendar.rawValue, arguments: rawArguments, exitCode: CLIExitCode.calendarFailure.rawValue)
+                Foundation.exit(CLIExitCode.calendarFailure.rawValue)
+            }
         } catch {
             report(error: error.localizedDescription, code: CLIErrorCode.cli.rawValue, arguments: rawArguments, exitCode: CLIExitCode.genericFailure.rawValue)
             Foundation.exit(CLIExitCode.genericFailure.rawValue)
@@ -326,6 +401,7 @@ struct MacosDataCLI {
     private struct CalendarWriteResult: Encodable { let operation: String; let dryRun: Bool; let event: CalendarEventPayload }
     private struct CalendarUpdatePreview: Encodable { let operation: String; let dryRun: Bool; let before: CalendarEventPayload; let after: CalendarEventPayload }
     private struct CalendarPermissionResult: Encodable { let granted: Bool; let access: String }
+    private struct RemindersPermissionResult: Encodable { let granted: Bool; let access: String }
 
     private static func emitJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -337,6 +413,15 @@ struct MacosDataCLI {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) { print(text) }
+    }
+
+    private static func emitRemindersJSONSuccess<T: Encodable>(_ value: T) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(JSONSuccess(data: value)), let text = String(data: data, encoding: .utf8) {
+            print(text)
+        }
     }
 
     private static func parseJSONWriteArguments(_ arguments: [String], command: String) throws -> (Data, String, Bool) {
@@ -547,6 +632,172 @@ struct MacosDataCLI {
         throw CalendarError.invalidInput("\(option) requires ISO 8601, for example 2026-08-14T09:00:00+09:00")
     }
 
+    private static func parseReminderQuery(_ arguments: [String]) throws -> ReminderQuery {
+        var status = ReminderQueryStatus.incomplete
+        var dueStart: Date?
+        var dueEnd: Date?
+        var listID: String?
+        var title: String?
+        var limit = Pagination.defaultLimit
+        var cursor: String?
+        var seen = Set<String>()
+        var index = 0
+        let supported = ["--status", "--due-start", "--due-end", "--list", "--title", "--limit", "--cursor"]
+
+        while index < arguments.count {
+            let option = arguments[index]
+            guard supported.contains(option), seen.insert(option).inserted, index + 1 < arguments.count else {
+                throw ReminderError.invalidInput("reminders query accepts --status, --due-start, --due-end, --list, --title, --limit, and --cursor")
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--status":
+                guard let parsed = ReminderQueryStatus(rawValue: value) else {
+                    throw ReminderError.invalidInput("--status requires incomplete, completed, or all")
+                }
+                status = parsed
+            case "--due-start": dueStart = try parseReminderDate(value, option: option)
+            case "--due-end": dueEnd = try parseReminderDate(value, option: option)
+            case "--list": listID = value
+            case "--title": title = value
+            case "--limit":
+                guard let parsed = Int(value) else { throw ReminderError.invalidInput("--limit requires an integer") }
+                limit = parsed
+            case "--cursor": cursor = value
+            default: break
+            }
+            index += 2
+        }
+
+        return try ReminderQuery(
+            status: status,
+            dueStart: dueStart,
+            dueEnd: dueEnd,
+            listID: listID,
+            title: title,
+            limit: limit,
+            cursor: cursor
+        )
+    }
+
+    private struct ReminderCreateArguments {
+        let data: Data
+        let mode: String
+        let idempotent: Bool
+    }
+
+    private static func parseReminderCreateArguments(_ arguments: [String]) throws -> ReminderCreateArguments {
+        var inputSource: String?
+        var mode: String?
+        var idempotent = false
+        var index = 0
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--input":
+                guard inputSource == nil, index + 1 < arguments.count else {
+                    throw ReminderError.invalidInput("create accepts exactly one JSON source")
+                }
+                inputSource = arguments[index + 1]
+                index += 2
+            case "--stdin":
+                guard inputSource == nil else {
+                    throw ReminderError.invalidInput("create accepts exactly one JSON source")
+                }
+                inputSource = "-"
+                index += 1
+            case "--dry-run", "--apply":
+                guard mode == nil else {
+                    throw ReminderError.invalidInput("create accepts exactly one of --dry-run or --apply")
+                }
+                mode = arguments[index]
+                index += 1
+            case "--idempotent":
+                guard !idempotent else { throw ReminderError.invalidInput("--idempotent may be specified once") }
+                idempotent = true
+                index += 1
+            default:
+                throw ReminderError.invalidInput("unsupported create option")
+            }
+        }
+        guard let inputSource, let mode else {
+            throw ReminderError.invalidInput("create requires JSON input (--input <file> or --stdin) and --dry-run or --apply")
+        }
+        let data = inputSource == "-"
+            ? FileHandle.standardInput.readDataToEndOfFile()
+            : try Data(contentsOf: URL(fileURLWithPath: inputSource))
+        guard !data.isEmpty else { throw ReminderError.invalidInput("create JSON input is empty") }
+        return ReminderCreateArguments(data: data, mode: mode, idempotent: idempotent)
+    }
+
+    private static func decodeReminder<T: Decodable>(_ data: Data) throws -> T {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        do { return try decoder.decode(T.self, from: data) }
+        catch { throw ReminderError.invalidInput("JSON does not match the Reminders contract") }
+    }
+
+    private struct ReminderEditArguments {
+        let data: Data
+        let mode: String
+    }
+
+    private static func parseReminderEditArguments(_ arguments: [String]) throws -> ReminderEditArguments {
+        var inputSource: String?
+        var mode: String?
+        var index = 0
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--input":
+                guard inputSource == nil, index + 1 < arguments.count else {
+                    throw ReminderError.invalidInput("edit accepts exactly one JSON source")
+                }
+                inputSource = arguments[index + 1]
+                index += 2
+            case "--stdin":
+                guard inputSource == nil else {
+                    throw ReminderError.invalidInput("edit accepts exactly one JSON source")
+                }
+                inputSource = "-"
+                index += 1
+            case "--dry-run", "--apply":
+                guard mode == nil else {
+                    throw ReminderError.invalidInput("edit accepts exactly one of --dry-run or --apply")
+                }
+                mode = arguments[index]
+                index += 1
+            default:
+                throw ReminderError.invalidInput("unsupported edit option")
+            }
+        }
+        guard let inputSource, let mode else {
+            throw ReminderError.invalidInput("edit requires JSON input (--input <file> or --stdin) and --dry-run or --apply")
+        }
+        let data = inputSource == "-"
+            ? FileHandle.standardInput.readDataToEndOfFile()
+            : try Data(contentsOf: URL(fileURLWithPath: inputSource))
+        guard !data.isEmpty else { throw ReminderError.invalidInput("edit JSON input is empty") }
+        return ReminderEditArguments(data: data, mode: mode)
+    }
+
+    private static func parseReminderDeleteArguments(_ arguments: [String]) throws -> Bool {
+        if arguments == ["--dry-run"] { return false }
+        if arguments == ["--apply", "--confirm", "DELETE REMINDER"] { return true }
+        throw ReminderError.invalidInput("delete requires --dry-run or --apply --confirm \"DELETE REMINDER\"")
+    }
+
+    private static func parseReminderStateArguments(_ arguments: [String], command: String) throws -> Bool {
+        if arguments == ["--dry-run"] { return false }
+        if arguments == ["--apply"] { return true }
+        throw ReminderError.invalidInput("\(command) requires exactly one of --dry-run or --apply")
+    }
+
+    private static func parseReminderDate(_ value: String, option: String) throws -> Date {
+        guard let date = ISO8601DateFormatter().date(from: value) else {
+            throw ReminderError.invalidInput("\(option) requires an ISO 8601 timestamp with an explicit offset")
+        }
+        return date
+    }
+
     private static func parseQuerySet(_ arguments: [String]) throws -> ContactQuerySet {
         var conditions: [ContactQuery] = []
         var fields = Set<String>()
@@ -713,7 +964,9 @@ struct MacosDataCLI {
         permission: ContactsPermission,
         store: ContactsStore,
         calendarPermission: CalendarPermission,
-        calendarStore: CalendarStore
+        calendarStore: CalendarStore,
+        remindersPermission: RemindersPermission,
+        remindersStore: RemindersStore
     ) -> DataResourcesResult {
         var resources: [DataResource] = []
         var limitations: [String] = []
@@ -768,6 +1021,26 @@ struct MacosDataCLI {
             limitations.append("calendar_permission_restricted")
         case .writeOnly:
             limitations.append("calendar_full_access_required")
+        }
+
+        switch remindersPermission.status {
+        case .fullAccess:
+            do {
+                let result = try remindersStore.sourceDescriptions()
+                resources.append(contentsOf: result.sources.map {
+                    RemindersResourceMapper.map($0, selected: $0.identifier == result.selectedSourceID, permission: .available)
+                })
+            } catch {
+                limitations.append("reminders_resource_discovery_failed")
+            }
+        case .notDetermined:
+            limitations.append("reminders_permission_not_determined")
+        case .denied:
+            limitations.append("reminders_permission_denied")
+        case .restricted:
+            limitations.append("reminders_permission_restricted")
+        case .writeOnly:
+            limitations.append("reminders_full_access_required")
         }
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
@@ -909,9 +1182,10 @@ struct MacosDataCLI {
           macos-data contacts <command> [options]
           macos-data mail <command> [options]
           macos-data calendar <command> [options]
+          macos-data reminders <command> [options]
 
         Unified resources:
-          resources --format json                List Contacts, Mail, and Calendar resources
+          resources --format json                List Contacts, Mail, Calendar, and Reminders resources
                                              with selection, permission, and limitations
 
         Calendar commands:
@@ -944,6 +1218,40 @@ struct MacosDataCLI {
           All-day create/edit uses YYYY-MM-DD with an exclusive end date.
           alarms accepts relativeMinutes or absoluteDate; [] clears all alarms.
           Attendees are returned by reads but are read-only in 0.3.
+
+        Reminders 0.4 commands:
+          permission                         Request full Reminders access
+          sources --format json              List reminder-capable EventKit sources
+          lists --format json                List reminder lists in the selected iCloud source
+          query [--status incomplete|completed|all]
+            [--due-start <iso8601>] [--due-end <iso8601>]
+            [--list <id|title>] [--title <text>]
+            [--limit <1...200>] [--cursor <cursor>] --format json
+                                             Query a bounded reminder page
+          get --id <reminder-id> --format json
+                                             Read one reminder by opaque ID
+          create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+                                             Preview or create a reminder in writable iCloud list
+          edit --id <reminder-id> --input <file>|--stdin --dry-run|--apply --format json
+                                             Partially update one reminder
+          complete --id <reminder-id> --dry-run|--apply --format json
+          reopen --id <reminder-id> --dry-run|--apply --format json
+                                             Change completion state; repeated apply is a safe no-op
+          delete --id <reminder-id> --dry-run --format json
+          delete --id <reminder-id> --apply --confirm "DELETE REMINDER" --format json
+                                             Delete one reminder from its writable iCloud list
+
+        Reminders selection:
+          Add --source iCloud or --source <source-identifier>. The default is
+          the unique verified iCloud CalDAV source containing reminder lists.
+          Dry-run never calls EventKit save. Apply saves once and returns
+          read-back verification; --idempotent adds a private 60-second receipt.
+          Delete apply requires the exact confirmation phrase and reports either
+          confirmed absence or accepted removal with read-back still pending.
+          Edit uses patch semantics: omitted fields remain unchanged, null clears
+          nullable fields, and values replace fields. Completion uses separate commands.
+          Complete/reopen set or clear completionDate. Recurring completion may
+          return the next visible occurrence separately as nextOccurrence.
 
         Mail commands:
           doctor --format json               Inspect Mail store, schema, and permissions
@@ -1020,7 +1328,7 @@ struct MacosDataCLI {
           Version: 0.1 (independent from the CLI release version)
           Exit codes: 0 success, 1 unexpected CLI error, 2 Contacts error,
             3 ambiguous/not-found query error, 4 Mail error, 5 Calendar error,
-            64 usage or invalid query
+            6 Reminders error, 64 usage or invalid query
           Success: {"ok": true, "contractVersion": "0.1", "data": ...}
           Failure: {"ok": false, "contractVersion": "0.1", "error": {"code": ..., "message": ...}}
           Add --format json to commands that support machine-readable output.
@@ -1030,6 +1338,7 @@ struct MacosDataCLI {
             always incomplete, and has no cursor; raw remains cache-only.
           Contacts writes target only the verified iCloud container.
           Calendar reads and writes target only the verified iCloud source.
+          Reminders reads target only the verified iCloud source and lists.
           Writes require --dry-run or explicit --apply.
           Recurring event edit/delete requires --span this or --span future.
           Avatar input is limited to 10 MB; output is <= 1024 px and 200 KB.

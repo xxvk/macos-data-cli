@@ -1,10 +1,11 @@
 # Usage
 
 `macos-data` is a local Terminal CLI. It reads and writes macOS data through Apple public frameworks; agents do not need a special integration.
+integration.
 
 ## Unified resources
 
-List the currently discoverable Contacts, Mail, and Calendar resource scopes in one
+List the currently discoverable Contacts, Mail, Calendar, and Reminders resource scopes in one
 machine-readable response:
 
 ```text
@@ -17,9 +18,11 @@ Each resource reports an adapter-owned opaque `id`, `kind`, `provider`,
 Mail account scopes are intentionally not selected merely because one account
 exists; the preferred `aim-tech.jp` work account still requires explicit,
 privacy-safe verification. With full access, Calendar reports EventKit sources
-and selects only the uniquely verified iCloud CalDAV source.
+and selects only the uniquely verified iCloud CalDAV source. Reminders follows
+the same fail-closed iCloud source policy and reports a distinct
+`remindersSource` resource kind.
 
-## Calendar (0.3 development)
+## Calendar (0.3)
 
 ```text
 macos-data calendar permission --format json
@@ -60,6 +63,116 @@ The returned `calevent_` ID binds the local calendar item and occurrence start.
 Treat it as opaque; moving an event can return a new ID. See the
 [Calendar architecture](development/calendar-adapter-architecture.md) for the
 full JSON and safety contract.
+
+## Reminders (0.4 development slice)
+
+The current source tree implements permission, iCloud list discovery, bounded
+query/get, create, partial edit, complete/reopen, and single-item delete:
+
+```text
+macos-data reminders permission --format json
+macos-data reminders sources --format json
+macos-data reminders lists --format json
+macos-data reminders query [--status incomplete|completed|all] \
+  [--due-start <iso8601>] [--due-end <iso8601>] \
+  [--list <id|unique-title>] [--title <text>] \
+  [--limit <1...200>] [--cursor <cursor>] --format json
+macos-data reminders get --id <opaque-reminder-id> --format json
+macos-data reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+macos-data reminders edit --id <opaque-reminder-id> --input <file>|--stdin --dry-run|--apply --format json
+macos-data reminders complete --id <opaque-reminder-id> --dry-run|--apply --format json
+macos-data reminders reopen --id <opaque-reminder-id> --dry-run|--apply --format json
+```
+
+Add `--source iCloud` or an exact source identifier when explicit selection is
+needed. Selection fails closed unless the source is a uniquely verified iCloud
+CalDAV source containing reminder lists. Query defaults to incomplete reminders;
+due boundaries require ISO 8601 timestamps with explicit offsets. Results use
+deterministic chronological ordering and an anchor cursor bound to privacy-hashed
+filters and the selected list set. Reusing it after changing filters/lists, or
+after its anchor was removed or changed, is rejected. Incomplete-reminder due
+ranges are passed to EventKit before fetching. Fetches time out after 10 seconds,
+propagate task cancellation, and reject results over 5,000 reminders. EventKit
+still materializes its result array before the adapter can enforce that cap, so
+the cap is a response-safety boundary rather than a strict peak-memory bound.
+
+Start and due values preserve EventKit `DateComponents`: `value`, `hasTime`,
+`floating`, and `timeZone` distinguish date-only, floating timed, and IANA-zone
+timed values. The read contract includes `alarms` and `recurrenceRules` arrays
+as well as their compatibility presence flags. Relative, absolute, and location
+alarms are readable; location-alarm writes remain outside 0.4. Persisting
+create, partial edit, complete/reopen, and single-item delete are implemented.
+
+`create --dry-run` validates and normalizes an unsaved draft without calling
+`EKEventStore.save`. It resolves the target writable list using `listID`, then
+the writable system default within the selected iCloud source, then a sole
+writable iCloud list. Ambiguity fails closed. The preview deliberately has no
+`id`. Unknown top-level JSON fields are rejected to catch Agent typos.
+
+`create --apply` saves once through EventKit and immediately reads the returned
+opaque ID. `verification: "readback_confirmed"` is the strong success state.
+`save_accepted_readback_pending` means EventKit accepted the save but immediate
+read-back was not visible; preserve the returned ID and do not retry automatically.
+`--idempotent` stores only a SHA-256 input fingerprint, opaque Reminder/list IDs,
+and creation time in a private 60-second local receipt; it never stores title,
+notes, URL, alarm, or recurrence content.
+
+Edit JSON is a partial patch. Omitted fields stay unchanged; `null` clears
+`notes`, `url`, `start`, `due`, `alarms`, or `recurrenceRules`; a supplied value
+replaces the field. `title`, `priority`, and `listID` cannot be null. Completion
+is intentionally rejected here and uses the separate complete/reopen commands.
+An alarm patch is rejected when the existing reminder has a read-only location
+alarm, preventing silent data loss. Apply saves once and uses the same no-retry
+read-back states as create. Real edit apply verification passed in the disposable
+gate and final cleanup found zero matching reminders.
+
+`complete` sets completion state and an explicit completion timestamp; `reopen`
+clears both. Repeating the requested target state returns `already_completed` or
+`already_incomplete` without saving. For a recurring reminder, completion can
+make the next incomplete occurrence visible; it is returned separately as
+`nextOccurrence`. Real complete/reopen apply and repeated no-op verification passed.
+The separate recurring-completion gate also passed against local iCloud with
+zero fixture residue. EventKit reused the opaque reminder ID while advancing the
+due date, so callers must not use an ID change as proof of occurrence advance:
+
+```text
+bash scripts/run_reminders_recurrence_integration.sh --confirm "REMINDERS RECURRENCE TEST"
+```
+
+Delete requires a preview or the exact confirmation phrase:
+
+```text
+macos-data reminders delete --id <opaque-reminder-id> --dry-run --format json
+macos-data reminders delete --id <opaque-reminder-id> --apply --confirm "DELETE REMINDER" --format json
+```
+
+`absence_confirmed` means the removed opaque ID no longer resolves.
+`remove_accepted_readback_pending` means EventKit accepted removal but immediate
+absence verification is inconclusive; do not retry automatically and use `get`.
+
+The disposable real iCloud create/get/edit/complete/reopen/delete gate passed
+locally and verified a final matching count of zero. Unit, release, read, and dry-run gates do not write
+reminders. Any rerun still requires explicit authorization:
+
+```text
+bash scripts/run_local_reminders_integration.sh --with-writes --confirm "REMINDERS CRUD TEST"
+```
+
+```json
+{
+  "title": "Prepare weekly report",
+  "listID": null,
+  "notes": null,
+  "url": null,
+  "priority": "high",
+  "start": null,
+  "due": {"value":"2026-08-17","timeZone":null,"hasTime":false,"floating":true},
+  "alarms": [{"relativeMinutes":-10}],
+  "recurrenceRules": []
+}
+```
+
+See the [Reminders 0.4 architecture draft](development/reminders-adapter-architecture.md).
 
 ## Mail (0.2)
 

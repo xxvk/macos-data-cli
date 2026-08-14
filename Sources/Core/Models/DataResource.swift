@@ -4,6 +4,7 @@ public enum DataResourceKind: String, Codable, Equatable, Sendable {
     case contactsContainer
     case mailAccount
     case calendarSource
+    case remindersSource
 }
 
 public enum DataResourceProvider: String, Codable, Equatable, Sendable {

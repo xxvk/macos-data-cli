@@ -7,13 +7,15 @@
 	<key>CFBundleName</key>
 	<string>macos-data</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.3.0</string>
+	<string>0.4.0</string>
 	<key>CFBundleVersion</key>
-	<string>0.3.0</string>
+	<string>0.4.0</string>
 	<key>NSContactsUsageDescription</key>
 	<string>macos-data needs Contacts access to read and manage your iCloud contacts from the local CLI.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>macos-data needs full Calendar access to query and explicitly manage events in your iCloud calendars.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>macos-data needs full Reminders access to query and explicitly manage reminders in your iCloud lists.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>macos-data uses Mail.app automation only for explicitly requested Mail fallback and reveal operations.</string>
 </dict>

@@ -10,7 +10,7 @@ adapters when no public framework exposes the required data.
 
 ## Project status
 
-The current source release is 0.3.0. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.4.0. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -28,6 +28,10 @@ ISO 8601 time zones, recurrence rules, opaque occurrence IDs, and dry-run/apply
 paths for create/edit/delete are implemented. Local read and dry-run smoke tests
 pass; the explicitly authorized disposable-event apply integration also passed
 and verified final absence. The public precompiled distribution may still lag the source tag.
+
+Reminders 0.4 adds permission/list discovery, bounded
+query/get, guarded CRUD, completion/reopen, alarms and recurrence. Disposable
+basic and recurring iCloud gates passed with zero fixture residue.
 
 See the detailed roadmaps:
 
@@ -218,9 +222,17 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 
 ## Future direction
 
-Current development focuses on Calendar 0.3 release hardening, followed by
-Reminders, Notes, and Photos. `macos-data` remains the canonical command through
+Calendar 0.3 and Reminders 0.4 are released. Future adapters remain planned.
+`macos-data` remains the canonical command through
 0.x; naming is reviewed again before 1.0.0.
+The current Reminders development slice supports full-access discovery,
+bounded query/get, and guarded `create --dry-run|--apply` with read-back states
+and optional short-lived idempotency. Partial edit and guarded single-item delete
+are implemented; complete/reopen include safe repeated no-ops and passed
+real-write verification. The automatic cleanup gate is implemented. The disposable
+create/get/edit/complete/reopen/delete gate
+passed against local iCloud with final matching count zero. See
+[Reminders usage](docs/usage.md).
 Mail 0.2 uses a read-only local SQLite/EMLX path with Mail.app Apple Events
 fallback and visual verification. See the
 [Mail architecture decision](docs/development/mail-adapter-architecture.md).
