@@ -10,7 +10,7 @@ public enum SafariResourceMapper {
             displayName: "Apple Safari",
             capabilities: .init(
                 readable: permission.bookmarksReadable,
-                writable: permission.readingListAddAvailable,
+                writable: permission.bookmarksReadable || permission.readingListAddAvailable,
                 selected: true,
                 permission: state
             )

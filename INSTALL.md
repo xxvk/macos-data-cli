@@ -1,6 +1,6 @@
 # macos-data-cli Installation
 
-`macos-data-cli` 0.7.1 can be built and installed locally from source. The
+`macos-data-cli` 0.8.1 can be built and installed locally from source. The
 public binary is not yet Developer ID signed or notarized.
 
 ### Unsigned distribution boundary
@@ -18,7 +18,7 @@ and must not be documented as equivalent to notarization.
 ## Requirements
 
 - macOS 26.0 or newer
-- Apple Silicon Mac (arm64); Intel Mac is not a supported target for 0.7.1
+- Apple Silicon Mac (arm64); Intel Mac is not a supported target for 0.8.1
 - Apple Contacts enabled in iCloud
 - Full Xcode compatible with Swift tools 6.2
 - Full Disk Access for the responsible process when using the Mail SQLite/EMLX
@@ -27,7 +27,7 @@ and must not be documented as equivalent to notarization.
   `mail reveal`
 - Shortcuts Automation permission for metadata discovery and folder moves;
   shortcut execution additionally requires the system `shortcuts` helper
-- Optional Cherri 2.3.x for the 0.7.1 managed-source authoring commands; it is
+- Optional Cherri 2.3.x for the managed-source authoring commands; it is
   invoked as an external process and is not included in the macos-data binary
 
 ## Build and install locally
@@ -41,7 +41,7 @@ swift build -c release
 sudo install -m 755 .build/release/macos-data /opt/homebrew/bin/macos-data
 ```
 
-Before committing a 0.7.1 release candidate, run the local non-writing release gate:
+Before committing a 0.8.1 release candidate, run the local non-writing release gate:
 
 ```bash
 bash scripts/run_release_gate.sh

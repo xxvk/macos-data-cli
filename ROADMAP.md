@@ -776,31 +776,139 @@ Architecture: [Safari adapter 0.8](docs/development/safari-adapter-architecture.
 - [x] Update source version metadata from 0.7.2 to 0.8.0 after all local gates;
   commit/push/tag/release still require separate authorization
 
-### 0.8.1: Direct Bookmarks.plist mutation feasibility
+### 0.8.1: Local-only Safari bookmark mutation
 
-- [ ] First prove lossless parser/serializer round trips on synthetic and copied
-  fixtures, preserving unknown values, ordering, mode, owner, and xattrs
-- [ ] Implement an attended quiescence/backup gate: Safari must be exited, no
-  Safari process may hold the plist, the file must be stable twice, and a private
-  mode-0600 recovery copy plus privacy-safe metadata must exist before mutation
-- [ ] Atomically add exactly one disposable folder/bookmark, then verify it in
-  Safari UI and through the 0.8 parser without touching any existing subtree
-- [ ] Require user confirmation that creation reaches a second iCloud device;
-  same-Mac restart alone is not synchronization proof
+The previously separate 0.8.1 feasibility, 0.8.2 safety-engine, and 0.8.3 CRUD
+development milestones are consolidated into the public 0.8.1 source release.
+Their historical gate names remain unchanged as evidence; the shipped contract
+is the guarded local-only CLI and never implies iCloud synchronization.
+
+- [x] Prove semantic parser/serializer round trips on synthetic fixtures and an
+  auto-deleted private copy of the live plist
+  - Unknown plist values, ordered children, mode, owner, group, and every source
+    xattr value are preserved; symlinks, overwrite, duplicate UUIDs, unknown node
+    types, and changes outside the selected ancestry fail closed
+  - The live binary plist is not byte-identical after Foundation serialization
+    (914,933 to 914,917 bytes), so safety uses typed canonical hashes for every
+    untouched subtree rather than whole-file byte equality
+  - macOS attaches destination-only `com.apple.provenance` when the test carrier
+    rewrites the private copy. It is reported explicitly; any other added xattr
+    fails the gate. The live source remained byte-for-byte unchanged
+- [x] Implement and locally audit the attended quiescence/backup gate
+  - Reject a running Safari application or any process holding the exact plist;
+    require matching device, inode, size, mtime, mode, owner, group, SHA-256, and
+    xattr-value hashes across two snapshots separated by 500 ms
+  - Create an exact recovery copy and privacy-safe JSON manifest in a mode-0700
+    directory with both files mode 0600, then re-check quiescence and an identical
+    third source snapshot; incomplete artifacts are automatically removed
+  - The live read-only audit passed with Safari exited, no open handles, exact
+    0600 recovery data, and an unchanged source; its temporary recovery directory
+    was automatically deleted. The gate must run again immediately before the
+    separately authorized mutation and is not reusable as a stale approval
+- [x] Execute one attended atomic disposable-bookmark mutation and verify the
+  fixture in Safari UI and through the 0.8 parser
+  - Pre-live TDD is complete: the writer rejects stale/tampered recovery state,
+    creates a same-directory candidate, re-applies exact source xattr values,
+    uses `RENAME_SWAP`, verifies both new and old sides, and swaps back on any
+    read-back failure
+  - An auto-deleted copy of the live Safari schema successfully added exactly one
+    bookmark under the unique built-in `BookmarksBar`; 206 untouched subtrees
+    retained their canonical hashes and the real source remained unchanged
+  - Session `3f6c5b6f-aa0c-4a21-98e8-fe66c578a781` added exactly one fixture;
+    Safari UI and the public CLI both found it, and 0600 recovery remains retained
+  - Reading List changing from 89 entries to zero was a separate manual deletion
+    by the user, not an effect of the fixture write. It is excluded from the
+    mutation-safety verdict
+- [x] Test a second iCloud device and record that the fixture did **not** appear;
+  direct plist replacement therefore proves local mutation only and does not
+  produce Safari's private iCloud change transaction
 - [ ] Remove only the disposable fixture through a Safari-owned route and prove
   deletion on both devices, with no duplicates, resurrection, missing old nodes,
   schema drift, or sync errors
-- [ ] Record a go/no-go decision. Any unprovable remote state or data anomaly
-  fails direct mutation and prohibits automatic retry or public exposure
+- [x] Record a split decision: **local-only go, iCloud-sync no-go**. Do not claim
+  cross-device persistence and do not restart private sync daemons as a substitute
+  for a supported Safari mutation
+- [x] Add an explicit local-only contract and warning before exposing direct-plist
+  writes: `syncStatus=local_only`, retained recovery, and a `nextAction` explaining
+  that Safari-owned import is required for an iCloud-synced copy
 
-### 0.8.2: Guarded Safari mutation, conditional on 0.8.1
+#### Internal safety-engine milestone included in 0.8.1
 
-- [ ] If and only if 0.8.1 proves local and cross-device safety, design bookmark
-  create/update/move/delete and Reading List update/delete with backups, optimistic
-  hashes, dry-run/apply, exact destructive confirmations, and disposable gates
-- [ ] If 0.8.1 fails, evaluate Shortcuts Safari actions, shipping Safari
-  WebExtension feature detection, and semantic non-coordinate Accessibility in
-  that order; do not assume WebKit source means Safari implements bookmark CRUD
+- [x] Productize the guarded direct-plist mutation foundation as an explicitly
+  local-only engine; never imply that it updates iCloud
+  - The detailed local CRUD contract and the useful design ideas audited from
+    Apache-2.0 `safari-bookmarks-mcp` are assigned to 0.8.3 below
+  - Do not adopt its weaker persistence path: macos-data must retain Safari quit
+    and open-handle gates, optimistic source identity/hash, metadata/xattr
+    preservation, fsync, rollback, private recovery, and live read-back
+- [x] Expose reusable prepare/apply/read-back/rollback primitives to the Safari
+  adapter, with privacy-safe receipts and stable local-only result/error codes
+- [x] Complete synthetic and private-live-copy TDD for stale source, concurrent
+  change, interrupted write, rollback failure, metadata drift, and safe no-op
+
+#### Internal CRUD milestone included in 0.8.1
+
+- [x] Adapt the useful **contract concepts**, not the persistence implementation,
+  from Apache-2.0
+  [`chikingsley/safari-bookmarks-mcp`](https://github.com/chikingsley/safari-bookmarks-mcp)
+  into an independently implemented macos-data adapter
+  - Use opaque UUID targeting for existing nodes and explicit parent UUID plus
+    child index for placement; permit a human-readable path only for discovery
+    and dry-run display, never as an ambiguous write identity
+  - Define strict JSON contracts for bookmark add/edit/move/remove and folder
+    create/rename/move/remove; reject unknown fields, duplicate UUIDs, invalid
+    indexes, missing parents, root mutation, and bookmark/folder type mismatch
+  - Reject moving a folder into itself or one of its descendants, and reject
+    deleting a non-empty folder unless the request uses a separate recursive
+    operation with an exact destructive confirmation phrase
+  - Make every mutation dry-run by default. `--apply` must require the current
+    source identity/hash token, return changed node/parent opaque IDs, and report
+    `syncStatus=local_only` plus an explicit iCloud limitation/next action
+- [x] Keep macos-data's stronger persistence and privacy gates instead of
+  adopting the reference project's direct read-modify-write behavior
+  - Require Safari fully quit, no open handle, stable repeated snapshots,
+    optimistic source identity/hash, private `0700` recovery, `0600` backup and
+    receipt, exact metadata/xattr preservation, same-directory atomic swap,
+    fsync, bounded read-back, rollback, and diagnostics redaction
+  - Preserve unknown plist fields and untouched subtree ordering/hashes; a
+    mutation outside the selected node ancestry must fail closed
+- [x] Build the feature with TDD and staged evidence
+  - Unit fixtures cover every CRUD operation, path/UUID resolution, cycle and
+    recursive-delete refusal, strict JSON, stale token, no-op, rollback, schema
+    drift, and privacy-safe diagnostics
+  - [x] A private copy of the live plist passed create → edit → move → remove and
+    folder create → rename → move → empty-delete with zero residue
+  - [x] One explicitly authorized disposable live fixture passed create plus
+    Safari UI/CLI read-back, then bookmark edit/move/delete and folder
+    rename/move/empty-delete. Final read-back found zero fixture residue, the
+    Reading List unchanged, and all 117 pre-existing nodes identical except
+    Safari's normalization of its two built-in root titles
+
+The combined 0.8.1 source release is the target after its local CRUD and release
+gates pass. It does not depend on iCloud synchronization, and the shipped
+binary must not call private Safari frameworks or sync daemons.
+
+### 0.8.8: Safari iCloud synchronization research
+
+- [x] Record the current no-go evidence
+  - Direct plist replacement was visible locally but produced no
+    `Sync.Changes` record and did not appear on the second device
+  - A private `WebBookmarkGroup` create/save did produce exactly one matching
+    `Sync.Changes` `Add`; the one-argument sync request was called exactly once,
+    but the fixture still did not appear on the second device
+  - After the failed remote read-back, the private fixture was UUID-resolved,
+    removed, saved, locally verified at zero matches, and issued exactly one
+    cleanup sync request. No automatic retry or daemon restart was performed
+- [ ] Revisit sync only after the local CRUD release is stable. Separately
+  evaluate Safari-owned HTML import, Shortcuts Safari actions, shipping Safari
+  WebExtension capability, and semantic non-coordinate Accessibility
+- [ ] Any future private-framework experiment requires a new explicit
+  authorization, disposable fixture, fresh recovery, compatibility/signing
+  audit, one-attempt receipt, second-device create/delete read-back, and zero
+  residue. A private selector or local `Sync.Changes` record is not sync proof
+- [ ] Do not expose an iCloud-syncing contract until one supported or explicitly
+  accepted route passes repeated cross-device create, update, move, delete,
+  conflict, duplicate, and recovery gates
 
 ### 0.9.0: Phone and Messages CLI feasibility
 

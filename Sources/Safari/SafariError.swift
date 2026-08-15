@@ -14,6 +14,10 @@ public enum SafariError: Error, Equatable, CustomStringConvertible, Sendable {
     case automationUnknown
     case addFailed
     case writeOutcomeUnknown
+    case localMutationSafariRunning
+    case localMutationStale
+    case localMutationConfirmationRequired
+    case localMutationUnsafe
 
     public var machineCode: String {
         switch self {
@@ -30,6 +34,10 @@ public enum SafariError: Error, Equatable, CustomStringConvertible, Sendable {
         case .automationUnknown: "SAFARI_AUTOMATION_UNKNOWN"
         case .addFailed: "SAFARI_READING_LIST_ADD_FAILED"
         case .writeOutcomeUnknown: "SAFARI_READING_LIST_OUTCOME_UNKNOWN"
+        case .localMutationSafariRunning: "SAFARI_LOCAL_MUTATION_SAFARI_RUNNING"
+        case .localMutationStale: "SAFARI_LOCAL_MUTATION_STALE"
+        case .localMutationConfirmationRequired: "SAFARI_LOCAL_MUTATION_CONFIRMATION_REQUIRED"
+        case .localMutationUnsafe: "SAFARI_LOCAL_MUTATION_UNSAFE"
         }
     }
 
@@ -61,6 +69,14 @@ public enum SafariError: Error, Equatable, CustomStringConvertible, Sendable {
             "Safari rejected the Reading List addition. No successful write was confirmed."
         case .writeOutcomeUnknown:
             "The Safari Apple Event exceeded its deadline. The item may have been added. Do not retry automatically; query the URL first."
+        case .localMutationSafariRunning:
+            "Quit Safari completely before applying a local bookmark mutation."
+        case .localMutationStale:
+            "Safari bookmark data changed or is in use. Run dry-run again and do not reuse the old source hash."
+        case .localMutationConfirmationRequired:
+            "Safari bookmark deletion requires the exact documented confirmation phrase."
+        case .localMutationUnsafe:
+            "The guarded local Safari mutation could not prove backup, atomic write, or read-back safety. No automatic retry is allowed."
         }
     }
 }

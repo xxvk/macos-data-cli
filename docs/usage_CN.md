@@ -22,10 +22,10 @@ Photos 始终报告一个 `photosLibrary` scope；未授权时不可读，limite
 Notes 始终报告一个只读 `notesLibrary` scope；permission 表示负责执行进程对 Notes.app 的
 Automation 状态，不代表可以访问 Notes 私有数据库。
 Safari 报告一个 `safariLibrary` scope。readable 表示负责执行进程可读取
-`Bookmarks.plist`；writable 表示同时能够回读且 Safari Automation 当前允许 0.8.0 的
-Reading List add，不代表支持 bookmark mutation。
+`Bookmarks.plist`；writable 表示能够进行受保护的 local-only plist mutation，或 Safari
+Automation 当前允许 Reading List add。它不表示 iCloud 同步可用。
 
-## Safari（0.8.0 开发切片）
+## Safari（0.8.1）
 
 Safari bookmark 与 Reading List 共用一份有界、严格只读 plist snapshot。读取可能要求
 稳定 app 或 Terminal host 获得 Full Disk Access。除非明确使用 `--request`，permission
@@ -64,8 +64,31 @@ printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
 
 相同标准化 URL 是安全 no-op。`save_accepted_readback_pending` 与
 `SAFARI_READING_LIST_OUTCOME_UNKNOWN` 都禁止自动重试；应等待 Safari 保存后用原 URL
-query。0.8.0 永不直接写 `Bookmarks.plist`。独立 0.8.1 direct-mutation gate 见
+query。0.8.1 同时提供下面独立受保护的 local-only bookmark/folder CRUD；其 recovery、
+原子替换、回读和不支持 iCloud 同步的边界见
 [Safari 架构](development/safari-adapter-architecture_CN.md)。
+
+### Local-only bookmark 与 folder CRUD
+
+使用 `bookmarks create|edit|move|delete` 和 `folders create|rename|move|delete`。
+输入为严格 JSON。默认 dry-run 会返回 `sourceSHA256Before`；执行 `--apply` 前，必须把该值写入
+`expectedSourceSHA256`。只有 Safari 完全退出，并且私有 recovery、atomic swap 与 read-back
+全部成功时才会 apply。
+
+```bash
+printf '%s' '{"parentID":"<opaque-folder-id>","index":0,"title":"Example","url":"https://example.com"}' \
+  | macos-data safari bookmarks create --stdin --format json
+
+printf '%s' '{"id":"<opaque-bookmark-id>","title":"Updated","url":"https://example.com/updated","expectedSourceSHA256":"<dry-run-source-hash>"}' \
+  | macos-data safari bookmarks edit --stdin --apply --format json
+
+printf '%s' '{"id":"<opaque-bookmark-id>","expectedSourceSHA256":"<dry-run-source-hash>"}' \
+  | macos-data safari bookmarks delete --stdin --apply \
+      --confirm "DELETE SAFARI BOOKMARK" --format json
+```
+
+folder delete 使用确认短语 `DELETE SAFARI FOLDER`，且只允许删除空 folder。所有结果都明确返回
+`syncStatus=local_only`；Agent 不得把本机回读成功解释为 iCloud 同步。
 
 ## Shortcuts（0.7.0–0.7.2）
 

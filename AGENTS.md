@@ -412,7 +412,7 @@ not assume a Homebrew or Release binary while development is in progress.
 
 ## Non-negotiable Safari rules
 
-- Safari 0.8.0 may read only the bounded public-user `Bookmarks.plist` snapshot.
+- Safari 0.8.1 may read only the bounded public-user `Bookmarks.plist` snapshot.
   Reject symlinks, oversized files, malformed roots, duplicate Reading List
   proxies, excessive depth/node counts, and unknown unsafe structures.
 - Bookmark, folder, Reading List, and cursor IDs are adapter-owned opaque values.
@@ -421,18 +421,48 @@ not assume a Homebrew or Release binary while development is in progress.
 - Never return or log Safari raw plist IDs, plist contents, titles, URLs,
   previews, paths, or AppleScript source. Live smoke output is aggregate or
   opaque only.
-- Safari 0.8.0 must never directly modify `Bookmarks.plist`. Its only write is
-  explicit Reading List add through Safari's official AppleScript command with
-  strict JSON, `--dry-run|--apply`, a five-second deadline, normalized-URL
-  idempotency, and immediate bounded read-back.
+- Reading List add uses Safari's official AppleScript command with strict JSON,
+  `--dry-run|--apply`, a five-second deadline, normalized-URL idempotency, and
+  immediate bounded read-back.
 - Pending or unknown Reading List outcomes prohibit automatic retry. The Agent
   must query the normalized URL after Safari has had time to save.
-- Direct plist mutation belongs exclusively to the separately authorized 0.8.1
-  feasibility gate. Safari must be fully exited; use only disposable fixtures,
-  preserve metadata and unknown fields, write atomically, and prove local
-  read-back plus creation and deletion on a second iCloud device. Never stop or
-  edit iCloud synchronization processes. Failure closes this route and triggers
-  evaluation of public Shortcuts, WebExtension, or semantic UI alternatives.
+- Version 0.8.1 exposes guarded local-only bookmark/folder CRUD. Apply requires
+  Safari fully exited, the exact dry-run source hash, private recovery, metadata
+  and unknown-field preservation, atomic replacement, and bounded local
+  read-back. Every result must say `syncStatus=local_only`; never claim that a
+  successful local write reached iCloud. Never stop or edit iCloud
+  synchronization processes.
+- A copied binary plist need not be byte-identical after Foundation
+  serialization. Verify typed canonical hashes for every untouched subtree,
+  preserve every source xattr value, and report destination-only
+  `com.apple.provenance`; any other added xattr fails closed. Copy-only evidence
+  is not authorization to replace the live plist.
+- The 0.8.1 quiescence gate must reject a running Safari app and any exact-plist
+  `lsof` holder, compare two full snapshots at least 500 ms apart, create only
+  mode-0600 recovery/metadata files in a mode-0700 directory, and compare a third
+  snapshot after backup. Use bounded non-mapped reads so the gate does not hold
+  the plist itself. A prior gate report cannot authorize a later replacement.
+- A direct-plist candidate must be on the same volume and use `RENAME_SWAP`, not
+  overwrite-in-place. Keep the exact old file until candidate, old side,
+  recovery, parser, metadata, and caller read-back all pass; otherwise swap back
+  and verify the restored source. Reapply and hash every source xattr after
+  writing candidate data because macOS may mutate quarantine metadata.
+- The 0.8.1 live fixture gate additionally requires the exact phrase
+  `CREATE SAFARI 0.8.1 FIXTURE`. Retain raw cleanup identifiers only in the
+  mode-0600 recovery receipt, launch Safari for immediate UI/parser read-back,
+  and never retry the live replacement automatically.
+- The attended 0.8.1 live experiment proved one local bookmark addition and no
+  loss of ordinary bookmarks. The simultaneous Reading List deletion was a
+  separate user action. A second iCloud device did not receive the fixture, so
+  direct-plist writes are local-only and must never imply iCloud synchronization.
+  Do not restart the private `SafariBookmarksSyncAgent` as a sync trigger.
+  A sync-capable path must use a separately gated Safari-owned mutation or
+  import and second-device read-back. Research-only capability detection may
+  inspect the unsupported Safari private `BookmarksController` selectors, but
+  it must not mutate data or become a public CLI contract. Any private-framework
+  fixture requires separate explicit authorization, disposable data, and a
+  second-device gate; failure must fall back to Safari-owned import/UI rather
+  than daemon manipulation.
 - Real Reading List add or direct-plist gates require explicit current-task
   authorization and zero-residue cleanup. Existing personal Safari data is
   never a mutation fixture.

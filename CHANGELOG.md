@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.8.1 — 2026-08-15
+
+### Added
+
+- Started the Safari 0.8.1 direct-plist feasibility gate with synthetic TDD,
+  private-copy metadata preservation, strict symlink/overwrite/UUID/schema
+  rejection, and typed canonical hashes for untouched subtrees.
+- Added a fail-closed quiescence and recovery gate that checks Safari and exact
+  plist holders, compares three full file snapshots, writes an exact 0600 backup
+  plus privacy-safe 0600 manifest in a 0700 directory, and cleans partial state.
+- Added a pre-live atomic writer with safety-snapshot binding, recovery-manifest
+  validation, same-directory `RENAME_SWAP`, exact xattr restoration, post-swap
+  read-back, and verified rollback on failure.
+- Added strict local-only Safari bookmark and folder CRUD contracts with opaque
+  IDs, default dry-run, optimistic source hashes, typed move/delete boundaries,
+  cycle and non-empty-folder rejection, private recovery, and atomic read-back.
+
+### Validation
+
+- Passed eighteen focused feasibility tests, all 29 Safari tests, and the complete
+  Swift regression suite. An opt-in read-only audit round-tripped an auto-deleted
+  private copy of the live plist while proving the source remained unchanged.
+- Passed an opt-in live safety-gate audit with Safari exited, no open handles,
+  matching snapshots, exact private recovery data, automatic cleanup, and no
+  source mutation.
+- Passed an auto-deleted atomic mutation audit against a copy of the live Safari
+  schema: one bookmark was added under the unique built-in `BookmarksBar`, 206
+  untouched subtree hashes remained stable, and the real plist was unchanged.
+- Executed the separately confirmed live fixture once. Safari UI and the public
+  CLI found exactly one new bookmark, and no pre-existing ordinary bookmark was
+  lost. The Reading List deletion observed at the same time was a separate user
+  action. The fixture did not reach a second iCloud device, so direct plist
+  mutation is proven local-only and not sync-capable.
+- Passed all 40 Safari regressions and a live-schema private-copy gate covering
+  folder create/rename/move/delete and bookmark create/edit/move/delete with all
+  original bookmark and Reading List projections restored and zero fixture residue.
+- Passed the separately authorized internal Safari local CRUD gate. Safari UI
+  displayed the created folder, CLI read-back confirmed its nested bookmark,
+  edit/move/delete completed, and final verification found zero fixture residue
+  with the Reading List unchanged. All 117 pre-existing nodes retained identity,
+  hierarchy, order, URLs, and dates; Safari only canonicalized its two built-in
+  root folder titles after launch.
+- A private `WebBookmarkGroup` save generated one local `Sync.Changes` Add and
+  requested sync once, but still did not appear on the second device. The fixture
+  was UUID-resolved, removed, saved, and locally verified at zero matches.
+
+### Limitations
+
+- Foundation preserves copied-plist semantics but not its exact binary encoding.
+  The private-copy output also receives macOS `com.apple.provenance`; its
+  presence is enforced, but its file-instance-specific value is not compared.
+  The live bookmark experiment did not generate a cross-device iCloud update, and
+  the source version is 0.8.1. Public distribution still requires the separate
+  Developer ID, notarization, GitHub Release, and Homebrew gates.
+
 ## 0.8.0 — 2026-08-15
 
 ### Added

@@ -3,10 +3,10 @@
 ## Current state
 
 The existing Homebrew Cask distribution path uses an Apple Silicon prebuilt
-binary from GitHub Release. Version 0.2.0 has been built, installed, and
-verified locally, but its public release asset and Cask update have not been
-published. The local binary is not signed with an Apple Developer ID or
-notarized and is not a public distribution artifact.
+binary from GitHub Release. The published 0.7.2 asset and current local install
+are not signed with an Apple Developer ID or notarized. Version 0.8.1 may be
+built and installed locally for development, but it must not be represented as
+a formal public distribution until the signing and notarization gates pass.
 
 ## Future public-release plan
 
@@ -88,7 +88,7 @@ Do not disable Gatekeeper globally. The permanent public-release solution remain
 ## Release checklist
 
 1. Run `scripts/check_public_release_prerequisites.sh` and resolve every failure.
-2. Sign, package, notarize, staple, and locally assess the 0.2.0 artifact.
+2. Sign, package, notarize, staple, and locally assess the target-version artifact.
 3. Publish the versioned binary to GitHub Release.
 4. Update the Homebrew Cask URL, version, checksum, and archive path.
 5. Push the Tap change.

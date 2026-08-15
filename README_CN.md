@@ -5,7 +5,8 @@
 项目希望填补一个实际空白：Agent 需要操作 macOS 原生数据时，通常只能依赖脆弱的
 GUI 自动化、特定平台集成，或直接接触不稳定的内部数据格式。`macos-data-cli` 提供
 本地、可脚本化、可测试的访问层：优先采用 Apple 公共 Framework；仅当公共 Framework
-无法暴露所需数据时，才允许范围明确、有文档、严格只读的本地 adapter。
+无法暴露所需数据时，才允许范围明确、有文档、fail-closed 的本地 adapter；任何写入必须
+另行定义 recovery、并发、回读与同步边界。
 
 ## 快速开始
 
@@ -40,7 +41,7 @@ macos-data mail doctor --format json
 
 ## 项目状态
 
-当前源码版本为 0.8.0。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
+当前源码版本为 0.8.1。Contacts adapter 在 0.1.7 阶段已支持权限检查、iCloud 容器验证、JSON
 读取、查询、受控写入、头像、删除、external ID 迁移和 JSON 快照导出。
 
 Mail 0.2 已提供只读 capability 检查、账号和 mailbox 发现、有限邮件 metadata
@@ -114,11 +115,11 @@ macOS 27 Beta 5 disposable gate 已校准准确的 `editor.shortcutname` marker�
 append-only Text insertion、有界 action delete 与有界全 move，包括 hash 回读、完整视觉顺序、剩余 action
 不变和原件不变。任意位置 insert 与混合 operation 仍不可用；全部 gate fixture 均已明确确认删除并验证零残留。
 
-Safari 0.8.0 adapter 从 Safari property-list snapshot 有界、严格只读地发现
-bookmark 与 Reading List，提供 opaque ID、严格查询、stale cursor 检测和权限状态，并通过 Safari
-官方 Automation 接口受保护地创建 Reading List 项。0.8.0 绝不直接修改 `Bookmarks.plist`。
-独立的 0.8.1 可行性 gate 才会验证直接 plist 写入；在形成任何公开 mutation contract 前，必须满足
-Safari 完全退出、一次性数据、原子 backup/restore、本机回读，以及第二台 iCloud 设备确认创建和删除。
+Safari 0.8 从 Safari property-list snapshot 有界发现 bookmark 与 Reading List，提供 opaque ID、
+严格查询、stale cursor 检测和受保护的 Reading List 创建。接下来的本地 CRUD slice 增加 bookmark/
+folder create、edit、move、delete，默认 dry-run，并要求乐观 source hash、Safari 完全退出、私有
+recovery、原子替换、rollback 与回读。这些 plist mutation 明确只在本机生效，不会同步到 iCloud；
+同步研究延后到 0.8.8。
 
 详细开发计划请参阅：
 

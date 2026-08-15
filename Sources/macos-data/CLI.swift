@@ -103,6 +103,11 @@ struct MacosDataCLI {
                 emitSafariJSONSuccess(try safariStore.bookmarks(query: request.query, limit: request.limit, cursor: request.cursor))
             case let args where args.count == 5 && args[0] == "safari" && args[1] == "bookmarks" && args[2] == "get" && args[3] == "--id":
                 emitSafariJSONSuccess(try safariStore.bookmark(id: args[4]))
+            case let args where args.count >= 3 && args[0] == "safari" && ["bookmarks", "folders"].contains(args[1]) && ["create", "edit", "rename", "move", "delete"].contains(args[2]):
+                let command = try safariLocalMutationCommand(collection: args[1], action: args[2])
+                let request = try parseSafariLocalMutationArguments(Array(args.dropFirst(3)))
+                let input = try SafariLocalMutationInput.decode(request.data, command: command)
+                emitSafariJSONSuccess(try safariStore.mutateLocally(input, apply: request.apply, confirmation: request.confirmation))
             case let args where args.count >= 3 && args[0] == "safari" && args[1] == "reading-list" && ["list", "query"].contains(args[2]):
                 let request = try parseSafariReadingListPageArguments(Array(args.dropFirst(3)))
                 emitSafariJSONSuccess(try safariStore.readingList(query: request.query, limit: request.limit, cursor: request.cursor))
@@ -790,6 +795,7 @@ struct MacosDataCLI {
     private struct SafariBookmarkPageArguments { let query: SafariBookmarkQuery; let limit: Int; let cursor: String? }
     private struct SafariReadingListPageArguments { let query: SafariReadingListQuery; let limit: Int; let cursor: String? }
     private struct SafariReadingListAddArguments { let data: Data; let apply: Bool }
+    private struct SafariLocalMutationArguments { let data: Data; let apply: Bool; let confirmation: String? }
 
     private static func emitJSONSuccess<T: Encodable>(_ value: T) {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -1863,7 +1869,8 @@ struct MacosDataCLI {
         case .targetUnavailable: limitations.append("safari_unavailable")
         case .unknown: limitations.append("safari_automation_unknown")
         }
-        limitations.append("safari_bookmark_mutation_deferred_to_guarded_0_8_1_plist_gate")
+        limitations.append("safari_bookmark_mutation_local_only_requires_safari_quit")
+        limitations.append("safari_bookmark_mutation_does_not_sync_to_icloud")
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
 
@@ -2466,6 +2473,61 @@ struct MacosDataCLI {
         return .init(data: data, apply: apply)
     }
 
+    private static func safariLocalMutationCommand(collection: String, action: String) throws -> SafariLocalMutationCommand {
+        switch (collection, action) {
+        case ("bookmarks", "create"): .bookmarkCreate
+        case ("bookmarks", "edit"): .bookmarkEdit
+        case ("bookmarks", "move"): .bookmarkMove
+        case ("bookmarks", "delete"): .bookmarkDelete
+        case ("folders", "create"): .folderCreate
+        case ("folders", "rename"): .folderRename
+        case ("folders", "move"): .folderMove
+        case ("folders", "delete"): .folderDelete
+        default: throw SafariError.invalidInput
+        }
+    }
+
+    private static func parseSafariLocalMutationArguments(_ arguments: [String]) throws -> SafariLocalMutationArguments {
+        var inputURL: URL?
+        var useStdin = false
+        var apply = false
+        var dryRun = false
+        var confirmation: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--input", "--stdin", "--dry-run", "--apply", "--confirm"].contains(option),
+                  seen.insert(option).inserted else { throw SafariError.invalidInput }
+            switch option {
+            case "--stdin": useStdin = true; index += 1
+            case "--dry-run": dryRun = true; index += 1
+            case "--apply": apply = true; index += 1
+            case "--input", "--confirm":
+                guard index + 1 < arguments.count else { throw SafariError.invalidInput }
+                if option == "--input" { inputURL = URL(fileURLWithPath: arguments[index + 1]) }
+                else { confirmation = arguments[index + 1] }
+                index += 2
+            default: throw SafariError.invalidInput
+            }
+        }
+        guard useStdin != (inputURL != nil), !(apply && dryRun), !(!apply && confirmation != nil) else {
+            throw SafariError.invalidInput
+        }
+        let data: Data
+        if useStdin {
+            data = FileHandle.standardInput.readDataToEndOfFile()
+        } else if let inputURL {
+            guard let values = try? inputURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
+                  values.isRegularFile == true, values.isSymbolicLink != true,
+                  (values.fileSize ?? SafariLocalMutationInput.maximumInputBytes + 1) <= SafariLocalMutationInput.maximumInputBytes,
+                  let value = try? Data(contentsOf: inputURL) else { throw SafariError.invalidInput }
+            data = value
+        } else { throw SafariError.invalidInput }
+        guard !data.isEmpty, data.count <= SafariLocalMutationInput.maximumInputBytes else { throw SafariError.invalidInput }
+        return .init(data: data, apply: apply, confirmation: confirmation)
+    }
+
     private static func validSafariHTTPURL(_ value: String) -> Bool {
         guard value.utf8.count <= 4_096, let url = URL(string: value),
               let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
@@ -2503,6 +2565,12 @@ struct MacosDataCLI {
             [--cursor <cursor>] --format json Query bookmark metadata with AND filters
           bookmarks get --id <opaque-id> --format json
                                              Read one bookmark or folder
+          bookmarks create|edit|move|delete --input <file>|--stdin
+            [--dry-run|--apply] [--confirm <phrase>] --format json
+                                             Guarded local-only bookmark CRUD
+          folders create|rename|move|delete --input <file>|--stdin
+            [--dry-run|--apply] [--confirm <phrase>] --format json
+                                             Guarded local-only folder CRUD
           reading-list list [--read true|false] [--limit <1...200>]
             [--cursor <cursor>] --format json List Reading List metadata
           reading-list query [--text <text>] [--url <http-url>]
@@ -2519,8 +2587,9 @@ struct MacosDataCLI {
           snapshot and may require Full Disk Access. Reading List add is the
           only mutation and uses Safari Automation with five-second timeout and
           immediate read-back. Pending/unknown outcomes must not be retried.
-          Bookmark plist mutation is not part of 0.8.0; 0.8.1 will test it only
-          with Safari exited, backup, disposable fixtures, and iCloud read-back.
+          Bookmark/folder mutation is explicitly local-only: dry-run is the
+          default, apply requires the returned source hash, Safari fully quit,
+          private recovery, atomic swap, and read-back. It does not sync to iCloud.
 
         Shortcuts 0.7 commands:
           permission --format json           Report Shortcuts Events Automation status without prompting

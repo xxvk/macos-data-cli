@@ -30,11 +30,11 @@ Notes reports one read-only `notesLibrary` scope. Its permission reflects the
 responsible process's Notes.app Automation state and does not imply access to a
 private Notes database.
 Safari reports one `safariLibrary` scope. Readability means the responsible
-process can read `Bookmarks.plist`; writability means that read-back is available
-and Safari Automation currently permits the 0.8.0 Reading List add command. It
-does not imply bookmark mutation support.
+process can read `Bookmarks.plist`; writability covers guarded local-only plist
+mutation or the Automation-backed Reading List add path. It does not imply
+iCloud synchronization, and local bookmark writes require Safari fully quit.
 
-## Safari (0.8.0 development slice)
+## Safari (0.8.1)
 
 Safari bookmarks and Reading List share one bounded, read-only property-list
 snapshot. Reads may require Full Disk Access for the stable app or Terminal host.
@@ -75,10 +75,34 @@ printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
 
 An existing normalized URL is a safe no-op. `save_accepted_readback_pending`
 and `SAFARI_READING_LIST_OUTCOME_UNKNOWN` both prohibit automatic retry; query
-the original URL after Safari saves. Version 0.8.0 never writes
-`Bookmarks.plist` directly. See the
-[Safari architecture](development/safari-adapter-architecture.md) for the
-separate 0.8.1 direct-mutation feasibility gate.
+the original URL after Safari saves. Version 0.8.1 also exposes the separately
+guarded local-only bookmark and folder CRUD contract below. See the
+[Safari architecture](development/safari-adapter-architecture.md) for its
+recovery, atomic-write, read-back, and no-iCloud-sync boundaries.
+
+### Local-only bookmark and folder CRUD
+
+Use `bookmarks create|edit|move|delete` and
+`folders create|rename|move|delete`. Input is strict JSON. Dry-run is the
+default and returns `sourceSHA256Before`; copy that value into
+`expectedSourceSHA256` before `--apply`. Apply fails closed unless Safari is
+fully quit and private recovery, atomic swap, and read-back all succeed.
+
+```bash
+printf '%s' '{"parentID":"<opaque-folder-id>","index":0,"title":"Example","url":"https://example.com"}' \
+  | macos-data safari bookmarks create --stdin --format json
+
+printf '%s' '{"id":"<opaque-bookmark-id>","title":"Updated","url":"https://example.com/updated","expectedSourceSHA256":"<dry-run-source-hash>"}' \
+  | macos-data safari bookmarks edit --stdin --apply --format json
+
+printf '%s' '{"id":"<opaque-bookmark-id>","expectedSourceSHA256":"<dry-run-source-hash>"}' \
+  | macos-data safari bookmarks delete --stdin --apply \
+      --confirm "DELETE SAFARI BOOKMARK" --format json
+```
+
+Folder deletion uses `DELETE SAFARI FOLDER` and only accepts an empty folder.
+Results always report `syncStatus=local_only`; agents must not interpret a
+successful local read-back as iCloud synchronization.
 
 ## Shortcuts (0.7.0–0.7.2)
 

@@ -93,7 +93,9 @@ assert_contains "$TMP_DIR/shortcuts-help.out" 'FORGET MANAGED SHORTCUT'
 "$CLI" safari --help >"$TMP_DIR/safari-help.out"
 assert_contains "$TMP_DIR/safari-help.out" 'Safari 0\.8 commands'
 assert_contains "$TMP_DIR/safari-help.out" 'reading-list add'
-assert_contains "$TMP_DIR/safari-help.out" 'Bookmark plist mutation is not part of 0\.8\.0'
+assert_contains "$TMP_DIR/safari-help.out" 'bookmarks create|edit|move|delete'
+assert_contains "$TMP_DIR/safari-help.out" 'folders create|rename|move|delete'
+assert_contains "$TMP_DIR/safari-help.out" 'does not sync to iCloud'
 
 "$CLI" --help >"$TMP_DIR/global-help.out"
 assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error, 9 Shortcuts error'
@@ -151,6 +153,12 @@ run_expected_failure safari-reading-list-add-missing-input 10 "$CLI" safari read
 run_expected_failure safari-reading-list-add-conflicting-mode 10 "$CLI" safari reading-list add --stdin --dry-run --apply --format json <<<'{"url":"https://macos-data.invalid/fixture-080"}'
 run_expected_failure safari-reading-list-add-unknown-field 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"https://macos-data.invalid/fixture-080","unknown":true}'
 run_expected_failure safari-reading-list-add-unsafe-url 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"file:///tmp/private"}'
+run_expected_failure safari-local-create-missing-input 10 "$CLI" safari bookmarks create --format json
+run_expected_failure safari-local-create-conflicting-mode 10 "$CLI" safari bookmarks create --stdin --dry-run --apply --format json <<<'{"parentID":"safarifolder_invalid","index":0,"title":"T","url":"https://example.com"}'
+run_expected_failure safari-local-create-unknown-field 10 "$CLI" safari bookmarks create --stdin --dry-run --format json <<<'{"parentID":"safarifolder_invalid","index":0,"title":"T","url":"https://example.com","unknown":true}'
+run_expected_failure safari-local-create-unsafe-url 10 "$CLI" safari bookmarks create --stdin --dry-run --format json <<<'{"parentID":"safarifolder_invalid","index":0,"title":"T","url":"file:///tmp/private"}'
+run_expected_failure safari-local-delete-confirm-on-dry-run 10 "$CLI" safari bookmarks delete --stdin --dry-run --confirm "DELETE SAFARI BOOKMARK" --format json <<<'{"id":"safaribookmark_invalid"}'
+run_expected_failure safari-local-folder-rename-wrong-command 10 "$CLI" safari bookmarks rename --stdin --dry-run --format json <<<'{"id":"safarifolder_invalid","title":"T"}'
 run_expected_failure notes-folders-invalid-limit 8 "$CLI" notes folders --limit 0 --format json
 run_expected_failure notes-folders-missing-value 8 "$CLI" notes folders --account-id --format json
 run_expected_failure notes-folder-create-missing-input 8 "$CLI" notes folder create --dry-run --format json

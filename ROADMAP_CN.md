@@ -601,27 +601,105 @@ Cherri 作为可选外部编译器调用，不复制其 GPL-2.0 源码；Apple �
 - [x] 全部本机 gate 通过后把源码版本从 0.7.2 更新为 0.8.0；commit/push/tag/release
   仍需单独授权
 
-### 0.8.1：直接修改 Bookmarks.plist 可行性
+### 0.8.1：Safari 本地书签修改
 
-- [ ] 先在 synthetic/copy fixture 证明 parser/serializer 无损 round trip，保留未知值、
-  顺序、mode、owner 和 xattr
-- [ ] 实现有人值守的 quiescence/backup gate：Safari 必须退出、无 Safari process 持有
-  plist、文件连续两次稳定；mutation 前创建 mode 0600 recovery copy 和隐私安全 metadata
-- [ ] 原子新增且仅新增一个 disposable folder/bookmark；通过 Safari UI 与 0.8 parser
-  回读，并证明所有旧 subtree 未触碰
-- [ ] 必须由用户确认第二台 iCloud 设备出现 fixture；同一台 Mac 重启不算 sync 证明
+原先分别编号为 0.8.1 可行性、0.8.2 安全引擎和 0.8.3 CRUD 的开发里程碑，统一合并到
+公开的 0.8.1 源码版本。历史 gate 名称继续作为证据保留；正式 contract 是受保护的
+local-only CLI，绝不暗示 iCloud 同步。
+
+- [x] 在 synthetic fixture 与真实 plist 的自动删除私有副本上证明语义 round trip
+  - 未知 plist 值、Children 顺序、mode、owner、group 和源 xattr 的每个值均保留；
+    symlink、覆盖、重复 UUID、未知节点类型和目标 ancestry 之外的变化一律 fail closed
+  - Foundation 重新序列化后真实 binary plist 并非 byte-identical（914,933 变为
+    914,917 bytes），因此安全判据改为所有未触碰 subtree 的类型化 canonical hash，
+    不能使用整个文件字节相等
+  - 测试 carrier 重写私有副本时 macOS 会额外附加 `com.apple.provenance`；必须显式报告，
+    任何其他新增 xattr 都会失败。真实源文件保持 byte-for-byte 不变
+- [x] 实现并完成本机有人值守的 quiescence/backup gate 审计
+  - Safari app 正在运行或任意进程持有准确 plist 时拒绝继续；间隔 500 ms 的两次 snapshot
+    必须具有相同 device、inode、size、mtime、mode、owner、group、SHA-256 和 xattr-value hash
+  - 在 mode 0700 目录创建准确 recovery copy 与隐私安全 JSON manifest，两份文件均为 0600；
+    随后再次检查 quiescence 和完全相同的第三次 source snapshot，失败时自动清理不完整 artifact
+  - 真实只读审计在 Safari 已退出、无打开句柄时通过：0600 recovery 数据准确、源文件不变，
+    临时 recovery 目录已自动删除。另行授权 mutation 前必须立即重新执行，旧 gate 结果不能复用
+- [x] 执行一次有人值守的 disposable bookmark 原子写入，并通过 Safari UI 与 0.8 parser
+  回读 fixture
+  - 真实写入前 TDD 已完成：writer 拒绝 stale/tampered recovery，创建同目录 candidate，
+    重新写入准确 source xattr value，使用 `RENAME_SWAP`，同时验证新旧两侧，并在任意
+    read-back 失败时 swap-back
+  - 在真实 Safari schema 的自动删除副本中，已向唯一内建 `BookmarksBar` 准确新增一个
+    bookmark；206 个未触碰 subtree 的 canonical hash 保持不变，真实源文件未变化
+  - session `3f6c5b6f-aa0c-4a21-98e8-fe66c578a781` 只新增一个 fixture；Safari UI 与
+    公开 CLI 均能找到，0600 recovery 仍完整保留
+  - Reading List 从 89 条变为 0 是用户另行手动删除，不是 fixture 写入造成；该变化不计入
+    mutation 安全结论
+- [x] 在第二台 iCloud 设备验证并记录 fixture **未出现**；直接替换 plist 只证明本机写入，
+  不会生成 Safari 私有的 iCloud change transaction
 - [ ] 通过 Safari 自己的路线只删除 fixture，并在两台设备证明消失；不得出现 duplicate、
   resurrection、旧节点丢失、schema drift 或 sync error
-- [ ] 给出 go/no-go 决策；远端状态不可证明或任何数据异常都必须判定 direct mutation
-  失败，禁止自动重试或开放公开写命令
+- [x] 给出拆分结论：**本机 local-only 可行，iCloud sync 不可行**。不得宣称跨设备持久化，
+  也不得把重启私有 sync daemon 当成受支持的同步按钮
+- [x] 在开放 direct-plist 写命令前增加明确 local-only contract 与警告：
+  `syncStatus=local_only`、保留 recovery，并用 `nextAction` 提示若要 iCloud 副本必须走
+  Safari-owned import
 
-### 0.8.2：受保护 Safari mutation（取决于 0.8.1）
+#### 已合并到 0.8.1 的内部安全引擎里程碑
 
-- [ ] 只有 0.8.1 证明本机与跨设备安全后，才设计 bookmark create/update/move/delete
-  与 Reading List update/delete，并要求 backup、乐观 hash、dry-run/apply、破坏性确认和
-  disposable gate
-- [ ] 如果 0.8.1 失败，再依次评估 Shortcuts Safari action、实际 Safari WebExtension
-  feature detection、非坐标语义 Accessibility；不能因为 WebKit 有源码就假定 Safari 已支持
+- [x] 将受保护 direct-plist 基础能力产品化为明确的 local-only mutation engine，绝不暗示更新 iCloud
+  - Apache-2.0 `safari-bookmarks-mcp` 中值得参考的 contract 设计与本地 CRUD 细节，统一移入下面的
+    0.8.3
+  - 不采用其较弱的 persistence 路线；macos-data 必须保留 Safari 退出/open-handle gate、乐观
+    source identity/hash、metadata/xattr 保留、fsync、rollback、私有 recovery 与真实 read-back
+- [x] 向 Safari adapter 提供可复用 prepare/apply/read-back/rollback primitive、隐私安全 receipt，
+  以及稳定的 local-only result/error code
+- [x] 完成 synthetic 与真实 plist 私有副本 TDD：stale source、并发变化、中断写入、rollback failure、
+  metadata drift 与安全 no-op
+
+#### 已合并到 0.8.1 的内部 CRUD 里程碑
+
+- [x] 参考 Apache-2.0
+  [`chikingsley/safari-bookmarks-mcp`](https://github.com/chikingsley/safari-bookmarks-mcp)
+  中有价值的 **contract 概念**，由 macos-data 独立实现，不复制其 persistence 实现
+  - 现有节点使用 opaque UUID 定位；放置位置必须显式提供 parent UUID 与 child index。
+    人类可读 path 只用于发现和 dry-run 展示，不得作为可能歧义的写入 identity
+  - 为 bookmark add/edit/move/remove 与 folder create/rename/move/remove 定义严格 JSON；
+    未知字段、重复 UUID、非法 index、父节点不存在、修改 root、bookmark/folder 类型不符一律拒绝
+  - 拒绝把 folder 移入自身或 descendant；非空 folder 默认禁止删除。若未来提供 recursive delete，
+    必须是独立操作并要求准确的破坏性确认短语
+  - 所有 mutation 默认 dry-run；`--apply` 必须携带当前 source identity/hash token，并返回变化节点与
+    parent 的 opaque ID，同时明确输出 `syncStatus=local_only`、iCloud limitation 和 `nextAction`
+- [x] 保留 macos-data 更强的 persistence/privacy gate，不采用参考项目的普通 read-modify-write
+  - 要求 Safari 完全退出、无 open handle、连续稳定 snapshot、乐观 source identity/hash、私有
+    `0700` recovery、`0600` backup/receipt、准确保留 metadata/xattr、同目录 atomic swap、fsync、
+    有界 read-back、rollback 和诊断脱敏
+  - 未知 plist 字段及未触碰 subtree 的顺序/hash 必须保留；selected ancestry 之外发生变化时 fail closed
+- [x] 使用 TDD 和分阶段证据实现
+  - unit fixture 覆盖所有 CRUD、path/UUID 解析、cycle/recursive-delete 拒绝、strict JSON、stale token、
+    no-op、rollback、schema drift 与隐私安全 diagnostics
+  - [x] 已在真实 plist 的私有副本完成 bookmark create → edit → move → remove，以及 folder create →
+    rename → move → empty-delete，并证明零残留
+  - [x] 另行明确授权的一次性真实 fixture 已通过 create、Safari UI/CLI 回读、bookmark
+    edit/move/delete 与 folder rename/move/empty-delete。最终 fixture 零残留、Reading List 未变化；
+    原有 117 个节点除 Safari 对两个内建根目录标题的规范化外完全一致
+
+合并后的 0.8.1 源码版本在本地 CRUD 与 release gate 全部通过后作为发布目标。它不依赖
+iCloud 同步，正式二进制也不得调用 Safari 私有 Framework 或同步 daemon。
+
+### 0.8.8：Safari iCloud 同步研究
+
+- [x] 记录当前 no-go 证据
+  - 直接替换 plist 在本机可见，但没有生成 `Sync.Changes`，第二设备也未出现
+  - 私有 `WebBookmarkGroup` create/save 确实生成唯一 matching `Sync.Changes` `Add`，并且单参数
+    sync request 只调用一次，但第二设备仍未出现 fixture
+  - 远端回读失败后，已通过 UUID 重新解析对象并删除、save，本机验证零匹配，同时只调用一次 cleanup
+    sync request；没有自动重试或重启 daemon
+- [ ] 只有本地 CRUD 发布稳定后才重新研究同步；分别评估 Safari-owned HTML import、Shortcuts Safari
+  action、实际 Safari WebExtension capability 与非坐标语义 Accessibility
+- [ ] 未来任何私有 Framework 实验都必须重新取得明确授权，使用 disposable fixture、全新 recovery、
+  compatibility/signing 审计、单次尝试 receipt、第二设备 create/delete 回读和零残留证明。私有 selector
+  被调用或本机存在 `Sync.Changes` 都不等于同步成功
+- [ ] 在某条受支持或用户明确接受的路线通过重复跨设备 create/update/move/delete、conflict、duplicate
+  与 recovery gate 前，不得公开 iCloud-syncing contract
 
 ### 0.9.0：Phone 与 Messages CLI 可行性调研
 

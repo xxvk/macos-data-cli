@@ -5,8 +5,9 @@ A CLI-first macOS native data access layer for agents and developers.
 Agents that need to work with macOS data often depend on fragile GUI automation,
 platform-specific integrations, or private and unstable data formats.
 `macos-data-cli` provides a local, scriptable, testable interface that prefers
-Apple public frameworks and permits narrowly scoped, documented read-only local
-adapters when no public framework exposes the required data.
+Apple public frameworks and permits narrowly scoped, documented local adapters
+with fail-closed read/write boundaries when no public framework exposes the
+required data.
 
 ## Quick Start
 
@@ -44,7 +45,7 @@ operations require an additional confirmation phrase. See the full
 
 ## Project status
 
-The current source release is 0.8.0. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.8.1. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -150,14 +151,13 @@ Text insertion, and bounded action deletion, including hash read-back, unchanged
 remaining actions, and unchanged originals. Arbitrary-position insert and move
 remain unavailable. All gate fixtures were explicitly deleted with zero residue.
 
-Safari 0.8.0 adds bounded,
-read-only bookmark and Reading List discovery from Safari's property-list
-snapshot, opaque IDs, strict queries, stale-cursor detection, permission status,
-and an official Safari Automation path for guarded Reading List creation. It
-does not directly mutate `Bookmarks.plist`. The separate 0.8.1 feasibility gate
-will test direct plist mutation only with Safari fully exited, disposable data,
-atomic backup/restore, local read-back, and creation/deletion confirmation on a
-second iCloud device before any public mutation contract is considered.
+Safari 0.8 adds bounded bookmark and Reading List discovery from Safari's
+property-list snapshot, opaque IDs, strict queries, stale-cursor detection, and
+guarded Reading List creation. The next local CRUD slice adds bookmark and
+folder create/edit/move/delete with dry-run by default, an optimistic source
+hash, Safari-quit checks, private recovery, atomic replacement, rollback, and
+read-back. These plist mutations are explicitly local-only and do not sync to
+iCloud; synchronization research is deferred to 0.8.8.
 
 See the detailed roadmaps:
 

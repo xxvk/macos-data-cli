@@ -98,6 +98,27 @@ public struct SafariStore: Sendable {
         return pendingReadbackResult(urlSHA256: urlSHA256)
     }
 
+    public func mutateLocally(
+        _ input: SafariLocalMutationInput,
+        apply: Bool,
+        confirmation: String? = nil
+    ) throws -> SafariLocalMutationResult {
+        do {
+            return try SafariLocalMutationService().execute(input, apply: apply, confirmation: confirmation)
+        } catch let error as SafariError {
+            throw error
+        } catch let error as SafariLocalMutationError {
+            switch error {
+            case .invalidInput: throw SafariError.invalidInput
+            case .invalidIdentifier, .targetNotFound: throw SafariError.invalidIdentifier
+            case .folderNotEmpty, .cycle, .rootMutation, .protectedCollection,
+                 .typeMismatch, .invalidParent, .invalidIndex, .duplicateIdentifier:
+                throw SafariError.localMutationUnsafe
+            case .schemaUnsupported, .preservationFailed: throw SafariError.schemaUnsupported
+            }
+        }
+    }
+
     private func pendingReadbackResult(urlSHA256: String) -> SafariReadingListAddResult {
         .init(
             operation: "add_accepted",
