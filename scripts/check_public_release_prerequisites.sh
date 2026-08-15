@@ -4,7 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NOTARY_PROFILE="${MACOS_DATA_NOTARY_PROFILE:-macos-data-notary}"
 CASK_FILE="${MACOS_DATA_CASK_FILE:-}"
+ALLOW_UNSIGNED=false
 failures=0
+
+case "${1:-}" in
+  "") ;;
+  --allow-unsigned) ALLOW_UNSIGNED=true ;;
+  *) echo "usage: $0 [--allow-unsigned]" >&2; exit 64 ;;
+esac
 
 pass() {
   echo "PASS $1"
@@ -51,14 +58,31 @@ fi
 identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
 if /usr/bin/grep -q 'Developer ID Application:' <<<"$identities"; then
   pass "Developer ID Application identity is available"
+elif [[ "$ALLOW_UNSIGNED" == true ]]; then
+  info "UNSIGNED RELEASE: Developer ID Application identity is unavailable"
 else
   fail "Developer ID Application identity is unavailable"
 fi
 
 if xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
   pass "notarytool keychain profile is usable: $NOTARY_PROFILE"
+elif [[ "$ALLOW_UNSIGNED" == true ]]; then
+  info "UNSIGNED RELEASE: notarytool profile is unavailable; artifact will not be notarized"
 else
   fail "notarytool keychain profile is unavailable: $NOTARY_PROFILE"
+fi
+
+if [[ "$ALLOW_UNSIGNED" == true ]]; then
+  if /usr/bin/file "$release_cli" | /usr/bin/grep -q 'arm64'; then
+    pass "unsigned release binary architecture=arm64"
+  else
+    fail "unsigned release binary is not arm64"
+  fi
+  if codesign --verify --strict "$release_cli" >/dev/null 2>&1; then
+    pass "unsigned release binary has a valid ad-hoc signature"
+  else
+    fail "unsigned release binary ad-hoc signature is invalid"
+  fi
 fi
 
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
@@ -82,4 +106,8 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "Public release preflight passed: version=$expected_version"
+if [[ "$ALLOW_UNSIGNED" == true ]]; then
+  echo "Unsigned public release preflight passed: version=$expected_version notarized=false"
+else
+  echo "Public release preflight passed: version=$expected_version notarized=true"
+fi

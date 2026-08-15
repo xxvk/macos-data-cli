@@ -2,6 +2,12 @@
 
 ## 0.8.1 — 2026-08-15
 
+- Preserved the existing explicitly authorized unsigned arm64 GitHub Release
+  and Homebrew channel for owners without an Apple Developer account. The
+  default release preflight still fails closed; `--allow-unsigned` verifies the
+  ad-hoc signature and requires the non-notarized Gatekeeper boundary to remain
+  visible.
+
 ### Added
 
 - Started the Safari 0.8.1 direct-plist feasibility gate with synthetic TDD,

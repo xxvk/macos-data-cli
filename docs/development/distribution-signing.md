@@ -3,10 +3,11 @@
 ## Current state
 
 The existing Homebrew Cask distribution path uses an Apple Silicon prebuilt
-binary from GitHub Release. The published 0.7.2 asset and current local install
-are not signed with an Apple Developer ID or notarized. Version 0.8.1 may be
-built and installed locally for development, but it must not be represented as
-a formal public distribution until the signing and notarization gates pass.
+binary from GitHub Release. The published 0.7.2 asset is not signed with an
+Apple Developer ID or notarized. Until an Apple Developer account is available,
+an explicitly authorized unsigned community release may use the same channel,
+provided its GitHub Release clearly states the Gatekeeper boundary. It must not
+be represented as Apple-trusted, Developer ID signed, or notarized.
 
 ## Future public-release plan
 
@@ -23,6 +24,20 @@ the `macos-data-notary` keychain profile, and GitHub CLI authentication. Set
 reports only status and never prints credentials or notarization history.
 For GitHub CLI failures, follow [GitHub CLI Environment Know-how](github-cli-environment.md)
 before deciding that the token is invalid.
+
+When the owner explicitly authorizes the existing unsigned community channel,
+run instead:
+
+```bash
+bash scripts/check_public_release_prerequisites.sh --allow-unsigned
+```
+
+This does not silently bypass the checks: it verifies a clean source tree, the
+exact Release binary version, arm64 architecture, valid ad-hoc signature, and
+GitHub authentication, while emitting explicit unsigned/notarization warnings.
+The Release notes and Homebrew handoff must preserve those warnings. The
+default invocation continues to fail closed without Developer ID and the
+notary profile.
 
 - Enroll in the Apple Developer Program.
 - Create a Developer ID Application certificate.
@@ -87,10 +102,15 @@ Do not disable Gatekeeper globally. The permanent public-release solution remain
 
 ## Release checklist
 
-1. Run `scripts/check_public_release_prerequisites.sh` and resolve every failure.
-2. Sign, package, notarize, staple, and locally assess the target-version artifact.
-3. Publish the versioned binary to GitHub Release.
-4. Update the Homebrew Cask URL, version, checksum, and archive path.
-5. Push the Tap change.
-6. On a clean local installation, run `brew update` and `brew upgrade --cask macos-data`.
-7. Verify `macos-data --version` and one bounded read-only Mail command.
+1. Choose the signed lane or obtain explicit owner authorization for the
+   unsigned community lane.
+2. Run `scripts/check_public_release_prerequisites.sh`; for the explicit
+   unsigned lane, add `--allow-unsigned` and preserve every warning.
+3. For the signed lane, sign, package, notarize, staple, and locally assess the
+   target-version artifact. For the unsigned lane, verify the arm64 ad-hoc
+   signature and publish the Gatekeeper limitation prominently.
+4. Publish the versioned binary to GitHub Release.
+5. Update the Homebrew Cask URL, version, checksum, and archive path.
+6. Push the Tap change.
+7. On a clean local installation, run `brew update` and `brew upgrade --cask macos-data`.
+8. Verify `macos-data --version` and one bounded read-only Mail command.
