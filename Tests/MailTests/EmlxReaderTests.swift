@@ -150,7 +150,7 @@ private final class EmlxFixture {
     init(rowID: Int64, mailboxPath: String) throws {
         self.rowID = rowID
         rootURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("macos-data-emlx-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("mpia-emlx-\(UUID().uuidString)", isDirectory: true)
         mailStoreURL = rootURL.appendingPathComponent("V10", isDirectory: true)
         let account = "ACCOUNT"
         let store = "11111111-2222-3333-4444-555555555555"

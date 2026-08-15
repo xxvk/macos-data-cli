@@ -60,3 +60,7 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# mpia docs site (Node/pnpm)
+docs-site/node_modules/
+docs-site/dist/

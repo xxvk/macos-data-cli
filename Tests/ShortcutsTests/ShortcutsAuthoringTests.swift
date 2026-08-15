@@ -337,7 +337,7 @@ final class ShortcutsAuthoringTests: XCTestCase {
         let oldBuild = ShortcutAuthorBuildResult(sourceSHA256: oldHash, sourceBytes: 10, compiledSHA256: String(repeating: "c", count: 64), compiledBytes: 10, actionCount: 1, compiler: "cherri", compilerVersion: "2.3.0", clientVersion: nil, signingMode: .anyone, experimental: true)
         try fixture.receipts.saveCompleted(build: oldBuild, shortcutID: oldID)
         let existing = ShortcutDescriptor(scriptingID: "existing", name: "Managed Fixture", subtitle: "", folderScriptingID: nil, acceptsInput: false, actionCount: 1, color: [], iconAvailable: false)
-        let candidateName = "Managed Fixture (macos-data \(fixture.buildResult.sourceSHA256.prefix(8)))"
+        let candidateName = "Managed Fixture (mpia \(fixture.buildResult.sourceSHA256.prefix(8)))"
         let candidate = ShortcutDescriptor(scriptingID: "candidate", name: candidateName, subtitle: "", folderScriptingID: nil, acceptsInput: false, actionCount: 2, color: [], iconAvailable: false)
         let importer = VisibleImporterStub(result: candidate)
         let builder = AuthorBuilderStub(result: fixture.buildResult)
@@ -358,10 +358,10 @@ final class ShortcutsAuthoringTests: XCTestCase {
     }
 
     func testRetainOldRewritesOnlyCompiledNameAndPreservesManagedSourceHash() throws {
-        let rewritten = try ShortcutsAuthoringService.source(Data(validSource.utf8), replacingDeclaredNameWith: "Managed Fixture (macos-data abcdef12)")
+        let rewritten = try ShortcutsAuthoringService.source(Data(validSource.utf8), replacingDeclaredNameWith: "Managed Fixture (mpia abcdef12)")
         let text = try XCTUnwrap(String(data: rewritten, encoding: .utf8))
 
-        XCTAssertTrue(text.contains("#define name Managed Fixture (macos-data abcdef12)"))
+        XCTAssertTrue(text.contains("#define name Managed Fixture (mpia abcdef12)"))
         XCTAssertTrue(text.contains("output(\"hello\")"))
         XCTAssertFalse(text.contains("#define name Managed Fixture\n"))
     }
@@ -412,7 +412,7 @@ final class ShortcutsAuthoringTests: XCTestCase {
             XCTAssertEqual(error as? ShortcutsError, .authorNameConflict)
         }
 
-        let candidateName = "Managed Fixture (macos-data \(fixture.buildResult.sourceSHA256.prefix(8)))"
+        let candidateName = "Managed Fixture (mpia \(fixture.buildResult.sourceSHA256.prefix(8)))"
         let candidate = ShortcutDescriptor(scriptingID: "candidate", name: candidateName, subtitle: "", folderScriptingID: nil, acceptsInput: false, actionCount: 2, color: [], iconAvailable: false)
         let candidateConflict = makeAuthoringService(fixture: fixture, builder: builder, importer: importer, snapshot: .init(shortcuts: [existing, candidate], folders: [], complete: true))
         XCTAssertThrowsError(try candidateConflict.update(id: oldID, sourceURL: fixture.source, expectedSourceSHA256: oldHash, strategy: .retainOld, signingMode: .anyone, apply: false)) { error in

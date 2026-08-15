@@ -56,9 +56,9 @@ bash scripts/run_local_contacts_integration.sh --with-writes
 - `kind` 只有 `person` 和 `organization`，来源是原生 Contacts 记录类型。
 - 读取模型中的 `external_id` 可以为空，但创建联系人时必须提供。
 - CLI 永远不得创建没有 `external_id` 的联系人；这是 Contacts 的固定规则，不是未来待办功能。
-- `external_id` 使用 `x-macos-data://external-id/<id>` 写入 URL 字段。
-- 保留 URL 的 label 必须严格为 `macos-data-cli`；读取端不得把 `Homepage` 或其他 label 识别为 `external_id`。
-- 保留 URL 的 value 格式为 `x-macos-data://external-id/<id>`。
+- `external_id` 使用 `mpia://ext-id/<id>` 写入 URL 字段。
+- 保留 URL 的 label 必须严格为 `mpia-cli`；读取端不得把 `Homepage` 或其他 label 识别为 `external_id`。
+- 保留 URL 的 value 格式为 `mpia://ext-id/<id>`。
 - `imageAvailable` 只表示 Contacts.framework 报告的头像数据可用性，不能据此断言 Contacts.app 是否显示 iCloud 头像。
 - 头像 apply 结果包含 `avatar.status`：`readback_confirmed` 表示保存后成功读回非空头像数据；`verification_unknown` 表示保存已接受，但 Contacts.framework 无法安全读回头像。Agent 应遵循 `avatar.nextAction`，不能自动删除、自动重建或自动重试头像写入。
 - `contacts avatar verify` 会先进行轻量头像可用性预检；预检为 false 时跳过 `imageData` 读取，以降低 iCloud fault 风险。
@@ -75,7 +75,7 @@ bash scripts/run_local_contacts_integration.sh --with-writes
 - 不直接访问 Contacts 私有数据库，也不上传联系人数据。
 - 0.1 只允许 iCloud 容器；找不到时必须拒绝写入，不得回退到本地或其他账户。
 - 诊断日志只保留 `external_id` 作为关联键。邮箱、国际电话号码、绝对路径
-  和底层异常文本在写入 `~/Library/Logs/macos-data-cli/diagnostics.log`
+  和底层异常文本在写入 `~/Library/Logs/mpia-cli/diagnostics.log`
   前必须脱敏。
 - 诊断日志不得包含姓名、组织、邮政地址、头像二进制数据或完整联系人 JSON。
 
@@ -138,7 +138,7 @@ bash scripts/run_local_contacts_integration.sh --with-writes
 
 当前最低部署目标为 macOS 26.0+。使用仓库约定的 Swift/Xcode 工具链，并将 Framework 可用性检查放在 adapter 边界附近。
 
-进行兼容性验证时，必须先重新构建 Release 配置再测试二进制；旧的 `.build/release/macos-data` 可能不包含最新源码改动。
+进行兼容性验证时，必须先重新构建 Release 配置再测试二进制；旧的 `.build/release/mpia` 可能不包含最新源码改动。
 
 ## Metadata（0.1）
 

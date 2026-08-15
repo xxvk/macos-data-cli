@@ -169,7 +169,7 @@ struct SafariLocalMutationEngineTests {
 
     @Test("Opt-in live-schema private copy completes full local CRUD with zero residue")
     func liveSchemaPrivateCopyCRUD() throws {
-        guard ProcessInfo.processInfo.environment["MACOS_DATA_SAFARI_LOCAL_CRUD_COPY_GATE"] == "1" else { return }
+        guard ProcessInfo.processInfo.environment["MPIA_SAFARI_LOCAL_CRUD_COPY_GATE"] == "1" else { return }
         let live = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari/Bookmarks.plist")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
@@ -181,7 +181,7 @@ struct SafariLocalMutationEngineTests {
         guard folders.count >= 2 else { throw SafariLocalMutationError.invalidParent }
         let parentA = folders[0]
         let parentB = folders.first(where: { $0.id != parentA.id && $0.parentID != parentA.id }) ?? folders[1]
-        let marker = "macos-data-private-copy-\(UUID().uuidString.lowercased())"
+        let marker = "mpia-private-copy-\(UUID().uuidString.lowercased())"
         let service = SafariLocalMutationService(
             source: source,
             recoveryRoot: directory.appendingPathComponent("recovery/safari-local", isDirectory: true),

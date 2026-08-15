@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data}"
-TEMP_DIR="$(mktemp -d /private/tmp/macos-data-mail-attachments.XXXXXX)"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia}"
+TEMP_DIR="$(mktemp -d /private/tmp/mpia-mail-attachments.XXXXXX)"
 trap '/bin/rm -rf -- "$TEMP_DIR"' EXIT
 
 if [[ ! -x "$CLI" ]]; then

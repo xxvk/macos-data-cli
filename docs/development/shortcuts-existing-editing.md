@@ -6,12 +6,12 @@
 planning, Accessibility discovery, and one guarded copy-first mutation:
 
 ```text
-macos-data shortcuts edit inspect --input <local.cherri|local.shortcut> --format json
-macos-data shortcuts edit plan --input <local.shortcut> --patch <plan.json>|--stdin --format json
-macos-data shortcuts edit copy --input <local.shortcut> --patch <plan.json>|--stdin \
+mpia shortcuts edit inspect --input <local.cherri|local.shortcut> --format json
+mpia shortcuts edit plan --input <local.shortcut> --patch <plan.json>|--stdin --format json
+mpia shortcuts edit copy --input <local.shortcut> --patch <plan.json>|--stdin \
   --expected-editor-name-sha256 <sha256> --dry-run|--apply \
   [--confirm "EDIT SHORTCUT COPY"] --format json
-macos-data shortcuts edit ui-inspect --format json
+mpia shortcuts edit ui-inspect --format json
 ```
 
 Inspect, plan, UI inspection, and edit-copy dry-run do not mutate any object.

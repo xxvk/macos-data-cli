@@ -37,7 +37,7 @@ public struct SystemShortcutsRunBridge: ShortcutsRunBridging {
     public func run(identifier: String, inputPaths: [URL], outputPath: URL?, outputType: String, timeoutSeconds: Int) throws -> ShortcutsRunDescriptor {
         let fileManager = FileManager.default
         if let outputPath, fileManager.fileExists(atPath: outputPath.path) { throw ShortcutsError.outputExists }
-        let temporary = fileManager.temporaryDirectory.appendingPathComponent("macos-data-shortcuts-\(UUID().uuidString)", isDirectory: true)
+        let temporary = fileManager.temporaryDirectory.appendingPathComponent("mpia-shortcuts-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: temporary, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         defer { try? fileManager.removeItem(at: temporary) }
         let capturesPlaintext = outputType == "public.utf8-plain-text"
@@ -50,7 +50,7 @@ public struct SystemShortcutsRunBridge: ShortcutsRunBridging {
             guard fileManager.fileExists(atPath: parent.path, isDirectory: &isDirectory), isDirectory.boolValue else {
                 throw ShortcutsError.invalidRunInput
             }
-            actualOutput = parent.appendingPathComponent(".macos-data-shortcuts-\(UUID().uuidString).tmp")
+            actualOutput = parent.appendingPathComponent(".mpia-shortcuts-\(UUID().uuidString).tmp")
         } else {
             actualOutput = temporary.appendingPathComponent("output")
         }

@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP="${MACOS_DATA_APP:-}"
+APP="${MPIA_APP:-}"
 ACCOUNT_ID="${NOTES_ACCOUNT_ID:-}"
 APPLY=false
 [[ "${1:-}" == "--apply" ]] && APPLY=true
 [[ $# -le 1 ]] || { echo "Usage: run_notes_folder_integration.sh [--apply]" >&2; exit 1; }
-[[ -n "$APP" && -d "$APP" ]] || { echo "Set MACOS_DATA_APP to a signed app bundle." >&2; exit 1; }
+[[ -n "$APP" && -d "$APP" ]] || { echo "Set MPIA_APP to a signed app bundle." >&2; exit 1; }
 [[ -n "$ACCOUNT_ID" ]] || { echo "Set NOTES_ACCOUNT_ID to the already-bound opaque iCloud Notes account ID." >&2; exit 1; }
 command -v jq >/dev/null || { echo "Notes folder integration requires jq." >&2; exit 1; }
 
 TMP_DIR="$(mktemp -d)"
 NONCE="$(date +%s)-$$"
-ROOT_NAME="macos-data-folder-gate-root-$NONCE"
-DESTINATION_NAME="macos-data-folder-gate-destination-$NONCE"
-CHILD_NAME="macos-data-folder-gate-child-$NONCE"
-RENAMED_NAME="macos-data-folder-gate-renamed-$NONCE"
+ROOT_NAME="mpia-folder-gate-root-$NONCE"
+DESTINATION_NAME="mpia-folder-gate-destination-$NONCE"
+CHILD_NAME="mpia-folder-gate-child-$NONCE"
+RENAMED_NAME="mpia-folder-gate-renamed-$NONCE"
 ROOT_ID=""
 ROOT_HASH=""
 DESTINATION_ID=""

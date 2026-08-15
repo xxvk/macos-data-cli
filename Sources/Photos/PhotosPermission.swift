@@ -27,7 +27,7 @@ public final class PhotosPermission: PhotoAccessProviding, @unchecked Sendable {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "macos-data Photos Authorization"
+            window.title = "mpia Photos Authorization"
             window.center()
             window.makeKeyAndOrderFront(nil)
             let result = AuthorizationResult()

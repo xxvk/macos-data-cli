@@ -206,7 +206,7 @@ enum SafariPlistRoundTripInspector {
 
         let xattrs = try SafariExtendedAttributes.values(at: source)
         let temporary = destination.deletingLastPathComponent()
-            .appendingPathComponent(".macos-data-safari-" + UUID().uuidString + ".tmp")
+            .appendingPathComponent(".mpia-safari-" + UUID().uuidString + ".tmp")
         var destinationCreated = false
         var completed = false
         defer { try? FileManager.default.removeItem(at: temporary) }

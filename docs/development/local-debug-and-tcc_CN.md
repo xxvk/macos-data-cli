@@ -14,7 +14,7 @@ export DEVELOPER_DIR="$(xcode-select -p)"
 
 ## 构建 Debug app
 
-Contacts 的 TCC 授权不能可靠地授予裸 `.build/debug/macos-data`。本机开发时
+Contacts 的 TCC 授权不能可靠地授予裸 `.build/debug/mpia`。本机开发时
 应构建带 bundle identifier 和 `NSContactsUsageDescription` 的 app：
 
 ```bash
@@ -24,19 +24,19 @@ bash scripts/build_debug_app.sh
 脚本生成：
 
 ```text
-.build/debug/macos-data.app
+.build/debug/mpia.app
 ```
 
 脚本会在 ad-hoc 签名之前清理 app bundle 的 extended attributes；项目位于
 iCloud/同步目录时，否则 `codesign` 可能报
 `resource fork, Finder information, or similar detritus not allowed`。
-签名使用仓库中的 `scripts/macos-data.entitlements`，并显式保留 Mail Automation
+签名使用仓库中的 `scripts/mpia.entitlements`，并显式保留 Mail Automation
 所需的 `com.apple.security.automation.apple-events=true`。可用下列命令验证最终 app，
 不要只检查 entitlement 源文件：
 
 ```bash
-codesign --verify --deep --strict .build/debug/macos-data.app
-codesign -d --entitlements - .build/debug/macos-data.app
+codesign --verify --deep --strict .build/debug/mpia.app
+codesign -d --entitlements - .build/debug/mpia.app
 ```
 
 Photos 还必须保留
@@ -45,22 +45,22 @@ PhotoKit 命令后据此判断 app 权限：TCC 可能将 Codex/ChatGPT 识别�
 真实 gate 使用稳定路径 app 和 LaunchServices：
 
 ```bash
-MACOS_DATA_APP="$HOME/Applications/macos-data-debug.app" \
+MPIA_APP="$HOME/Applications/mpia-debug.app" \
   bash scripts/run_photos_read_smoke.sh
 ```
 
 `open -n -W -o <temporary-file> --stderr <temporary-file> <app> --args ...`
 可以保持 app 的独立 TCC 身份并捕获 JSON；smoke 只打印聚合数量。ad-hoc 重建改变 code hash，
-因此替换 app 后需要重签名，必要时只重置 `com.xvk.macos-data-cli` 的 Photos 条目。
+因此替换 app 后需要重签名，必要时只重置 `com.xvk.mpia.cli` 的 Photos 条目。
 
 第一次使用时启动权限请求：
 
 ```bash
-open -W .build/debug/macos-data.app --args contacts permission
+open -W .build/debug/mpia.app --args contacts permission
 ```
 
 然后在“系统设置 → 隐私与安全性 → 通讯录”中确认
-`macos-data.app` 已打开。若系统没有显示该 app，重新运行构建脚本后再启动。
+`mpia.app` 已打开。若系统没有显示该 app，重新运行构建脚本后再启动。
 
 ## 读取验证
 
@@ -68,8 +68,8 @@ open -W .build/debug/macos-data.app --args contacts permission
 支持 `--output` 的 export 命令：
 
 ```bash
-open -W .build/debug/macos-data.app --args \
-  contacts export --format json --output /tmp/macos-data-contacts.json
+open -W .build/debug/mpia.app --args \
+  contacts export --format json --output /tmp/mpia-contacts.json
 ```
 
 确认读取成功后应删除临时快照；联系人 JSON 可能包含个人敏感信息。
@@ -77,10 +77,10 @@ open -W .build/debug/macos-data.app --args \
 不要用裸 Debug 二进制验证授权：
 
 ```text
-.build/debug/macos-data contacts count --format json
+.build/debug/mpia contacts count --format json
 ```
 
-它可能与已授权的 `macos-data.app` 被 macOS TCC 视为不同身份，并返回
+它可能与已授权的 `mpia.app` 被 macOS TCC 视为不同身份，并返回
 `Access Denied` 或 permission-not-granted。真实 Contacts 写入仍须遵循
 `rules_CN.md` 的 dry-run、显式 apply 和确认短语要求。
 
@@ -133,7 +133,7 @@ Debug app 已包含 `NSAppleEventsUsageDescription`。先通过 UI 启动 Mail.a
 
 ```bash
 bash scripts/build_debug_app.sh
-open -W .build/debug/macos-data.app --args mail reveal --id <opaque-id> --format json
+open -W .build/debug/mpia.app --args mail reveal --id <opaque-id> --format json
 ```
 
 `reveal` 会在 Mail.app 中可见地定位消息；确认该行为可接受后再授权。普通
@@ -157,7 +157,7 @@ Debug app 的两个 Info.plist 都必须包含 `NSCalendarsFullAccessUsageDescri
 后，用 app bundle 内的 executable 请求 full access：
 
 ```bash
-.build/debug/macos-data.app/Contents/MacOS/macos-data calendar permission --format json
+.build/debug/mpia.app/Contents/MacOS/mpia calendar permission --format json
 ```
 
 返回 `fullAccess` 后，使用隐私安全 smoke；不要直接打印真实事件 JSON：

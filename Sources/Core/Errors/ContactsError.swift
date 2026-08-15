@@ -14,7 +14,7 @@ public enum ContactsError: Error, Equatable, Sendable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .permissionRequired: return "Contacts permission has not been granted. Run 'macos-data contacts permission' and allow access in macOS Settings."
+        case .permissionRequired: return "Contacts permission has not been granted. Run 'mpia contacts permission' and allow access in macOS Settings."
         case .permissionDenied: return "Contacts permission was denied. Enable access in System Settings > Privacy & Security > Contacts."
         case .permissionRestricted: return "Contacts access is restricted by macOS or device policy."
         case .readFailed(let message): return "Unable to read Contacts: \(message)"

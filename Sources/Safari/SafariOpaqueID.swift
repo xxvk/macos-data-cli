@@ -13,7 +13,7 @@ enum SafariOpaqueID {
     static func isReadingList(_ value: String) -> Bool { hasValidDigest(value, prefix: "safarireading_") }
 
     private static func value(prefix: String, namespace: String, uuid: String) -> String {
-        prefix + SHA256.hash(data: Data("macos-data-safari-v1:\(namespace):\(uuid)".utf8))
+        prefix + SHA256.hash(data: Data("mpia-safari-v1:\(namespace):\(uuid)".utf8))
             .map { String(format: "%02x", $0) }.joined()
     }
 

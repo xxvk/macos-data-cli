@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.xvk.mpia.cli</string>
+	<key>CFBundleName</key>
+	<string>mpia</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.9.0</string>
+	<key>CFBundleVersion</key>
+	<string>0.9.0</string>
+	<key>NSContactsUsageDescription</key>
+	<string>mpia needs Contacts access to read and manage your iCloud contacts from the local CLI.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>mpia needs full Calendar access to query and explicitly manage events in your iCloud calendars.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>mpia needs full Reminders access to query and explicitly manage reminders in your iCloud lists.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>mpia needs Photos access to query photo and album metadata and to export only explicitly requested assets.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>mpia uses Apple Events only for explicitly requested Mail.app, Notes.app, Shortcuts, and Safari operations.</string>
+</dict>
+</plist>

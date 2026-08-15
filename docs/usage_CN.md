@@ -1,6 +1,6 @@
 # 使用说明
 
-`macos-data` 是一个本地 Terminal CLI。它使用 Apple 公共 Framework 和明确公开的 App
+`mpia` 是一个本地 Terminal CLI。它使用 Apple 公共 Framework 和明确公开的 App
 Automation 接口访问 macOS 数据，Agent 不需要专用集成即可调用。
 
 ## 统一资源查询
@@ -8,7 +8,7 @@ Automation 接口访问 macOS 数据，Agent 不需要专用集成即可调用�
 使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos、Notes、Shortcuts 和 Safari 资源作用域：
 
 ```text
-macos-data resources --format json
+mpia resources --format json
 ```
 
 每个资源返回 adapter 管理的 opaque `id`、`kind`、`provider`、`displayName`，以及
@@ -32,23 +32,23 @@ Safari bookmark 与 Reading List 共用一份有界、严格只读 plist snapsho
 命令不会弹授权：
 
 ```bash
-macos-data safari permission --format json
-macos-data safari permission --request --format json
+mpia safari permission --format json
+mpia safari permission --request --format json
 ```
 
 普通 bookmark 命令会排除 Safari proxy 和 Reading List subtree，folder 关系使用 opaque ID。
 filter 使用 AND 语义；默认每页 50、最大 200。底层 plist 变化后旧 cursor 必须 stale。
 
 ```bash
-macos-data safari bookmarks list --limit 50 --format json
-macos-data safari bookmarks query --text "reference" --format json
-macos-data safari bookmarks query --url "https://example.com" \
+mpia safari bookmarks list --limit 50 --format json
+mpia safari bookmarks query --text "reference" --format json
+mpia safari bookmarks query --url "https://example.com" \
   --folder-id <opaque-folder-id> --format json
-macos-data safari bookmarks get --id <opaque-bookmark-or-folder-id> --format json
+mpia safari bookmarks get --id <opaque-bookmark-or-folder-id> --format json
 
-macos-data safari reading-list list --read false --limit 50 --format json
-macos-data safari reading-list query --text "article" --format json
-macos-data safari reading-list get --id <opaque-reading-list-id> --format json
+mpia safari reading-list list --read false --limit 50 --format json
+mpia safari reading-list query --text "article" --format json
+mpia safari reading-list get --id <opaque-reading-list-id> --format json
 ```
 
 Reading List add 只接受严格 JSON。结果不会回显 URL、title 或 preview，只返回 URL SHA-256
@@ -56,10 +56,10 @@ Reading List add 只接受严格 JSON。结果不会回显 URL、title 或 previ
 
 ```bash
 printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
-  | macos-data safari reading-list add --stdin --dry-run --format json
+  | mpia safari reading-list add --stdin --dry-run --format json
 
 printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
-  | macos-data safari reading-list add --stdin --apply --format json
+  | mpia safari reading-list add --stdin --apply --format json
 ```
 
 相同标准化 URL 是安全 no-op。`save_accepted_readback_pending` 与
@@ -77,13 +77,13 @@ query。0.8.1 同时提供下面独立受保护的 local-only bookmark/folder CR
 
 ```bash
 printf '%s' '{"parentID":"<opaque-folder-id>","index":0,"title":"Example","url":"https://example.com"}' \
-  | macos-data safari bookmarks create --stdin --format json
+  | mpia safari bookmarks create --stdin --format json
 
 printf '%s' '{"id":"<opaque-bookmark-id>","title":"Updated","url":"https://example.com/updated","expectedSourceSHA256":"<dry-run-source-hash>"}' \
-  | macos-data safari bookmarks edit --stdin --apply --format json
+  | mpia safari bookmarks edit --stdin --apply --format json
 
 printf '%s' '{"id":"<opaque-bookmark-id>","expectedSourceSHA256":"<dry-run-source-hash>"}' \
-  | macos-data safari bookmarks delete --stdin --apply \
+  | mpia safari bookmarks delete --stdin --apply \
       --confirm "DELETE SAFARI BOOKMARK" --format json
 ```
 
@@ -99,21 +99,21 @@ folder delete 使用确认短语 `DELETE SAFARI FOLDER`，且只允许删除空 
 probe 时，如果 helper 正处于空闲未运行状态，仍可能返回 `targetNotRunning`。
 
 ```bash
-macos-data shortcuts permission --format json
-macos-data shortcuts permission --request --format json
-macos-data shortcuts list --limit 50 --format json
-macos-data shortcuts folders --limit 50 --format json
-macos-data shortcuts get --id <opaque-shortcut-id> --format json
-macos-data shortcuts list --folder-id <opaque-folder-id> --limit 50 --format json
+mpia shortcuts permission --format json
+mpia shortcuts permission --request --format json
+mpia shortcuts list --limit 50 --format json
+mpia shortcuts folders --limit 50 --format json
+mpia shortcuts get --id <opaque-shortcut-id> --format json
+mpia shortcuts list --folder-id <opaque-folder-id> --limit 50 --format json
 ```
 
 移动默认只预览；apply 需要准确确认短语，并在同一个有界 Apple Event 中回读 folder ID：
 
 ```bash
-macos-data shortcuts move --id <opaque-shortcut-id> \
+mpia shortcuts move --id <opaque-shortcut-id> \
   --destination-folder-id <opaque-folder-id> --dry-run --format json
 
-macos-data shortcuts move --id <opaque-shortcut-id> \
+mpia shortcuts move --id <opaque-shortcut-id> \
   --destination-folder-id <opaque-folder-id> \
   --apply --confirm "MOVE SHORTCUT" --format json
 ```
@@ -121,11 +121,11 @@ macos-data shortcuts move --id <opaque-shortcut-id> \
 运行 Shortcut 可能触发任意外部副作用，因此必须明确 apply 和确认。最多接受 16 个输入文件，
 deadline 为 1～300 秒；默认把输出限制为 256 KiB UTF-8 文本。二进制或较大输出应提供不存在的
 `--output-path`，CLI 禁止覆盖。超时表示副作用可能已经发生，Agent 不得自动重试。
-Apple CLI 会把 plaintext 结果写到 stdout，因此 macos-data 先在私有临时文件中捕获 stdout，完成
+Apple CLI 会把 plaintext 结果写到 stdout，因此 mpia 先在私有临时文件中捕获 stdout，完成
 大小、UTF-8 和 hash 检查后，才返回 JSON 或原子写入用户指定的输出文件。
 
 ```bash
-macos-data shortcuts run --id <opaque-shortcut-id> \
+mpia shortcuts run --id <opaque-shortcut-id> \
   --input-path ./input.txt --output-type public.utf8-plain-text --timeout 30 \
   --apply --confirm "RUN SHORTCUT" --format json
 ```
@@ -134,15 +134,15 @@ macos-data shortcuts run --id <opaque-shortcut-id> \
 validate、build、create、update 与本机 registry 生命周期命令：
 
 ```bash
-macos-data shortcuts author validate --source ./managed.cherri --format json
-macos-data shortcuts author build --source ./managed.cherri \
+mpia shortcuts author validate --source ./managed.cherri --format json
+mpia shortcuts author build --source ./managed.cherri \
   --output ./managed.shortcut --signing-mode people-who-know-me --format json
-macos-data shortcuts create --source ./managed.cherri --idempotent --dry-run --format json
-macos-data shortcuts create --source ./managed.cherri --idempotent --apply \
+mpia shortcuts create --source ./managed.cherri --idempotent --dry-run --format json
+mpia shortcuts create --source ./managed.cherri --idempotent --apply \
   --confirm "CREATE MANAGED SHORTCUT" --format json
-macos-data shortcuts update --id <managed-opaque-id> --source ./managed-v2.cherri \
+mpia shortcuts update --id <managed-opaque-id> --source ./managed-v2.cherri \
   --expected-source-sha256 <sha256> --strategy replace --dry-run --format json
-macos-data shortcuts managed list --format json
+mpia shortcuts managed list --format json
 ```
 
 命令要求可选 Cherri 2.3.x，禁止远程签名、拒绝覆盖，只返回 hash/字节数等脱敏结果，不返回源码、
@@ -155,11 +155,11 @@ macos-data shortcuts managed list --format json
 任意现有 Shortcut 的 0.7.2 实验性编辑先从只读本地分类与计划开始：
 
 ```bash
-macos-data shortcuts edit inspect --input ./candidate.shortcut --format json
-macos-data shortcuts edit inspect --input ./candidate.cherri --format json
-macos-data shortcuts edit plan --input ./candidate.shortcut --patch ./plan.json --format json
+mpia shortcuts edit inspect --input ./candidate.shortcut --format json
+mpia shortcuts edit inspect --input ./candidate.cherri --format json
+mpia shortcuts edit plan --input ./candidate.shortcut --patch ./plan.json --format json
 # 或：... --stdin --format json
-macos-data shortcuts edit ui-inspect --format json
+mpia shortcuts edit ui-inspect --format json
 ```
 
 输入必须是单个不超过 10 MiB、非 symlink 的本地 regular file。包括 iCloud share link 在内的 URI 会在
@@ -197,9 +197,9 @@ index 只指向非 output 的 visible action；每个操作都基于前一个操
 replace-text、受限末尾 insert-text，或删除后至少保留一个 action 的有界全 delete plan 可执行：
 
 ```text
-macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+mpia shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
   --expected-editor-name-sha256 <sha256> --dry-run --format json
-macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+mpia shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
   --expected-editor-name-sha256 <sha256> --apply \
   --confirm "EDIT SHORTCUT COPY" --format json
 ```
@@ -226,13 +226,13 @@ click、按键、set-value 或任何其他 AX action 路径。UI tree 上限 2,0
 不触发弹窗地检查 Notes.app Automation 状态：
 
 ```text
-macos-data notes permission --format json
+mpia notes permission --format json
 ```
 
 只有显式命令可以请求 macOS 授权：
 
 ```text
-macos-data notes permission --request --format json
+mpia notes permission --request --format json
 ```
 
 响应包含 `access`、`readable`、`complete` 和 `requested`。access 可能为 `available`、
@@ -241,8 +241,8 @@ macos-data notes permission --request --format json
 只读发现有界 account 与嵌套 folder 结构，不读取 note 标题或正文：
 
 ```text
-macos-data notes accounts --format json
-macos-data notes folders [--account-id <opaque-id>] [--parent-id <opaque-id>] \
+mpia notes accounts --format json
+mpia notes folders [--account-id <opaque-id>] [--parent-id <opaque-id>] \
   [--limit <1...200>] [--cursor <opaque-cursor>] --format json
 ```
 
@@ -252,7 +252,7 @@ cursor 与 account/parent filter 绑定，跨 filter 或 stale cursor 会 fail c
 只读查询有界 note metadata，不读取正文：
 
 ```text
-macos-data notes query [--account-id <opaque-id>] [--folder-id <opaque-id>] \
+mpia notes query [--account-id <opaque-id>] [--folder-id <opaque-id>] \
   [--title <substring>] [--modified-after <iso8601>] \
   [--limit <1...200>] [--cursor <opaque-cursor>] --format json
 ```
@@ -268,10 +268,10 @@ Notes.app scripting dictionary，绝不读取 Notes 私有 store 或 CloudKit co
 读取一条已选择的 note；默认只返回 metadata，不获取正文：
 
 ```text
-macos-data notes get --id <opaque-note-id> --format json
-macos-data notes get --id <opaque-note-id> --body plaintext --format json
-macos-data notes get --id <opaque-note-id> --body html --format json
-macos-data notes get --id <opaque-note-id> --include-attachments --format json
+mpia notes get --id <opaque-note-id> --format json
+mpia notes get --id <opaque-note-id> --body plaintext --format json
+mpia notes get --id <opaque-note-id> --body html --format json
+mpia notes get --id <opaque-note-id> --include-attachments --format json
 ```
 
 `plaintext` 和 `html` 是对敏感正文的显式 opt-in。返回的 UTF-8 正文上限为 256 KiB；超过上限
@@ -290,9 +290,9 @@ attachment `contents`，也不执行 save 或 binary export。`attachmentsComple
 因为 Notes scripting dictionary 没有稳定的 account type 字段：
 
 ```text
-macos-data notes write-account status --format json
-macos-data notes write-account bind --account-id <notesaccount-id> --dry-run --format json
-macos-data notes write-account bind --account-id <notesaccount-id> --apply \
+mpia notes write-account status --format json
+mpia notes write-account bind --account-id <notesaccount-id> --dry-run --format json
+mpia notes write-account bind --account-id <notesaccount-id> --apply \
   --confirm "BIND ICLOUD NOTES" --format json
 ```
 
@@ -306,25 +306,25 @@ create JSON 只能通过文件或 stdin 提供：
 ```
 
 ```text
-macos-data notes create --stdin --dry-run --format json
-macos-data notes create --stdin --apply --idempotent --format json
+mpia notes create --stdin --dry-run --format json
+mpia notes create --stdin --apply --idempotent --format json
 ```
 
 rename/move 必须使用最近一次 query/get 返回的准确 ISO-8601 `modificationDate`：
 
 ```text
-macos-data notes rename --id <note-id> --stdin --dry-run --format json
+mpia notes rename --id <note-id> --stdin --dry-run --format json
 # stdin: {"title":"新标题","expectedModificationDate":"2026-08-14T00:00:00Z"}
 
-macos-data notes move --id <note-id> --stdin --apply --format json
+mpia notes move --id <note-id> --stdin --apply --format json
 # stdin: {"destinationFolderID":"notesfolder_...","expectedModificationDate":"2026-08-14T00:00:00Z"}
 ```
 
 开发中的可恢复删除必须提供最新的整秒 modification date 与准确确认短语：
 
 ```text
-macos-data notes delete --id <note-id> --stdin --dry-run --format json
-macos-data notes delete --id <note-id> --stdin --apply --confirm "DELETE NOTE" --format json
+mpia notes delete --id <note-id> --stdin --dry-run --format json
+mpia notes delete --id <note-id> --stdin --apply --confirm "DELETE NOTE" --format json
 # stdin: {"expectedModificationDate":"2026-08-14T00:00:00Z"}
 ```
 
@@ -336,7 +336,7 @@ pending 或 unknown 结果禁止 Agent 自动重试。
 正文已经变化：
 
 ```text
-macos-data notes edit-body --id <note-id> --stdin --dry-run --format json
+mpia notes edit-body --id <note-id> --stdin --dry-run --format json
 # stdin: {"bodyFormat":"plaintext","body":"替换后的正文","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"<64位小写十六进制>"}
 ```
 
@@ -349,19 +349,19 @@ apply 返回 pending/unknown 时禁止自动重试。
 明确表示已绑定 account 的根目录；省略 parent 字段属于错误：
 
 ```text
-macos-data notes folder create --stdin --dry-run --format json
+mpia notes folder create --stdin --dry-run --format json
 # stdin: {"name":"Projects","parentFolderID":null}
 
-macos-data notes folder rename --id <folder-id> --stdin --dry-run --format json
+mpia notes folder rename --id <folder-id> --stdin --dry-run --format json
 # stdin: {"name":"Archive","expectedNameSHA256":"<64位小写十六进制>"}
 
-macos-data notes folder move --id <folder-id> --stdin --dry-run --format json
+mpia notes folder move --id <folder-id> --stdin --dry-run --format json
 # stdin: {"destinationParentFolderID":null,"expectedParentFolderID":"notesfolder_...","expectedNameSHA256":"<64位小写十六进制>"}
 
-macos-data notes folder delete --id <folder-id> --stdin --dry-run --format json
+mpia notes folder delete --id <folder-id> --stdin --dry-run --format json
 # stdin: {"expectedParentFolderID":null,"expectedNameSHA256":"<64位小写十六进制>"}
 
-macos-data notes folder delete --id <folder-id> --stdin --apply \
+mpia notes folder delete --id <folder-id> --stdin --apply \
   --confirm "DELETE EMPTY NOTES FOLDER" --format json
 # Notes 4.13 上 apply 返回 NOTES_FOLDER_DELETE_UNSUPPORTED
 ```
@@ -391,32 +391,32 @@ apply 根据真实 runtime 证据被禁用。attachment mutation、note delete�
 不触发弹窗地读取当前权限：
 
 ```text
-macos-data photos permission --format json
+mpia photos permission --format json
 ```
 
 显式请求 Photos read/write 权限：
 
 ```text
-macos-data photos permission --request --format json
+mpia photos permission --request --format json
 ```
 
 响应包含 `access`、`readable`、`complete` 和 `requested`。`limited` 表示
 `readable: true`、`complete: false`。授权后可以枚举 album metadata：
 
 ```text
-macos-data photos albums --kind all --limit 50 --format json
-macos-data photos albums --kind user --limit 50 --cursor <opaque-cursor> --format json
+mpia photos albums --kind all --limit 50 --format json
+mpia photos albums --kind user --limit 50 --cursor <opaque-cursor> --format json
 ```
 
 结果保留用户 folder 层级、区分 user/smart album，并允许 title 重名；后续选择必须使用 opaque
 album ID。按 creation date 查询有界 asset metadata；默认排除 hidden asset 和精确位置：
 
 ```text
-macos-data photos query --start 2026-08-01T00:00:00Z --end 2026-08-15T00:00:00Z \
+mpia photos query --start 2026-08-01T00:00:00Z --end 2026-08-15T00:00:00Z \
   [--album-id <opaque-album-id>] [--media image|video|audio|unknown] \
   [--favorite true|false] [--include-hidden] [--include-location] \
   [--limit <1...200>] [--cursor <opaque-cursor>] --format json
-macos-data photos get --id <opaque-asset-id> [--include-location] --format json
+mpia photos get --id <opaque-asset-id> [--include-location] --format json
 ```
 
 时间范围必须有序且不超过 366 天。query/get 只返回 metadata 和 opaque reference，
@@ -426,7 +426,7 @@ macos-data photos get --id <opaque-asset-id> [--include-location] --format json
 将一个显式资源导出到新的本地文件：
 
 ```text
-macos-data photos export --id <opaque-asset-id> --output <file> \
+mpia photos export --id <opaque-asset-id> --output <file> \
   [--variant original|current|paired-video|adjustment-data] \
   [--allow-network] --format json
 ```
@@ -445,15 +445,15 @@ networkAllowed，不包含媒体 byte，也不回显输出路径。照片库修�
 请求读取和写入所需的 EventKit full access：
 
 ```text
-macos-data calendar permission --format json
+mpia calendar permission --format json
 ```
 
 `writeOnly` 不能读取日历，因此不会被 CLI 当作成功。列出 source 和选中 iCloud source
 内的日历：
 
 ```text
-macos-data calendar sources --format json
-macos-data calendar calendars --format json
+mpia calendar sources --format json
+mpia calendar calendars --format json
 ```
 
 默认必须找到唯一的 iCloud CalDAV source。可以添加 `--source iCloud` 或准确 identifier，
@@ -462,13 +462,13 @@ macos-data calendar calendars --format json
 按明确时间窗查询事件：
 
 ```text
-macos-data calendar query \
+mpia calendar query \
   --start 2026-08-01T00:00:00+09:00 \
   --end 2026-09-01T00:00:00+09:00 \
   --limit 50 --format json
-macos-data calendar query --start <iso8601> --end <iso8601> \
+mpia calendar query --start <iso8601> --end <iso8601> \
   --calendar <id|unique-title> --title <text> --format json
-macos-data calendar conflicts --start <iso8601> --end <iso8601> \
+mpia calendar conflicts --start <iso8601> --end <iso8601> \
   [--calendar <id|unique-title>] --format json
 ```
 
@@ -479,7 +479,7 @@ URL、参与者状态、availability、event status 和周期规则。
 使用 query 返回的 `calevent_` opaque ID读取事件：
 
 ```text
-macos-data calendar get --id <calevent-id> --format json
+mpia calendar get --id <calevent-id> --format json
 ```
 
 该 ID 同时定位周期系列和 occurrence start；不得解析。移动事件后应使用返回的新 ID。
@@ -496,11 +496,11 @@ macos-data calendar get --id <calevent-id> --format json
 ```
 
 ```text
-macos-data calendar create --input event.json --dry-run --format json
-macos-data calendar create --input event.json --apply --format json
-macos-data calendar create --input event.json --apply --idempotent --format json
-macos-data calendar edit --id <id> --input patch.json --dry-run --format json
-macos-data calendar edit --id <id> --input patch.json --apply --format json
+mpia calendar create --input event.json --dry-run --format json
+mpia calendar create --input event.json --apply --format json
+mpia calendar create --input event.json --apply --idempotent --format json
+mpia calendar edit --id <id> --input patch.json --dry-run --format json
+mpia calendar edit --id <id> --input patch.json --apply --format json
 ```
 
 存在多个可写 iCloud 日历且系统默认日历不属于所选 source 时，在 create JSON 中明确
@@ -532,8 +532,8 @@ edit/delete 会使相关 receipt 失效。`calendar conflicts` 检测严格时�
 删除先预览，再使用独立确认短语：
 
 ```text
-macos-data calendar delete --id <id> --dry-run --span this --format json
-macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" --span this --format json
+mpia calendar delete --id <id> --dry-run --span this --format json
+mpia calendar delete --id <id> --apply --confirm "DELETE EVENT" --span this --format json
 ```
 
 详细边界参阅 [Calendar adapter 架构](development/calendar-adapter-architecture_CN.md)。
@@ -543,20 +543,20 @@ macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" --span thi
 当前源码实现权限、iCloud reminder list 发现，以及只读 query/get：
 
 ```text
-macos-data reminders permission --format json
-macos-data reminders sources --format json
-macos-data reminders lists --format json
-macos-data reminders query [--status incomplete|completed|all] \
+mpia reminders permission --format json
+mpia reminders sources --format json
+mpia reminders lists --format json
+mpia reminders query [--status incomplete|completed|all] \
   [--due-start <iso8601>] [--due-end <iso8601>] \
   [--list <id|unique-title>] [--title <text>] \
   [--limit <1...200>] [--cursor <cursor>] --format json
-macos-data reminders get --id <opaque-reminder-id> --format json
-macos-data reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-macos-data reminders edit --id <opaque-reminder-id> --input <file>|--stdin --dry-run|--apply --format json
-macos-data reminders complete --id <opaque-reminder-id> --dry-run|--apply --format json
-macos-data reminders reopen --id <opaque-reminder-id> --dry-run|--apply --format json
-macos-data reminders delete --id <opaque-reminder-id> --dry-run --format json
-macos-data reminders delete --id <opaque-reminder-id> --apply --confirm "DELETE REMINDER" --format json
+mpia reminders get --id <opaque-reminder-id> --format json
+mpia reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+mpia reminders edit --id <opaque-reminder-id> --input <file>|--stdin --dry-run|--apply --format json
+mpia reminders complete --id <opaque-reminder-id> --dry-run|--apply --format json
+mpia reminders reopen --id <opaque-reminder-id> --dry-run|--apply --format json
+mpia reminders delete --id <opaque-reminder-id> --dry-run --format json
+mpia reminders delete --id <opaque-reminder-id> --apply --confirm "DELETE REMINDER" --format json
 ```
 
 需要显式选择时可以添加 `--source iCloud` 或准确 source identifier。只有唯一验证通过、
@@ -638,7 +638,7 @@ Mail 0.2 是只读 adapter：不发送、起草、回复、转发、移动、归
 运行只读 capability 检查：
 
 ```text
-macos-data mail doctor --format json
+mpia mail doctor --format json
 ```
 
 `doctor` 动态发现最高数字的 `~/Library/Mail/V*`，只读打开 `Envelope Index`，检查
@@ -653,9 +653,9 @@ macOS/Mail schema 的保证，每次运行仍会重新 probe。Automation 的
 发现隐私安全的账号作用域和 mailbox：
 
 ```text
-macos-data mail accounts --format json
-macos-data mail mailboxes --format json
-macos-data mail mailboxes --account-id <opaque-account-id> --format json
+mpia mail accounts --format json
+mpia mail mailboxes --format json
+mpia mail mailboxes --account-id <opaque-account-id> --format json
 ```
 
 account ID 是 adapter 派生的 opaque local scope；响应不会返回原始账号 authority 或
@@ -664,7 +664,7 @@ account ID 是 adapter 派生的 opaque local scope；响应不会返回原始�
 读取本地 Mail schema 报告的会话分组：
 
 ```text
-macos-data mail threads --limit 50 --format json
+mpia mail threads --limit 50 --format json
 ```
 
 只有明确的正数 `conversation_id` 才会被分组。响应只返回 opaque thread ID、消息数量和
@@ -673,7 +673,7 @@ macos-data mail threads --limit 50 --format json
 只搜索本地已缓存的邮件正文，不启动 Mail.app：
 
 ```text
-macos-data mail search --text "project alpha" --limit 20 --format json
+mpia mail search --text "project alpha" --limit 20 --format json
 ```
 
 该命令只读取本地 EMLX 缓存，最多扫描 200 个 metadata 候选，时间预算为 1 秒。缺失、partial、
@@ -689,10 +689,10 @@ V10 schema/FDA 快路径不可用时，仅当 Mail.app 已运行且 Automation �
 查询有限 message metadata：
 
 ```text
-macos-data mail query --unread --limit 50 --format json
-macos-data mail query --mailbox-id <id> --subject <text> --format json
-macos-data mail query --from <text> --received-after 2026-07-01 --format json
-macos-data mail query --cursor <cursor> --limit 50 --format json
+mpia mail query --unread --limit 50 --format json
+mpia mail query --mailbox-id <id> --subject <text> --format json
+mpia mail query --from <text> --received-after 2026-07-01 --format json
+mpia mail query --cursor <cursor> --limit 50 --format json
 ```
 
 filter 使用 AND 语义，支持 `--account-id`、`--mailbox-id`、`--from`、`--to`、
@@ -711,10 +711,10 @@ Mail 响应返回 `backend`；query 还返回 `cacheState`、`truncated`、`next
 使用 `mail query` 返回的 opaque ID 读取唯一一封邮件：
 
 ```text
-macos-data mail get --id <id> --format json
-macos-data mail get --id <id> --content text --format json
-macos-data mail get --id <id> --content raw --output message.eml --format json
-macos-data mail get --id <id> --content raw --output -
+mpia mail get --id <id> --format json
+mpia mail get --id <id> --content text --format json
+mpia mail get --id <id> --content raw --output message.eml --format json
+mpia mail get --id <id> --content raw --output -
 ```
 
 默认 projection 是 `metadata`，不会读取 EMLX payload。`--content text` 才会显式
@@ -735,7 +735,7 @@ Mail reindex 或移动邮件后，opaque local ID 可能变 stale。
 在 Mail.app 中可视化定位一条结果：
 
 ```text
-macos-data mail reveal --id <id> --format json
+mpia mail reveal --id <id> --format json
 ```
 
 `reveal` 可以启动并激活 Mail.app；它使用同一个 opaque local ID，不会主动修改 read、
@@ -744,7 +744,7 @@ flag、mailbox 或 message 数据。
 不导出附件，只交叉校验 attachment metadata：
 
 ```text
-macos-data mail attachments verify --id <id> --format json
+mpia mail attachments verify --id <id> --format json
 ```
 
 verifier 只返回 SQLite/MIME count、cache state，以及 complete EMLX 是否一致；不返回
@@ -754,7 +754,7 @@ verifier 只返回 SQLite/MIME count、cache state，以及 complete EMLX 是否
 显式导出本地缓存附件：
 
 ```text
-macos-data mail attachments export --id <id> --output ./attachments --format json
+mpia mail attachments export --id <id> --output ./attachments --format json
 ```
 
 导出要求 SQLite/EMLX fast path；必要时创建输出目录，拒绝路径穿越和不安全文件名，
@@ -765,15 +765,15 @@ macos-data mail attachments export --id <id> --output ./attachments --format jso
 列出当前 Contacts 容器：
 
 ```text
-macos-data contacts containers --format json
+mpia contacts containers --format json
 ```
 
 默认使用已经验证的 iCloud 容器。也可以显式指定 `iCloud` 或列表返回的
 精确的 iCloud container identifier：
 
 ```text
-macos-data contacts list --container iCloud --format json
-macos-data contacts get --external-id <id> --container <icloud-container-id> --format json
+mpia contacts list --container iCloud --format json
+mpia contacts get --external-id <id> --container <icloud-container-id> --format json
 ```
 
 不存在或非 iCloud 的 container 会直接报错，不会静默回退到本地或
@@ -782,7 +782,7 @@ Exchange 账户。
 当前版本只使用 iCloud Contacts 容器：
 
 ```text
-macos-data contacts container
+mpia contacts container
 ```
 
 如果找不到 iCloud 容器，所有写入操作都会拒绝，不会回退到本地或其他账户。
@@ -790,8 +790,8 @@ macos-data contacts container
 导出 JSON 快照：
 
 ```text
-macos-data contacts export --format json
-macos-data contacts export --format json --output contacts-snapshot.json
+mpia contacts export --format json
+mpia contacts export --format json --output contacts-snapshot.json
 ```
 
 `list` 用于实时读取；`export` 用于生成可保存、审计或交给 Agent 批量处理的快照。
@@ -815,9 +815,9 @@ External ID migration 会在 `data.contact` 返回迁移后的联系人，并同
 检查权限和联系人数量：
 
 ```text
-macos-data contacts permission
-macos-data contacts count
-macos-data contacts count --format json
+mpia contacts permission
+mpia contacts count
+mpia contacts count --format json
 ```
 
 JSON 响应使用独立于 CLI 发布版本的 contract `0.1`。成功 envelope 包含
@@ -827,16 +827,16 @@ JSON 响应使用独立于 CLI 发布版本的 contract `0.1`。成功 envelope 
 以 JSON 读取联系人：
 
 ```text
-macos-data contacts list --format json
-macos-data contacts get --external-id <id> --format json
+mpia contacts list --format json
+mpia contacts get --external-id <id> --format json
 ```
 
 Contacts 有上限分页，使用统一分页 contract：
 
 ```text
-macos-data contacts list --limit 50 --format json
-macos-data contacts list --limit 50 --cursor <opaque-cursor> --format json
-macos-data contacts query --kind organization --limit 50 --format json
+mpia contacts list --limit 50 --format json
+mpia contacts list --limit 50 --cursor <opaque-cursor> --format json
+mpia contacts query --kind organization --limit 50 --format json
 ```
 
 分页响应包含 `items`、`limit`、`nextCursor`、`truncated`、`complete`。Contacts cursor
@@ -849,13 +849,13 @@ Mail query 响应现在也提供统一的 `items` 字段；已有的 `messages` 
 查询支持多个条件，条件之间使用 AND 语义；单次最多三个不同字段：
 
 ```text
-macos-data contacts query --name "张三"
-macos-data contacts query --kind organization
-macos-data contacts query --phone "+81"
-macos-data contacts query --email "person@example.com"
-macos-data contacts query --url "example.com"
-macos-data contacts query --organization "Example"
-macos-data contacts query --postal-code "10001"
+mpia contacts query --name "张三"
+mpia contacts query --kind organization
+mpia contacts query --phone "+81"
+mpia contacts query --email "person@example.com"
+mpia contacts query --url "example.com"
+mpia contacts query --organization "Example"
+mpia contacts query --postal-code "10001"
 ```
 
 从 JSON 创建联系人。写入前应先查看 dry-run：
@@ -864,16 +864,16 @@ macos-data contacts query --postal-code "10001"
 没有 external ID 的联系人可以被读取，但 CLI 不会创建或管理没有 ID 的新记录。
 
 ```text
-macos-data contacts create --input contact.json --dry-run
-macos-data contacts create --input contact.json --apply
-cat contact.json | macos-data contacts create --stdin --dry-run
-cat contact.json | macos-data contacts create --stdin --apply --idempotent
-macos-data contacts edit --external-id <id> --input contact.json --dry-run
-macos-data contacts edit --external-id <id> --input contact.json --apply
-cat patch.json | macos-data contacts edit --external-id <id> --stdin --dry-run
+mpia contacts create --input contact.json --dry-run
+mpia contacts create --input contact.json --apply
+cat contact.json | mpia contacts create --stdin --dry-run
+cat contact.json | mpia contacts create --stdin --apply --idempotent
+mpia contacts edit --external-id <id> --input contact.json --dry-run
+mpia contacts edit --external-id <id> --input contact.json --apply
+cat patch.json | mpia contacts edit --external-id <id> --stdin --dry-run
 ```
 
-第一版通过 `kind` 区分 `person` 和 `organization`。`external_id` 只能存储在 label 为 `macos-data-cli` 的 URL 中，value 格式为 `x-macos-data://external-id/<id>`。其他 URL label 都按普通网址处理。CLI 默认选择已经验证的 iCloud 容器，也可以显式指定 `--container iCloud` 或准确的容器 identifier。
+第一版通过 `kind` 区分 `person` 和 `organization`。`external_id` 只能存储在 label 为 `mpia-cli` 的 URL 中，value 格式为 `mpia://ext-id/<id>`。其他 URL label 都按普通网址处理。CLI 默认选择已经验证的 iCloud 容器，也可以显式指定 `--container iCloud` 或准确的容器 identifier。
 
 默认情况下重试仍保持严格行为。只有在确认相同 external ID 的持久化字段
 等价时，才应给 create 添加 `--idempotent`。JSON-only metadata 和头像可用性
@@ -888,19 +888,19 @@ cat patch.json | macos-data contacts edit --external-id <id> --stdin --dry-run
 
 普通编辑不会修改 `external_id`。如果输入 JSON 包含 `externalID`，它必须与 `--external-id` 完全一致；修改 external ID 应单独设计迁移功能。
 
-如果写入返回 CoreData 错误 `134092`，说明 macOS Contacts 记录可能已经损坏或无法保存。应先保留 JSON 表示，再明确确认删除并重新创建联系人，然后重试。`macos-data` 不会自动执行这个破坏性恢复操作。
+如果写入返回 CoreData 错误 `134092`，说明 macOS Contacts 记录可能已经损坏或无法保存。应先保留 JSON 表示，再明确确认删除并重新创建联系人，然后重试。`mpia` 不会自动执行这个破坏性恢复操作。
 
 头像使用独立参数写入，不进入普通联系人 JSON：
 
 ```text
-macos-data contacts edit --external-id <id> --image ./avatar.png --dry-run
-macos-data contacts edit --external-id <id> --image ./avatar.png --apply
+mpia contacts edit --external-id <id> --image ./avatar.png --dry-run
+mpia contacts edit --external-id <id> --image ./avatar.png --apply
 ```
 
 只读验证已有头像，不会写入联系人：
 
 ```text
-macos-data contacts avatar verify --external-id <id> --format json
+mpia contacts avatar verify --external-id <id> --format json
 ```
 
 结果可能是 `readback_confirmed`、`not_available` 或
@@ -911,8 +911,8 @@ macos-data contacts avatar verify --external-id <id> --format json
 该流程会保留 JSON 联系人字段，但会创建新的 Contacts 记录，因此必须明确确认：
 
 ```text
-macos-data contacts avatar replace --external-id <id> --image ./avatar.png --dry-run
-macos-data contacts avatar replace --external-id <id> --image ./avatar.png --apply --confirm "RECREATE CONTACT"
+mpia contacts avatar replace --external-id <id> --image ./avatar.png --dry-run
+mpia contacts avatar replace --external-id <id> --image ./avatar.png --apply --confirm "RECREATE CONTACT"
 ```
 
 头像输入上限为 10 MB，处理后最长边不超过 1024 px，最终文件不超过 200 KB。超过输入上限、无法解码或无法压缩到目标大小时，CLI 会报错且不会修改联系人。
@@ -926,25 +926,25 @@ macos-data contacts avatar replace --external-id <id> --image ./avatar.png --app
 删除单条联系人必须使用 `external_id`。先预览：
 
 ```text
-macos-data contacts delete --external-id <id> --dry-run
+mpia contacts delete --external-id <id> --dry-run
 ```
 
 确认删除：
 
 ```text
-macos-data contacts delete --external-id <id> --apply --confirm "DELETE CONTACT"
+mpia contacts delete --external-id <id> --apply --confirm "DELETE CONTACT"
 ```
 
 迁移 external ID 必须使用独立命令。先预览：
 
 ```text
-macos-data contacts external-id migrate --from <old-id> --to <new-id> --dry-run
+mpia contacts external-id migrate --from <old-id> --to <new-id> --dry-run
 ```
 
 确认无误后写入：
 
 ```text
-macos-data contacts external-id migrate --from <old-id> --to <new-id> --apply --confirm "CHANGE EXTERNAL ID"
+mpia contacts external-id migrate --from <old-id> --to <new-id> --apply --confirm "CHANGE EXTERNAL ID"
 ```
 
 完整的数据格式、错误行为和安全规则请参阅[开发规则](development/rules_CN.md)，本机验证记录请参阅[本机 Contacts 测试数据](development/local-contacts-fixture.md)。

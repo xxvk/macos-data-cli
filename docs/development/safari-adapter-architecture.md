@@ -176,7 +176,7 @@ live fixture.
 
 The live entrypoint is disabled unless the exact confirmation phrase
 `CREATE SAFARI 0.8.1 FIXTURE` is supplied. It creates one bookmark named
-`macos-data 0.8.1 plist feasibility fixture` under the unique built-in
+`mpia 0.8.1 plist feasibility fixture` under the unique built-in
 `BookmarksBar`. The raw fixture UUID and URL are retained only in a mode-0600
 receipt beside the recovery files so later cleanup can target exactly that item.
 Success must be followed by Safari UI and parser verification; no automatic
@@ -216,7 +216,7 @@ group, ACLs or extended attributes, fsync the file and directory, validate and
 roll back after read-back, or generate `Sync.Changes`. A long-lived MCP service
 also loads the plist once and can later overwrite concurrent Safari changes.
 Its tests use fixture files and contain no live Safari or second-device iCloud
-gate; repository Issues are disabled. macos-data already has stricter gates for
+gate; repository Issues are disabled. mpia already has stricter gates for
 all of these local-file concerns, so no source code was copied. Only its
 operation vocabulary and negative test cases are candidates for adaptation.
 

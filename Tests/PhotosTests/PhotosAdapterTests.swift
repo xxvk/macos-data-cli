@@ -326,7 +326,7 @@ final class PhotosAdapterTests: XCTestCase {
         try FileManager.default.removeItem(at: output)
         let temporary = try PhotoExportFileCoordinator.prepare(outputURL: output)
         XCTAssertEqual(temporary.deletingLastPathComponent().standardizedFileURL.path, directory.standardizedFileURL.path)
-        XCTAssertTrue(temporary.lastPathComponent.hasPrefix(".macos-data-export-"))
+        XCTAssertTrue(temporary.lastPathComponent.hasPrefix(".mpia-export-"))
         XCTAssertNotEqual(temporary, output)
     }
 

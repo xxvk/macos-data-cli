@@ -38,7 +38,7 @@ public enum PhotoError: Error, Equatable, Sendable, CustomStringConvertible {
     public var description: String {
         switch self {
         case .permissionRequired:
-            "Photos permission has not been granted. Run 'macos-data photos permission --request'."
+            "Photos permission has not been granted. Run 'mpia photos permission --request'."
         case .permissionDenied:
             "Photos permission was denied. Enable access in System Settings > Privacy & Security > Photos."
         case .permissionRestricted:

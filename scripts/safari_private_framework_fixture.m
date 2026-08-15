@@ -7,7 +7,7 @@
 #import <sys/stat.h>
 #import <unistd.h>
 
-static NSString *const FixtureTitle = @"macos-data private Framework fixture";
+static NSString *const FixtureTitle = @"mpia private Framework fixture";
 
 static id SendObject(id target, NSString *selector) {
     id (*send)(id, SEL) = (void *)objc_msgSend;
@@ -228,7 +228,7 @@ static int CopyRoundTrip(NSString *path) {
     NSString *error = nil;
     NSDictionary *context = LoadContext(path, &error);
     if (!context) return 10;
-    NSString *url = [@"https://example.com/macos-data-safari-framework-copy/" stringByAppendingString:NSUUID.UUID.UUIDString.lowercaseString];
+    NSString *url = [@"https://example.com/mpia-safari-framework-copy/" stringByAppendingString:NSUUID.UUID.UUIDString.lowercaseString];
     NSDictionary *before = InspectPlist(path, url, &error);
     if (!before || [before[@"fixtureCount"] unsignedIntegerValue] != 0) return 11;
     id leaf = CreateFixture(context, url, &error);
@@ -259,7 +259,7 @@ static int LiveCreate(NSString *path, NSString *receiptPath, NSString *session, 
     NSString *error = nil;
     NSDictionary *context = LoadContext(path, &error);
     if (!context) return 24;
-    NSString *url = [@"https://example.com/macos-data-safari-framework/" stringByAppendingString:session.lowercaseString];
+    NSString *url = [@"https://example.com/mpia-safari-framework/" stringByAppendingString:session.lowercaseString];
     NSDictionary *before = InspectPlist(path, url, &error);
     if (!before || [before[@"fixtureCount"] unsignedIntegerValue] != 0) return 25;
     id leaf = CreateFixture(context, url, &error);

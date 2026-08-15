@@ -37,7 +37,7 @@ struct SafariPlistMutationFeasibilityTests {
         try sourceData.write(to: source, options: .withoutOverwriting)
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: source.path)
         try SafariExtendedAttributes.set(
-            name: "com.xvk.macos-data.test",
+            name: "com.xvk.mpia.test",
             value: Data("backup-xattr".utf8),
             at: source
         )
@@ -56,7 +56,7 @@ struct SafariPlistMutationFeasibilityTests {
         #expect(posixMode(report.backupURL) == 0o600)
         #expect(posixMode(report.metadataURL) == 0o600)
         #expect(try SafariExtendedAttributes.value(
-            name: "com.xvk.macos-data.test", at: report.backupURL
+            name: "com.xvk.mpia.test", at: report.backupURL
         ) == Data("backup-xattr".utf8))
         let metadata = try Data(contentsOf: report.metadataURL)
         let object = try JSONSerialization.jsonObject(with: metadata) as! [String: Any]
@@ -119,7 +119,7 @@ struct SafariPlistMutationFeasibilityTests {
         try original.write(to: source, options: .withoutOverwriting)
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: source.path)
         try SafariExtendedAttributes.set(
-            name: "com.xvk.macos-data.test",
+            name: "com.xvk.mpia.test",
             value: Data("atomic-xattr".utf8),
             at: source
         )
@@ -141,10 +141,10 @@ struct SafariPlistMutationFeasibilityTests {
         #expect(try Data(contentsOf: safety.backupURL) == original)
         #expect(posixMode(source) == 0o644)
         #expect(try SafariExtendedAttributes.value(
-            name: "com.xvk.macos-data.test", at: source
+            name: "com.xvk.mpia.test", at: source
         ) == Data("atomic-xattr".utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path)
-            .filter { $0.hasPrefix(".macos-data-safari-swap-") }.isEmpty)
+            .filter { $0.hasPrefix(".mpia-safari-swap-") }.isEmpty)
     }
 
     @Test("Atomic writer rejects a stale gate before replacement")
@@ -195,7 +195,7 @@ struct SafariPlistMutationFeasibilityTests {
         #expect(try Data(contentsOf: source) == original)
         #expect(try Data(contentsOf: safety.backupURL) == original)
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path)
-            .filter { $0.hasPrefix(".macos-data-safari-swap-") }.isEmpty)
+            .filter { $0.hasPrefix(".mpia-safari-swap-") }.isEmpty)
     }
 
     @Test("Atomic writer refuses a tampered recovery manifest")
@@ -276,7 +276,7 @@ struct SafariPlistMutationFeasibilityTests {
         let destination = directory.appendingPathComponent("destination.plist")
         try syntheticPlistData().write(to: source, options: .withoutOverwriting)
         try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: source.path)
-        try SafariExtendedAttributes.set(name: "com.xvk.macos-data.test", value: Data("fixture-xattr".utf8), at: source)
+        try SafariExtendedAttributes.set(name: "com.xvk.mpia.test", value: Data("fixture-xattr".utf8), at: source)
 
         let report = try SafariPlistRoundTripInspector.writePrivateCopy(source: source, destination: destination)
 
@@ -288,7 +288,7 @@ struct SafariPlistMutationFeasibilityTests {
         #expect(report.destinationMetadata.groupID == report.sourceMetadata.groupID)
         #expect(report.destinationMetadata.extendedAttributeNames == report.sourceMetadata.extendedAttributeNames)
         #expect(report.destinationAddedExtendedAttributeNames.isEmpty)
-        #expect(try SafariExtendedAttributes.value(name: "com.xvk.macos-data.test", at: destination) == Data("fixture-xattr".utf8))
+        #expect(try SafariExtendedAttributes.value(name: "com.xvk.mpia.test", at: destination) == Data("fixture-xattr".utf8))
     }
 
     @Test("Copy gate rejects symlinks and refuses overwrite")
@@ -457,7 +457,7 @@ struct SafariPlistMutationFeasibilityTests {
 
     @Test("Opt-in live plist audit mutates only an auto-deleted private copy")
     func liveCopyAudit() throws {
-        guard ProcessInfo.processInfo.environment["MACOS_DATA_SAFARI_PLIST_COPY_AUDIT"] == "1" else { return }
+        guard ProcessInfo.processInfo.environment["MPIA_SAFARI_PLIST_COPY_AUDIT"] == "1" else { return }
         let source = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Safari/Bookmarks.plist")
         let directory = try privateTemporaryDirectory()
@@ -488,7 +488,7 @@ struct SafariPlistMutationFeasibilityTests {
 
     @Test("Opt-in live safety gate either blocks active Safari or creates an auto-deleted recovery")
     func liveSafetyGateAudit() throws {
-        guard ProcessInfo.processInfo.environment["MACOS_DATA_SAFARI_SAFETY_GATE_AUDIT"] == "1" else { return }
+        guard ProcessInfo.processInfo.environment["MPIA_SAFARI_SAFETY_GATE_AUDIT"] == "1" else { return }
         let source = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Safari/Bookmarks.plist")
         let directory = try privateTemporaryDirectory()
@@ -529,7 +529,7 @@ struct SafariPlistMutationFeasibilityTests {
     @Test("Opt-in private Framework gate retains one exact recovery session")
     func livePrivateFrameworkRecoveryPreparation() throws {
         guard let sessionID = ProcessInfo.processInfo.environment[
-            "MACOS_DATA_SAFARI_PRIVATE_FRAMEWORK_RECOVERY_SESSION"
+            "MPIA_SAFARI_PRIVATE_FRAMEWORK_RECOVERY_SESSION"
         ] else { return }
         guard let session = UUID(uuidString: sessionID) else {
             Issue.record("Invalid private Framework recovery session")
@@ -538,7 +538,7 @@ struct SafariPlistMutationFeasibilityTests {
         let source = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Safari/Bookmarks.plist")
         let recovery = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/macos-data-cli/recovery", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/mpia-cli/recovery", isDirectory: true)
             .appendingPathComponent("safari-private-framework", isDirectory: true)
             .appendingPathComponent(session.uuidString.lowercased(), isDirectory: true)
         guard FileManager.default.fileExists(atPath: recovery.path) == false else {
@@ -565,7 +565,7 @@ struct SafariPlistMutationFeasibilityTests {
 
     @Test("Opt-in atomic mutation audit uses only an auto-deleted copy of the live plist")
     func livePrivateCopyAtomicMutationAudit() throws {
-        guard ProcessInfo.processInfo.environment["MACOS_DATA_SAFARI_ATOMIC_COPY_AUDIT"] == "1" else { return }
+        guard ProcessInfo.processInfo.environment["MPIA_SAFARI_ATOMIC_COPY_AUDIT"] == "1" else { return }
         let liveSource = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Safari/Bookmarks.plist")
         let liveBefore = try Data(contentsOf: liveSource)
@@ -584,7 +584,7 @@ struct SafariPlistMutationFeasibilityTests {
         }
         let bookmarksBarUUID = try SafariPlistRoundTripInspector.standardBookmarksBarUUID(data: liveBefore)
         let unique = UUID().uuidString
-        let fixtureURL = "https://example.com/macos-data-safari-private-copy/" + unique
+        let fixtureURL = "https://example.com/mpia-safari-private-copy/" + unique
         let mutation = try SafariPlistRoundTripInspector.simulateAppendBookmark(
             data: liveBefore,
             parentUUID: bookmarksBarUUID,
@@ -592,7 +592,7 @@ struct SafariPlistMutationFeasibilityTests {
                 "WebBookmarkType": "WebBookmarkTypeLeaf",
                 "WebBookmarkUUID": unique,
                 "URLString": fixtureURL,
-                "URIDictionary": ["title": "macos-data private copy fixture"]
+                "URIDictionary": ["title": "mpia private copy fixture"]
             ]
         )
         let safety = try testSafetyGate().prepare(source: working, recoveryDirectory: recovery)
@@ -616,21 +616,21 @@ struct SafariPlistMutationFeasibilityTests {
 
     @Test("Retired live mutation gate refuses another persistent fixture")
     func explicitLiveMutationGate() throws {
-        let confirmation = ProcessInfo.processInfo.environment["MACOS_DATA_SAFARI_LIVE_MUTATION_CONFIRM"]
+        let confirmation = ProcessInfo.processInfo.environment["MPIA_SAFARI_LIVE_MUTATION_CONFIRM"]
         guard confirmation != nil else { return }
         throw SafariPlistAtomicMutationError.invalidPreparedMutation
     }
 
     @Test("Opt-in live readback compares current plist with retained recovery")
     func liveFixtureReadbackAudit() throws {
-        guard let sessionID = ProcessInfo.processInfo.environment["MACOS_DATA_SAFARI_READBACK_SESSION"] else {
+        guard let sessionID = ProcessInfo.processInfo.environment["MPIA_SAFARI_READBACK_SESSION"] else {
             return
         }
         guard UUID(uuidString: sessionID) != nil else {
             throw SafariPlistFeasibilityError.mutationTargetInvalid
         }
         let recovery = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/macos-data-cli/recovery/safari", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/mpia-cli/recovery/safari", isDirectory: true)
             .appendingPathComponent(sessionID.lowercased(), isDirectory: true)
         let receiptURL = recovery.appendingPathComponent("fixture-receipt.json")
         let receipt = try JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as! [String: Any]
@@ -821,7 +821,7 @@ struct SafariPlistMutationFeasibilityTests {
 
     private func privateTemporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("macos-data-safari-feasibility-" + UUID().uuidString, isDirectory: true)
+            .appendingPathComponent("mpia-safari-feasibility-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: false,

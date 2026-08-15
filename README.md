@@ -1,10 +1,10 @@
-# macos-data-cli
+# mpia-cli
 
 A CLI-first macOS native data access layer for agents and developers.
 
 Agents that need to work with macOS data often depend on fragile GUI automation,
 platform-specific integrations, or private and unstable data formats.
-`macos-data-cli` provides a local, scriptable, testable interface that prefers
+`mpia-cli` provides a local, scriptable, testable interface that prefers
 Apple public frameworks and permits narrowly scoped, documented local adapters
 with fail-closed read/write boundaries when no public framework exposes the
 required data.
@@ -14,11 +14,11 @@ required data.
 Build from source and request the first read-only JSON snapshot:
 
 ```bash
-git clone https://github.com/xxvk/macos-data-cli.git
-cd macos-data-cli
+git clone https://github.com/xxvk/mpia-cli.git
+cd mpia-cli
 export DEVELOPER_DIR="$(xcode-select -p)"
 swift build
-.build/debug/macos-data resources --format json
+.build/debug/mpia resources --format json
 ```
 
 Requirements: macOS 26 or newer, Apple Silicon, and Xcode with Swift 6.2.
@@ -29,13 +29,13 @@ macOS permissions.
 ## Usage
 
 Start with capability and permission checks; these commands do not modify user
-data. The examples use an installed `macos-data`; from the source checkout, use
-`.build/debug/macos-data` instead:
+data. The examples use an installed `mpia`; from the source checkout, use
+`.build/debug/mpia` instead:
 
 ```bash
-macos-data resources --format json
-macos-data contacts permission
-macos-data mail doctor --format json
+mpia resources --format json
+mpia contacts permission
+mpia mail doctor --format json
 ```
 
 Commands that can write use explicit dry-run/apply paths, and destructive
@@ -45,7 +45,10 @@ operations require an additional confirmation phrase. See the full
 
 ## Project status
 
-The current source release is 0.8.1. The Contacts adapter introduced through 0.1.7 supports
+The current source release is 0.9.0, which renames the project from
+`macos-data-cli` to `mpia-cli`: the canonical command is now `mpia`, the
+Contacts URL label is `mpia-cli`, and the external-ID scheme is
+`mpia://ext-id/<id>`. The Contacts adapter introduced through 0.1.7 supports
 permission checks, iCloud container verification, JSON reads, queries,
 controlled writes, avatars, deletion, external ID migration, and JSON
 snapshots.
@@ -182,14 +185,14 @@ User documentation:
 ## Mail 0.2 commands
 
 ```text
-macos-data mail doctor --format json
-macos-data mail accounts --format json
-macos-data mail mailboxes [--account-id <id>] --format json
-macos-data mail query [filters] [--limit <1...200>] [--cursor <cursor>] --format json
-macos-data mail get --id <id> [--content metadata|text] --format json
-macos-data mail get --id <id> --content raw --output <file|->
-macos-data mail reveal --id <id> --format json
-macos-data mail attachments verify --id <id> --format json
+mpia mail doctor --format json
+mpia mail accounts --format json
+mpia mail mailboxes [--account-id <id>] --format json
+mpia mail query [filters] [--limit <1...200>] [--cursor <cursor>] --format json
+mpia mail get --id <id> [--content metadata|text] --format json
+mpia mail get --id <id> --content raw --output <file|->
+mpia mail reveal --id <id> --format json
+mpia mail attachments verify --id <id> --format json
 ```
 
 `doctor` does not launch Mail.app, prompt for permission, or read message
@@ -222,16 +225,16 @@ before any Mail store or Mail.app access occurs. This boundary is part of the
 ## Calendar 0.3 commands
 
 ```text
-macos-data calendar permission
-macos-data calendar sources --format json
-macos-data calendar calendars --format json
-macos-data calendar query --start <iso8601> --end <iso8601> --format json
-macos-data calendar conflicts --start <iso8601> --end <iso8601> --format json
-macos-data calendar get --id <opaque-event-id> --format json
-macos-data calendar create --input event.json --dry-run|--apply [--idempotent] --format json
-macos-data calendar edit --id <id> --input patch.json --dry-run|--apply [--span this|future] --format json
-macos-data calendar delete --id <id> --dry-run [--span this|future] --format json
-macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+mpia calendar permission
+mpia calendar sources --format json
+mpia calendar calendars --format json
+mpia calendar query --start <iso8601> --end <iso8601> --format json
+mpia calendar conflicts --start <iso8601> --end <iso8601> --format json
+mpia calendar get --id <opaque-event-id> --format json
+mpia calendar create --input event.json --dry-run|--apply [--idempotent] --format json
+mpia calendar edit --id <id> --input patch.json --dry-run|--apply [--span this|future] --format json
+mpia calendar delete --id <id> --dry-run [--span this|future] --format json
+mpia calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
 ```
 
 The adapter defaults only to the uniquely verified iCloud CalDAV source and
@@ -277,35 +280,35 @@ If a query matches multiple contacts, the CLI returns an ambiguous result and re
 Currently available:
 
 ```text
-macos-data contacts permission
-macos-data contacts count [--format json]
-macos-data contacts list --format json
-macos-data contacts get --external-id <id> --format json
-macos-data contacts query --name "..."
-macos-data contacts query --kind organization
-macos-data contacts query --phone "..."
-macos-data contacts query --email "..."
-macos-data contacts query --url "..."
-macos-data contacts query --organization "..."
-macos-data contacts query --postal-code "..."
-macos-data contacts create --input contact.json --dry-run
-macos-data contacts create --input contact.json --apply
-cat contact.json | macos-data contacts create --stdin --dry-run
-cat contact.json | macos-data contacts create --stdin --apply --idempotent
-macos-data contacts edit --external-id <id> --input contact.json --dry-run
-macos-data contacts edit --external-id <id> --input contact.json --apply
-cat patch.json | macos-data contacts edit --external-id <id> --stdin --dry-run
-macos-data contacts edit --external-id <id> --image <file> --dry-run
-macos-data contacts edit --external-id <id> --image <file> --apply
-macos-data contacts avatar verify --external-id <id> --format json
-macos-data contacts avatar replace --external-id <id> --image <file> --dry-run
-macos-data contacts avatar replace --external-id <id> --image <file> --apply --confirm "RECREATE CONTACT"
-macos-data contacts delete --external-id <id> --dry-run
-macos-data contacts delete --external-id <id> --apply --confirm "DELETE CONTACT"
-macos-data contacts delete --external-id <id> --apply --confirm "DELETE CONTACT" --ignore-not-found
-macos-data contacts external-id migrate --from <old> --to <new> --dry-run
-macos-data contacts external-id migrate --from <old> --to <new> --apply --confirm "CHANGE EXTERNAL ID"
-macos-data contacts export --format json [--output <file>]
+mpia contacts permission
+mpia contacts count [--format json]
+mpia contacts list --format json
+mpia contacts get --external-id <id> --format json
+mpia contacts query --name "..."
+mpia contacts query --kind organization
+mpia contacts query --phone "..."
+mpia contacts query --email "..."
+mpia contacts query --url "..."
+mpia contacts query --organization "..."
+mpia contacts query --postal-code "..."
+mpia contacts create --input contact.json --dry-run
+mpia contacts create --input contact.json --apply
+cat contact.json | mpia contacts create --stdin --dry-run
+cat contact.json | mpia contacts create --stdin --apply --idempotent
+mpia contacts edit --external-id <id> --input contact.json --dry-run
+mpia contacts edit --external-id <id> --input contact.json --apply
+cat patch.json | mpia contacts edit --external-id <id> --stdin --dry-run
+mpia contacts edit --external-id <id> --image <file> --dry-run
+mpia contacts edit --external-id <id> --image <file> --apply
+mpia contacts avatar verify --external-id <id> --format json
+mpia contacts avatar replace --external-id <id> --image <file> --dry-run
+mpia contacts avatar replace --external-id <id> --image <file> --apply --confirm "RECREATE CONTACT"
+mpia contacts delete --external-id <id> --dry-run
+mpia contacts delete --external-id <id> --apply --confirm "DELETE CONTACT"
+mpia contacts delete --external-id <id> --apply --confirm "DELETE CONTACT" --ignore-not-found
+mpia contacts external-id migrate --from <old> --to <new> --dry-run
+mpia contacts external-id migrate --from <old> --to <new> --apply --confirm "CHANGE EXTERNAL ID"
+mpia contacts export --format json [--output <file>]
 ```
 
 Query conditions use AND semantics. A query accepts at most three conditions, and each field can appear only once. `--format json` does not count as a condition.
@@ -356,7 +359,7 @@ See [`docs/development/distribution-signing.md`](docs/development/distribution-s
 Calendar 0.3, Reminders 0.4, Photos 0.5, and the bounded read-only Notes 0.6
 source releases are complete. Guarded Notes create/rename/move writes are
 assigned to 0.6.1. Notes integration is Automation rather than a native Notes
-Framework and must not access private Notes stores. `macos-data` remains the canonical command through
+Framework and must not access private Notes stores. `mpia` remains the canonical command through
 0.x; naming is reviewed again before 1.0.0.
 The current Reminders development slice supports full-access discovery,
 bounded query/get, and guarded `create --dry-run|--apply` with read-back states

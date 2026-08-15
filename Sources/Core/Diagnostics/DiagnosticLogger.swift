@@ -4,7 +4,7 @@ import Foundation
 /// The log intentionally excludes command arguments because they may contain private data.
 public enum DiagnosticLogger {
     public static let directoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/macos-data-cli", isDirectory: true)
+        .appendingPathComponent("Library/Logs/mpia-cli", isDirectory: true)
     public static let fileURL: URL = directoryURL.appendingPathComponent("diagnostics.log")
 
     public static func record(code: String, message: String) {

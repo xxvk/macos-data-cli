@@ -85,7 +85,7 @@ public enum PhotoExportFileCoordinator {
               fileManager.isWritableFile(atPath: parent.path) else {
             throw PhotoError.invalidOutput
         }
-        return parent.appendingPathComponent(".macos-data-export-\(UUID().uuidString).tmp")
+        return parent.appendingPathComponent(".mpia-export-\(UUID().uuidString).tmp")
     }
 
     public static func commit(temporaryURL: URL, outputURL: URL) throws {

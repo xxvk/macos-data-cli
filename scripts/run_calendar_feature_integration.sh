@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data.app/Contents/MacOS/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia.app/Contents/MacOS/mpia}"
 CONFIRMATION=""
 
 while [[ $# -gt 0 ]]; do
@@ -21,7 +21,7 @@ done
 TMP_DIR="$(mktemp -d)"
 chmod 700 "$TMP_DIR"
 SUFFIX="$(date -u '+%Y%m%dT%H%M%SZ')-$$"
-URL_VALUE="https://example.invalid/macos-data/calendar-feature-test/$SUFFIX"
+URL_VALUE="https://example.invalid/mpia/calendar-feature-test/$SUFFIX"
 ALL_DAY_START="$(date -v+30d '+%Y-%m-%d')"
 ALL_DAY_END="$(date -v+32d '+%Y-%m-%d')"
 ALL_DAY_EDITED_END="$(date -v+33d '+%Y-%m-%d')"
@@ -66,7 +66,7 @@ cleanup() {
 trap cleanup EXIT
 
 jq -n \
-  --arg title "macos-data disposable all-day $SUFFIX" \
+  --arg title "mpia disposable all-day $SUFFIX" \
   --arg start "$ALL_DAY_START" --arg end "$ALL_DAY_END" --arg url "$URL_VALUE" '{
     title: $title,
     allDay: true,
@@ -108,7 +108,7 @@ echo "feature gate: alarm clear read-back"
 
 create_timed_fixture() {
   local label="$1" start="$2" end="$3" output="$4"
-  jq -n --arg title "macos-data disposable conflict $label $SUFFIX" \
+  jq -n --arg title "mpia disposable conflict $label $SUFFIX" \
     --arg start "$start" --arg end "$end" --arg url "$URL_VALUE" '{
       title: $title, startDate: $start, endDate: $end, timeZone: "UTC", url: $url
     }' >"$TMP_DIR/$label-create.json"
@@ -119,11 +119,11 @@ create_timed_fixture A "$TIMED_A_START" "$TIMED_A_END" "$TMP_DIR/a.json"
 create_timed_fixture B "$TIMED_B_START" "$TIMED_B_END" "$TMP_DIR/b.json"
 create_timed_fixture C "$TIMED_C_START" "$TIMED_C_END" "$TMP_DIR/c.json"
 wait_for_fixture_count 4 "$TMP_DIR/four-fixtures.json"
-A_ID="$(jq -r --arg title "macos-data disposable conflict A $SUFFIX" '.[] | select(.title == $title) | .id' "$TMP_DIR/four-fixtures.json")"
-B_ID="$(jq -r --arg title "macos-data disposable conflict B $SUFFIX" '.[] | select(.title == $title) | .id' "$TMP_DIR/four-fixtures.json")"
-C_ID="$(jq -r --arg title "macos-data disposable conflict C $SUFFIX" '.[] | select(.title == $title) | .id' "$TMP_DIR/four-fixtures.json")"
+A_ID="$(jq -r --arg title "mpia disposable conflict A $SUFFIX" '.[] | select(.title == $title) | .id' "$TMP_DIR/four-fixtures.json")"
+B_ID="$(jq -r --arg title "mpia disposable conflict B $SUFFIX" '.[] | select(.title == $title) | .id' "$TMP_DIR/four-fixtures.json")"
+C_ID="$(jq -r --arg title "mpia disposable conflict C $SUFFIX" '.[] | select(.title == $title) | .id' "$TMP_DIR/four-fixtures.json")"
 
-jq -n --arg title "macos-data disposable conflict A $SUFFIX" \
+jq -n --arg title "mpia disposable conflict A $SUFFIX" \
   --arg start "$TIMED_A_START" --arg end "$TIMED_B_END" --arg url "$URL_VALUE" '{
     title: $title, startDate: $start, endDate: $end, timeZone: "UTC", url: $url,
     notes: "different persisted payload"

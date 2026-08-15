@@ -236,14 +236,14 @@ require a signed host app plus user-enabled Mail extension. That is a possible
 The first release is intentionally read-only:
 
 ```text
-macos-data mail doctor --format json
-macos-data mail accounts --format json
-macos-data mail mailboxes [--account-id <id>] --format json
-macos-data mail query [filters] [--limit <n>] [--cursor <cursor>] --format json
-macos-data mail get --id <opaque-local-id> [--content metadata|text] --format json
-macos-data mail get --id <opaque-local-id> --content raw --output <file|->
-macos-data mail reveal --id <opaque-local-id> [--format json]
-macos-data mail attachments verify --id <opaque-local-id> --format json
+mpia mail doctor --format json
+mpia mail accounts --format json
+mpia mail mailboxes [--account-id <id>] --format json
+mpia mail query [filters] [--limit <n>] [--cursor <cursor>] --format json
+mpia mail get --id <opaque-local-id> [--content metadata|text] --format json
+mpia mail get --id <opaque-local-id> --content raw --output <file|->
+mpia mail reveal --id <opaque-local-id> [--format json]
+mpia mail attachments verify --id <opaque-local-id> --format json
 ```
 
 Initial query filters should cover account, mailbox, sender, recipient,
@@ -277,7 +277,7 @@ paths, content IDs, or payload bytes; partial EMLX can never produce `matched`.
 The command grammar is:
 
 ```text
-macos-data <domain> <operation> [selector] [projection] [rendering]
+mpia <domain> <operation> [selector] [projection] [rendering]
 ```
 
 For Mail, `mail` is the domain; query filters and `--id` select data;
@@ -362,7 +362,7 @@ operation is user-visible.
 
 ## Agent and MCP boundary
 
-The Mail implementation belongs in `macos-data`, not in a Codex plugin or MCP
+The Mail implementation belongs in `mpia`, not in a Codex plugin or MCP
 server. The CLI owns path discovery, TCC diagnostics, schema adaptation, MIME
 parsing, limits, and the stable JSON contract. This keeps the same audited local
 behavior available to a human in Terminal and to any agent.

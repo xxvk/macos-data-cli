@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP="${MACOS_DATA_APP:-}"
+APP="${MPIA_APP:-}"
 ACCOUNT_ID="${NOTES_ACCOUNT_ID:-}"
 SOURCE_FOLDER_ID="${NOTES_SOURCE_FOLDER_ID:-}"
 DESTINATION_FOLDER_ID="${NOTES_DESTINATION_FOLDER_ID:-}"
@@ -12,7 +12,7 @@ while [[ $# -gt 0 ]]; do
     *) echo "usage: $0 [--with-soft-delete]" >&2; exit 64 ;;
   esac
 done
-[[ -n "$APP" && -d "$APP" ]] || { echo "Set MACOS_DATA_APP to a signed app bundle." >&2; exit 1; }
+[[ -n "$APP" && -d "$APP" ]] || { echo "Set MPIA_APP to a signed app bundle." >&2; exit 1; }
 [[ -n "$ACCOUNT_ID" && -n "$SOURCE_FOLDER_ID" && -n "$DESTINATION_FOLDER_ID" ]] || {
   echo "Set NOTES_ACCOUNT_ID, NOTES_SOURCE_FOLDER_ID, and NOTES_DESTINATION_FOLDER_ID." >&2
   exit 1
@@ -22,9 +22,9 @@ command -v jq >/dev/null || { echo "Notes write integration requires jq." >&2; e
 command -v shasum >/dev/null || { echo "Notes write integration requires shasum." >&2; exit 1; }
 
 TMP_DIR="$(mktemp -d)"
-TITLE="${NOTES_TEST_TITLE:-macos-data-notes-write-gate-$(date +%s)-$$}"
+TITLE="${NOTES_TEST_TITLE:-mpia-notes-write-gate-$(date +%s)-$$}"
 RENAMED_TITLE="${TITLE}-renamed"
-EDITED_BODY="Disposable macos-data 0.6.2 body-edit integration fixture."
+EDITED_BODY="Disposable mpia 0.6.2 body-edit integration fixture."
 NOTE_ID=""
 CURRENT_STAGE="initialization"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -56,7 +56,7 @@ run_app "$TMP_DIR/bind.json" notes write-account bind --account-id "$ACCOUNT_ID"
 jq -e '.ok == true and .data.dryRun == false' "$TMP_DIR/bind.json" >/dev/null
 
 jq -cn --arg folder "$SOURCE_FOLDER_ID" --arg title "$TITLE" \
-  '{folderID:$folder,title:$title,bodyFormat:"plaintext",body:"Disposable macos-data 0.6.2 integration fixture."}' >"$TMP_DIR/create-input.json"
+  '{folderID:$folder,title:$title,bodyFormat:"plaintext",body:"Disposable mpia 0.6.2 integration fixture."}' >"$TMP_DIR/create-input.json"
 CURRENT_STAGE="create-preview"
 run_app "$TMP_DIR/create-preview.json" notes create --input "$TMP_DIR/create-input.json" --dry-run --format json
 jq -e '.ok == true and .data.dryRun == true and .data.title == null and .data.body == null' "$TMP_DIR/create-preview.json" >/dev/null

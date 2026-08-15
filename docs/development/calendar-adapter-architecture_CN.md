@@ -20,16 +20,16 @@ Calendar.app GUI 或 AppleScript。本文定义 0.3.0 源码版本 contract；�
 ## 命令
 
 ```text
-macos-data calendar permission
-macos-data calendar sources --format json
-macos-data calendar calendars --format json
-macos-data calendar query --start <iso8601> --end <iso8601> [--calendar <id|title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
-macos-data calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|title>] --format json
-macos-data calendar get --id <opaque-event-id> --format json
-macos-data calendar create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-macos-data calendar edit --id <id> --input <file>|--stdin --dry-run|--apply [--span this|future] --format json
-macos-data calendar delete --id <id> --dry-run [--span this|future] --format json
-macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+mpia calendar permission
+mpia calendar sources --format json
+mpia calendar calendars --format json
+mpia calendar query --start <iso8601> --end <iso8601> [--calendar <id|title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
+mpia calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|title>] --format json
+mpia calendar get --id <opaque-event-id> --format json
+mpia calendar create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+mpia calendar edit --id <id> --input <file>|--stdin --dry-run|--apply [--span this|future] --format json
+mpia calendar delete --id <id> --dry-run [--span this|future] --format json
+mpia calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
 ```
 
 所有日期输入和 Calendar JSON 输出使用 ISO 8601。`timeZone` 使用 IANA identifier，

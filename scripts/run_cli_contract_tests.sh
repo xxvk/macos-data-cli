@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 NO_APPLY=false
@@ -150,8 +150,8 @@ run_expected_failure safari-bookmarks-invalid-limit 10 "$CLI" safari bookmarks l
 run_expected_failure safari-bookmarks-get-missing-id 64 "$CLI" safari bookmarks get --format json
 run_expected_failure safari-reading-list-invalid-read 10 "$CLI" safari reading-list query --read yes --format json
 run_expected_failure safari-reading-list-add-missing-input 10 "$CLI" safari reading-list add --dry-run --format json
-run_expected_failure safari-reading-list-add-conflicting-mode 10 "$CLI" safari reading-list add --stdin --dry-run --apply --format json <<<'{"url":"https://macos-data.invalid/fixture-080"}'
-run_expected_failure safari-reading-list-add-unknown-field 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"https://macos-data.invalid/fixture-080","unknown":true}'
+run_expected_failure safari-reading-list-add-conflicting-mode 10 "$CLI" safari reading-list add --stdin --dry-run --apply --format json <<<'{"url":"https://mpia.invalid/fixture-080"}'
+run_expected_failure safari-reading-list-add-unknown-field 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"https://mpia.invalid/fixture-080","unknown":true}'
 run_expected_failure safari-reading-list-add-unsafe-url 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"file:///tmp/private"}'
 run_expected_failure safari-local-create-missing-input 10 "$CLI" safari bookmarks create --format json
 run_expected_failure safari-local-create-conflicting-mode 10 "$CLI" safari bookmarks create --stdin --dry-run --apply --format json <<<'{"parentID":"safarifolder_invalid","index":0,"title":"T","url":"https://example.com"}'
@@ -222,7 +222,7 @@ run_expected_failure shortcuts-edit-ui-inspect-rejects-options 9 "$CLI" shortcut
 "$CLI" shortcuts edit inspect --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json >"$TMP_DIR/shortcuts-edit-inspect-cherri.out"
 assert_contains "$TMP_DIR/shortcuts-edit-inspect-cherri.out" '"capability"[[:space:]]*:[[:space:]]*"managed_source_route"'
 assert_contains "$TMP_DIR/shortcuts-edit-inspect-cherri.out" '"canApplySemanticEdit"[[:space:]]*:[[:space:]]*false'
-if rg -qi 'Macos Data 071 Fixture|macos-data-071-sentinel|#define|WFWorkflowAction' "$TMP_DIR/shortcuts-edit-inspect-cherri.out"; then
+if rg -qi 'Macos Data 071 Fixture|mpia-071-sentinel|#define|WFWorkflowAction' "$TMP_DIR/shortcuts-edit-inspect-cherri.out"; then
   echo "Shortcuts acquisition result leaked source, name, or action data" >&2
   exit 1
 fi
@@ -235,7 +235,7 @@ if rg -q 'opaque signed payload' "$TMP_DIR/shortcuts-edit-inspect-opaque.out"; t
   exit 1
 fi
 shortcut_hash="$(shasum -a 256 "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" | awk '{print $1}')"
-private_edit_value='macos-data-072-private-edit-value'
+private_edit_value='mpia-072-private-edit-value'
 printf '{"expectedInputSHA256":"%s","operations":[{"operation":"replace_text","index":0,"value":"%s"}]}' "$shortcut_hash" "$private_edit_value" >"$TMP_DIR/plan.json"
 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --format json >"$TMP_DIR/shortcuts-edit-plan.out"
 assert_contains "$TMP_DIR/shortcuts-edit-plan.out" '"operation"[[:space:]]*:[[:space:]]*"edit_plan"'

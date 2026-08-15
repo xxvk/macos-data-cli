@@ -5,15 +5,15 @@ set -euo pipefail
 # swift test. It uses the already documented iCloud Contacts fixtures.
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-CLI="${MACOS_DATA_BIN:-$ROOT_DIR/.build/debug/macos-data}"
+CLI="${MPIA_BIN:-$ROOT_DIR/.build/debug/mpia}"
 if [[ ! -x "$CLI" ]]; then
-  CLI="${MACOS_DATA_BIN:-$ROOT_DIR/.build/arm64-apple-macosx/debug/macos-data}"
+  CLI="${MPIA_BIN:-$ROOT_DIR/.build/arm64-apple-macosx/debug/mpia}"
 fi
 if [[ ! -x "$CLI" ]]; then
-  CLI="${MACOS_DATA_BIN:-$(command -v macos-data || true)}"
+  CLI="${MPIA_BIN:-$(command -v mpia || true)}"
 fi
 if [[ -z "$CLI" || ! -x "$CLI" ]]; then
-  echo "macos-data binary not found; run swift build first or set MACOS_DATA_BIN" >&2
+  echo "mpia binary not found; run swift build first or set MPIA_BIN" >&2
   exit 1
 fi
 
@@ -46,8 +46,8 @@ run contacts count
 run contacts get --external-id "$PERSON_ID" --format json
 run contacts get --external-id "$ORGANIZATION_ID" --format json
 run contacts get --external-id "$CREATE_ID" --format json
-run contacts query --organization "macos-data Test Organization" --format json
-run contacts export --format json --output "${TMPDIR:-/tmp}/macos-data-contacts-snapshot.json"
+run contacts query --organization "mpia Test Organization" --format json
+run contacts export --format json --output "${TMPDIR:-/tmp}/mpia-contacts-snapshot.json"
 run contacts create --input "$ROOT_DIR/Tests/Fixtures/organization-create.json" --dry-run --format json
 run contacts edit --external-id "$PERSON_ID" --input "$PATCH_FIXTURE" --dry-run --format json
 run contacts edit --external-id "$PERSON_ID" --image "$AVATAR_FIXTURE" --dry-run --format json

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.9.0 — 2026-08-16
+
+- Renamed the project from `macos-data-cli` to `mpia-cli`. The canonical command
+  is now `mpia`; the executable target and source directory are `mpia`; the app
+  bundle and entitlements are `mpia`; and the environment variables are `MPIA_CLI`
+  and `MPIA_APP`.
+- Changed the bundle identifier to `com.xvk.mpia.cli`. This is a new code-signing
+  identity, so macOS treats it as a new app and each adapter's TCC authorization
+  (Contacts, Calendar, Reminders, Photos, Full Disk Access, Automation) must be
+  granted once more.
+- Changed the Contacts external-ID scheme from `x-macos-data://external-id/<id>`
+  to `mpia://ext-id/<id>` and the reserved URL label from `macos-data-cli` to
+  `mpia-cli`. Existing `x-macos-data://` records are no longer resolved; re-create
+  or migrate them before relying on them.
+- Moved on-disk state from `~/Library/Application Support/macos-data-cli/` and
+  `~/Library/Logs/macos-data-cli` to the `mpia-cli` equivalents; the Safari opaque
+  seed is now `mpia-safari-v1:`.
+- Kept the historical decision records (`docs/development/adr/0001-*` and
+  `docs/development/naming-audit*`) unchanged; see the new
+  `docs/development/adr/0002-rename-to-mpia-cli.md`.
+
 ## 0.8.1 — 2026-08-15
 
 - Preserved the existing explicitly authorized unsigned arm64 GitHub Release

@@ -140,7 +140,7 @@ manifest 会在 replacement 前被拒绝。
 必须通过另行授权的一次性 live fixture 验证。
 
 live 入口默认禁用，只有提供准确确认短语 `CREATE SAFARI 0.8.1 FIXTURE` 才会执行。它会在
-唯一内建 `BookmarksBar` 下创建一个名为 `macos-data 0.8.1 plist feasibility fixture` 的
+唯一内建 `BookmarksBar` 下创建一个名为 `mpia 0.8.1 plist feasibility fixture` 的
 bookmark。原始 fixture UUID 和 URL 只保存于 recovery 同目录的 mode 0600 receipt，供之后
 精确清理。成功后必须通过 Safari UI 和 parser 回读验证，禁止自动重试。
 
@@ -168,7 +168,7 @@ file、atomic replacement 与 mode 保留。这些能补强 local CRUD contract 
 其当前实现不要求 Safari 退出，不检测 open handle、稳定 pre-write hash 或 Safari file lock，也不完整保留
 owner/group/ACL/xattr，不执行 file/directory fsync、写后 read-back rollback，更不会生成 `Sync.Changes`。
 长驻 MCP service 只在启动时加载一次 plist，后续 apply 可能覆盖 Safari 并发修改。测试全部基于 fixture，
-没有真实 Safari 或第二设备 iCloud gate，仓库 Issues 也被禁用。macos-data 对这些本机文件风险已有更严格
+没有真实 Safari 或第二设备 iCloud gate，仓库 Issues 也被禁用。mpia 对这些本机文件风险已有更严格
 gate，因此没有复制其代码；只把 operation vocabulary 与负向测试案例作为候选参考。
 
 本机存在私有 `SafariBookmarksSyncAgent`，但 Apple 没有发布让外部 plist 编辑提交给该 agent

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="${MACOS_DATA_APP:-}"
-[[ -n "$APP" && -d "$APP" ]] || { echo "Set MACOS_DATA_APP to a signed app bundle." >&2; exit 1; }
+APP="${MPIA_APP:-}"
+[[ -n "$APP" && -d "$APP" ]] || { echo "Set MPIA_APP to a signed app bundle." >&2; exit 1; }
 command -v jq >/dev/null || { echo "Photos export smoke requires jq." >&2; exit 1; }
 
 ALLOW_NETWORK=false

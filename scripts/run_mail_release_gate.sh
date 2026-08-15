@@ -32,10 +32,10 @@ fi
 
 bash scripts/run_swift_tests.sh
 swift build -c release
-release_version="$(.build/release/macos-data --version)"
-source_bundle_version="$(plutil -extract CFBundleShortVersionString raw -o - Sources/macos-data/Info.plist)"
-debug_bundle_version="$(plutil -extract CFBundleShortVersionString raw -o - scripts/macos-data-app-Info.plist)"
-debug_build_version="$(plutil -extract CFBundleVersion raw -o - scripts/macos-data-app-Info.plist)"
+release_version="$(.build/release/mpia --version)"
+source_bundle_version="$(plutil -extract CFBundleShortVersionString raw -o - Sources/mpia/Info.plist)"
+debug_bundle_version="$(plutil -extract CFBundleShortVersionString raw -o - scripts/mpia-app-Info.plist)"
+debug_build_version="$(plutil -extract CFBundleVersion raw -o - scripts/mpia-app-Info.plist)"
 for observed_version in "$release_version" "$source_bundle_version" "$debug_bundle_version" "$debug_build_version"; do
   if [[ "$observed_version" != "$expected_version" ]]; then
     echo "Release version drift: expected=$expected_version observed=$observed_version" >&2
@@ -43,13 +43,13 @@ for observed_version in "$release_version" "$source_bundle_version" "$debug_bund
   fi
 done
 bash scripts/build_debug_app.sh
-plutil -lint scripts/macos-data-app-Info.plist scripts/macos-data.entitlements
+plutil -lint scripts/mpia-app-Info.plist scripts/mpia.entitlements
 debug_app_temp_root="$(mktemp -d)"
 trap 'rm -rf "$debug_app_temp_root"' EXIT
-debug_app="$debug_app_temp_root/macos-data.app"
-ditto --norsrc --noextattr .build/debug/macos-data.app "$debug_app"
+debug_app="$debug_app_temp_root/mpia.app"
+ditto --norsrc --noextattr .build/debug/mpia.app "$debug_app"
 xattr -cr "$debug_app"
-codesign --force --sign - --entitlements scripts/macos-data.entitlements "$debug_app" >/dev/null
+codesign --force --sign - --entitlements scripts/mpia.entitlements "$debug_app" >/dev/null
 codesign --verify --deep --strict "$debug_app"
 automation_entitlement="$(
   codesign -d --entitlements :- "$debug_app" 2>/dev/null \

@@ -6,7 +6,7 @@ public final class NotesWriteAccountStore: @unchecked Sendable {
     public var fileURL: URL { directory.appendingPathComponent("notes-write-account.json") }
 
     public init(directory: URL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/macos-data-cli/config", isDirectory: true)) {
+        .appendingPathComponent("Library/Application Support/mpia-cli/config", isDirectory: true)) {
         self.directory = directory
     }
 

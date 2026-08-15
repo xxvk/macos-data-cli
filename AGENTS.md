@@ -1,7 +1,7 @@
 # Agent Integration Guide
 
 This repository is a CLI, not an Agent Skill. Agents and Skills that invoke
-`macos-data` should read these files before using it:
+`mpia` should read these files before using it:
 
 1. `README.md` or `README_CN.md` for the supported command surface
 2. `docs/usage.md` or `docs/usage_CN.md` for command details and examples
@@ -147,24 +147,24 @@ bash scripts/build_debug_app.sh
 The resulting authorized app is:
 
 ```text
-.build/debug/macos-data.app
+.build/debug/mpia.app
 ```
 
 `scripts/build_debug_app.sh` signs this bundle with
-`scripts/macos-data.entitlements`. Do not remove the
+`scripts/mpia.entitlements`. Do not remove the
 `com.apple.security.automation.apple-events` entitlement: the release gate reads
 it back from the signed app and fails if it is absent or false.
 
-For pure unit tests, `.build/debug/macos-data` remains available. Skills should
-allow the executable/app path to be configured with `MACOS_DATA_CLI`; they must
+For pure unit tests, `.build/debug/mpia` remains available. Skills should
+allow the executable/app path to be configured with `MPIA_CLI`; they must
 not assume a Homebrew or Release binary while development is in progress.
 
 ## Non-negotiable Contacts rules
 
 - Contacts writes target the verified iCloud container only.
 - Every CLI-created contact must have `external_id`.
-- The external ID is stored only as URL label `macos-data-cli` with value
-  `x-macos-data://external-id/<id>`.
+- The external ID is stored only as URL label `mpia-cli` with value
+  `mpia://ext-id/<id>`.
 - Regular edit cannot change `external_id`; use the migration command.
 - Writes require `--dry-run` or explicit `--apply`.
 - Delete requires `--confirm "DELETE CONTACT"`.
@@ -345,7 +345,7 @@ not assume a Homebrew or Release binary while development is in progress.
   authorization, aggregate kind counts, completeness, and truncation; it must
   stop before collection fetch when access is unreadable.
 - Agent sandboxes can become the TCC responsible process. For the real local
-  gate, use a stable installed bundle and set `MACOS_DATA_APP`; the smoke script
+  gate, use a stable installed bundle and set `MPIA_APP`; the smoke script
   will launch it through LaunchServices. Do not treat a direct sandbox denial as
   evidence about the app bundle's Photos permission.
 - Use `scripts/run_photos_metadata_smoke.sh` for bounded query/get verification.
@@ -523,7 +523,7 @@ does not authorize committing, tagging, pushing, or publishing.
 
 The contract script uses the raw Debug executable and therefore requires the
 calling process to have Contacts permission. For this machine's TCC behavior,
-real read verification must use the authorized `.build/debug/macos-data.app`;
+real read verification must use the authorized `.build/debug/mpia.app`;
 see `docs/development/local-debug-and-tcc_CN.md`.
 
 Real Contacts writes are exceptional operations and must follow the documented

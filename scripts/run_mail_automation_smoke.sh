@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data.app/Contents/MacOS/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia.app/Contents/MacOS/mpia}"
 WITH_TEXT_FALLBACK=false
 GUI_SESSION=false
 
@@ -28,7 +28,7 @@ run_cli() {
   "${RUNNER[@]}" "$CLI" "$@"
 }
 
-TEMP_DIR="$(mktemp -d /private/tmp/macos-data-mail-automation.XXXXXX)"
+TEMP_DIR="$(mktemp -d /private/tmp/mpia-mail-automation.XXXXXX)"
 trap '/bin/rm -rf -- "$TEMP_DIR"' EXIT
 
 doctor_file="$TEMP_DIR/doctor.json"

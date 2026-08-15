@@ -15,7 +15,7 @@ public final class CalendarIdempotencyStore: @unchecked Sendable {
 
     public init(
         directory: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/macos-data-cli/idempotency/calendar", isDirectory: true),
+            .appendingPathComponent("Library/Application Support/mpia-cli/idempotency/calendar", isDirectory: true),
         validity: TimeInterval = 60,
         now: @escaping @Sendable () -> Date = Date.init
     ) {

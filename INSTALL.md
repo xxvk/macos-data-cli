@@ -1,13 +1,13 @@
-# macos-data-cli Installation
+# mpia-cli Installation
 
-`macos-data-cli` 0.8.1 can be built and installed locally from source. The
+`mpia-cli` 0.8.1 can be built and installed locally from source. The
 public binary is not yet Developer ID signed or notarized.
 
 ### Unsigned distribution boundary
 
 Until a Developer ID certificate and notarization are available, a Release
 binary built from this repository is ad-hoc signed only. Gatekeeper may reject
-it with “Apple could not verify macos-data”; this is expected and is separate
+it with “Apple could not verify mpia”; this is expected and is separate
 from Homebrew checksum verification. Do not disable Gatekeeper globally.
 
 Before making a local trust decision, verify the downloaded asset's SHA-256
@@ -28,17 +28,17 @@ and must not be documented as equivalent to notarization.
 - Shortcuts Automation permission for metadata discovery and folder moves;
   shortcut execution additionally requires the system `shortcuts` helper
 - Optional Cherri 2.3.x for the managed-source authoring commands; it is
-  invoked as an external process and is not included in the macos-data binary
+  invoked as an external process and is not included in the mpia binary
 
 ## Build and install locally
 
-From the `macos-data-cli` submodule directory:
+From the `mpia-cli` submodule directory:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 swift test
 swift build -c release
-sudo install -m 755 .build/release/macos-data /opt/homebrew/bin/macos-data
+sudo install -m 755 .build/release/mpia /opt/homebrew/bin/mpia
 ```
 
 Before committing a 0.8.1 release candidate, run the local non-writing release gate:
@@ -50,7 +50,7 @@ bash scripts/run_release_gate.sh
 After installing the candidate locally, include the installed binary smoke:
 
 ```bash
-bash scripts/run_release_gate.sh --installed-cli /opt/homebrew/bin/macos-data
+bash scripts/run_release_gate.sh --installed-cli /opt/homebrew/bin/mpia
 ```
 
 The ordinary release gate invokes the shared CLI contracts with `--no-apply`.
@@ -65,22 +65,22 @@ the authorized Debug app:
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 bash scripts/build_debug_app.sh
-open -W .build/debug/macos-data.app --args contacts permission
+open -W .build/debug/mpia.app --args contacts permission
 ```
 
-Approve `macos-data.app` under System Settings → Privacy & Security → Contacts.
-The raw `.build/debug/macos-data` executable may be treated as a different TCC
+Approve `mpia.app` under System Settings → Privacy & Security → Contacts.
+The raw `.build/debug/mpia` executable may be treated as a different TCC
 identity and is not the correct real-Contacts verification path. See
 [`local-debug-and-tcc_CN.md`](docs/development/local-debug-and-tcc_CN.md).
 
 Verify:
 
 ```bash
-macos-data --version
-macos-data --help
-macos-data mail doctor --format json
-macos-data contacts permission
-macos-data contacts container
+mpia --version
+mpia --help
+mpia mail doctor --format json
+mpia contacts permission
+mpia contacts container
 bash scripts/run_installed_release_smoke.sh
 ```
 
@@ -93,7 +93,7 @@ The CLI requests Contacts and Mail Automation access through macOS. Contacts
 writes target only the verified iCloud Contacts container and are refused when
 that container is unavailable. Mail 0.2.0 never writes the Mail store.
 
-The installed raw binary and `.build/debug/macos-data.app` may be treated as
+The installed raw binary and `.build/debug/mpia.app` may be treated as
 different TCC identities. Use the signed Debug app for development permission
 work; grant FDA/Automation to the responsible installed-binary host separately
 when needed.

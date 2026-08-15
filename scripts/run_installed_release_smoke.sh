@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${1:-/opt/homebrew/bin/macos-data}"
+CLI="${1:-/opt/homebrew/bin/mpia}"
 
 if [[ ! -x "$CLI" ]]; then
-  echo "installed macos-data binary is missing or not executable: $CLI" >&2
+  echo "installed mpia binary is missing or not executable: $CLI" >&2
   exit 1
 fi
 
@@ -16,7 +16,7 @@ if [[ "$installed_version" != "$expected_version" ]]; then
   exit 1
 fi
 
-TEMP_DIR="$(mktemp -d /private/tmp/macos-data-installed-smoke.XXXXXX)"
+TEMP_DIR="$(mktemp -d /private/tmp/mpia-installed-smoke.XXXXXX)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 run_json() {
@@ -35,7 +35,7 @@ run_json() {
 }
 
 "$CLI" --help >"$TEMP_DIR/help.txt"
-if ! head -n 1 "$TEMP_DIR/help.txt" | rg -q '^macos-data '; then
+if ! head -n 1 "$TEMP_DIR/help.txt" | rg -q '^mpia '; then
   echo "installed binary help header is invalid" >&2
   exit 1
 fi

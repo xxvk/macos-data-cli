@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NOTARY_PROFILE="${MACOS_DATA_NOTARY_PROFILE:-macos-data-notary}"
-CASK_FILE="${MACOS_DATA_CASK_FILE:-}"
+NOTARY_PROFILE="${MPIA_NOTARY_PROFILE:-mpia-notary}"
+CASK_FILE="${MPIA_CASK_FILE:-}"
 ALLOW_UNSIGNED=false
 failures=0
 
@@ -28,7 +28,7 @@ info() {
 
 cd "$ROOT_DIR"
 expected_version="$(tr -d '[:space:]' < VERSION)"
-release_cli="$ROOT_DIR/.build/release/macos-data"
+release_cli="$ROOT_DIR/.build/release/mpia"
 
 if [[ -n "$expected_version" ]]; then
   pass "source version=$expected_version"
@@ -95,10 +95,10 @@ if [[ -n "$CASK_FILE" ]]; then
   if [[ -f "$CASK_FILE" ]]; then
     pass "Homebrew Cask file is available"
   else
-    fail "MACOS_DATA_CASK_FILE does not name a file"
+    fail "MPIA_CASK_FILE does not name a file"
   fi
 else
-  info "MACOS_DATA_CASK_FILE is not set; Cask update will be handled separately"
+  info "MPIA_CASK_FILE is not set; Cask update will be handled separately"
 fi
 
 if [[ $failures -gt 0 ]]; then

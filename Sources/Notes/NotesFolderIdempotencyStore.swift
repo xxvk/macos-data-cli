@@ -15,7 +15,7 @@ public final class NotesFolderIdempotencyStore: @unchecked Sendable {
     private let directory: URL
     private let validity: TimeInterval
     private let now: @Sendable () -> Date
-    public init(directory: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/macos-data-cli/idempotency/notes-folders", isDirectory: true), validity: TimeInterval = 60, now: @escaping @Sendable () -> Date = Date.init) {
+    public init(directory: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/mpia-cli/idempotency/notes-folders", isDirectory: true), validity: TimeInterval = 60, now: @escaping @Sendable () -> Date = Date.init) {
         self.directory = directory; self.validity = validity; self.now = now
     }
     public func receipt(for input: NotesFolderCreateInput) throws -> NotesFolderIdempotencyReceipt? {

@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data.app/Contents/MacOS/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia.app/Contents/MacOS/mpia}"
 TMP_DIR="$(mktemp -d)"
-TITLE="macos-data recurring reminder $(date -u +%Y%m%dT%H%M%SZ)-$$"
+TITLE="mpia recurring reminder $(date -u +%Y%m%dT%H%M%SZ)-$$"
 
 usage() {
   echo 'usage: run_reminders_recurrence_integration.sh --confirm "REMINDERS RECURRENCE TEST"' >&2

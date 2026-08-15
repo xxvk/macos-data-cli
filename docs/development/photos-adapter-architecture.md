@@ -59,12 +59,12 @@ trigger iCloud downloads. Hidden assets are excluded unless `--include-hidden`
 is explicit.
 
 ```text
-macos-data photos permission [--request] --format json
-macos-data photos albums [--kind user|smart|all] [--limit N] [--cursor C] --format json
-macos-data photos query --start <ISO-8601> --end <ISO-8601> [--album-id ID]
+mpia photos permission [--request] --format json
+mpia photos albums [--kind user|smart|all] [--limit N] [--cursor C] --format json
+mpia photos query --start <ISO-8601> --end <ISO-8601> [--album-id ID]
   [--media image|video|audio|unknown] [--favorite true|false]
   [--include-hidden] [--include-location] [--limit N] [--cursor C] --format json
-macos-data photos get --id <opaque-asset-id> [--include-location] --format json
+mpia photos get --id <opaque-asset-id> [--include-location] --format json
 ```
 
 Query uses creation date, requires start before end, and has a bounded range.
@@ -109,7 +109,7 @@ only import a disposable fixture and must prove cleanup.
 - When an agent shell is the responsible process, macOS can attribute PhotoKit
   access to that sandbox instead of the CLI app. For a valid local TCC gate,
   install the current bundle at a stable path and run the smoke with
-  `MACOS_DATA_APP=/path/to/macos-data-debug.app`. The script uses LaunchServices
+  `MPIA_APP=/path/to/mpia-debug.app`. The script uses LaunchServices
   plus temporary stdout/stderr files, preserving the app identity without
   exposing album titles or identifiers. A direct sandbox result is not valid
   evidence that the app itself was denied.

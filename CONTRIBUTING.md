@@ -1,6 +1,6 @@
-# Contributing to macos-data-cli
+# Contributing to mpia-cli
 
-Thanks for helping improve `macos-data-cli`. Contributions should preserve its
+Thanks for helping improve `mpia-cli`. Contributions should preserve its
 local-first design, stable JSON contracts, and fail-closed safety boundaries.
 
 ## Before you start

@@ -2,7 +2,7 @@
 
 ## Current status
 
-`macos-data-cli` now models and maps:
+`mpia-cli` now models and maps:
 
 - `phoneticGivenName`
 - `phoneticFamilyName`

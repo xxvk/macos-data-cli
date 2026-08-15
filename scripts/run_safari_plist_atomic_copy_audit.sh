@@ -10,5 +10,5 @@ SOURCE="$HOME/Library/Safari/Bookmarks.plist"
 }
 
 cd "$ROOT_DIR"
-MACOS_DATA_SAFARI_ATOMIC_COPY_AUDIT=1 \
+MPIA_SAFARI_ATOMIC_COPY_AUDIT=1 \
   bash scripts/run_swift_tests.sh --filter SafariPlistMutationFeasibilityTests.livePrivateCopyAtomicMutationAudit

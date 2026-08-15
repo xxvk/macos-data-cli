@@ -18,9 +18,9 @@ bash scripts/check_public_release_prerequisites.sh
 ```
 
 It verifies version alignment, a clean worktree, Developer ID availability,
-the `macos-data-notary` keychain profile, and GitHub CLI authentication. Set
-`MACOS_DATA_NOTARY_PROFILE` when using another profile and
-`MACOS_DATA_CASK_FILE` when the Tap checkout is available locally. The script
+the `mpia-notary` keychain profile, and GitHub CLI authentication. Set
+`MPIA_NOTARY_PROFILE` when using another profile and
+`MPIA_CASK_FILE` when the Tap checkout is available locally. The script
 reports only status and never prints credentials or notarization history.
 For GitHub CLI failures, follow [GitHub CLI Environment Know-how](github-cli-environment.md)
 before deciding that the token is invalid.
@@ -43,7 +43,7 @@ notary profile.
 - Create a Developer ID Application certificate.
 - Build the release binary in a controlled CI environment.
 - Sign the binary with `codesign`, hardened runtime, and a secure timestamp.
-- Preserve `scripts/macos-data.entitlements`; Mail.app Automation requires
+- Preserve `scripts/mpia.entitlements`; Mail.app Automation requires
   `com.apple.security.automation.apple-events` when Hardened Runtime is enabled.
 - Package the signed binary for distribution.
 - Submit the package with `xcrun notarytool`.
@@ -76,15 +76,15 @@ After the Tap has been updated successfully, the normal local update flow is:
 
 ```bash
 brew update
-brew upgrade --cask macos-data
-macos-data --version
+brew upgrade --cask mpia
+mpia --version
 ```
 
 If macOS displays:
 
 ```text
-“macos-data” Not Opened
-Apple could not verify “macos-data” is free of malware...
+“mpia” Not Opened
+Apple could not verify “mpia” is free of malware...
 ```
 
 this means the downloaded binary has a `com.apple.quarantine` attribute and is not yet signed and notarized with Apple Developer ID. It does not mean that Homebrew checksum verification failed.
@@ -92,10 +92,10 @@ this means the downloaded binary has a `com.apple.quarantine` attribute and is n
 For the current personally controlled local installation, verify the binary and remove only its quarantine attribute:
 
 ```bash
-which macos-data
-xattr -l "$(which macos-data)"
-xattr -d com.apple.quarantine "$(which macos-data)"
-macos-data --version
+which mpia
+xattr -l "$(which mpia)"
+xattr -d com.apple.quarantine "$(which mpia)"
+mpia --version
 ```
 
 Do not disable Gatekeeper globally. The permanent public-release solution remains Developer ID signing, hardened runtime, notarization, and stapling as described above.
@@ -112,5 +112,5 @@ Do not disable Gatekeeper globally. The permanent public-release solution remain
 4. Publish the versioned binary to GitHub Release.
 5. Update the Homebrew Cask URL, version, checksum, and archive path.
 6. Push the Tap change.
-7. On a clean local installation, run `brew update` and `brew upgrade --cask macos-data`.
-8. Verify `macos-data --version` and one bounded read-only Mail command.
+7. On a clean local installation, run `brew update` and `brew upgrade --cask mpia`.
+8. Verify `mpia --version` and one bounded read-only Mail command.

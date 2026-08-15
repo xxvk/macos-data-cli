@@ -93,17 +93,17 @@ final class ContactPayloadTests: XCTestCase {
     func testQueryMatcherSupportsNameEmailOrganizationAndPostalCode() {
         let contact = ContactPayload(
             kind: .organization,
-            givenName: "macos-data",
+            givenName: "mpia",
             familyName: "Test Contact",
-            organizationName: "macos-data Test",
-            emails: [LabeledValue(value: "macos-data-test@example.invalid")],
+            organizationName: "mpia Test",
+            emails: [LabeledValue(value: "mpia-test@example.invalid")],
             addresses: [PostalAddress(postalCode: "100-0001")]
         )
         let matcher = ContactQueryMatcher()
 
         XCTAssertTrue(matcher.matches(contact, query: .name("test contact")))
-        XCTAssertTrue(matcher.matches(contact, query: .email("MACOS-DATA-TEST@EXAMPLE.INVALID")))
-        XCTAssertTrue(matcher.matches(contact, query: .organization("macos-data")))
+        XCTAssertTrue(matcher.matches(contact, query: .email("MPIA-TEST@EXAMPLE.INVALID")))
+        XCTAssertTrue(matcher.matches(contact, query: .organization("mpia")))
         XCTAssertTrue(matcher.matches(contact, query: .postalCode("1000001")))
         XCTAssertEqual(contact.kind, .organization)
     }
@@ -191,7 +191,7 @@ final class ContactPayloadTests: XCTestCase {
     }
 
     func testCLIReleaseVersionMatchesCurrentRelease() {
-        XCTAssertEqual(CLIVersion.current, "0.8.1")
+        XCTAssertEqual(CLIVersion.current, "0.9.0")
     }
 
     func testCLIExitCodesAndErrorCodesAreStable() {

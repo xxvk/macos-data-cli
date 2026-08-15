@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data.app/Contents/MacOS/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia.app/Contents/MacOS/mpia}"
 
 [[ -x "$CLI" ]] || { echo "Reminders smoke requires an executable CLI: $CLI" >&2; exit 1; }
 command -v jq >/dev/null || { echo "Reminders smoke requires jq." >&2; exit 1; }

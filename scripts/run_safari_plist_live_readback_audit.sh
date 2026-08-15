@@ -10,5 +10,5 @@ if [[ "${1:-}" != "--session" || ! "$SESSION" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
 fi
 
 cd "$ROOT_DIR"
-MACOS_DATA_SAFARI_READBACK_SESSION="$SESSION" \
+MPIA_SAFARI_READBACK_SESSION="$SESSION" \
   bash scripts/run_swift_tests.sh --filter SafariPlistMutationFeasibilityTests.liveFixtureReadbackAudit

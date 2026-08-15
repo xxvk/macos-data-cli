@@ -2,15 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT_DIR/.build/debug/macos-data.app"
-CLI="$APP/Contents/MacOS/macos-data"
+APP="$ROOT_DIR/.build/debug/mpia.app"
+CLI="$APP/Contents/MacOS/mpia"
 
 if [[ ! -d "$APP" ]]; then
   echo "signed Debug app is missing; run bash scripts/build_debug_app.sh" >&2
   exit 1
 fi
 
-TEMP_DIR="$(mktemp -d /private/tmp/macos-data-mail-app-metadata.XXXXXX)"
+TEMP_DIR="$(mktemp -d /private/tmp/mpia-mail-app-metadata.XXXXXX)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 run_cli() {
@@ -18,7 +18,7 @@ run_cli() {
   shift
   set +e
   launchctl asuser "$(id -u)" /usr/bin/env \
-    MACOS_DATA_MAIL_FORCE_APP_FALLBACK=1 \
+    MPIA_MAIL_FORCE_APP_FALLBACK=1 \
     "$CLI" "$@" >"$output" 2>"$TEMP_DIR/stderr.json"
   local status=$?
   set -e

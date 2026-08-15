@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "macos-data-cli",
+    name: "mpia-cli",
     platforms: [
         .macOS(.v26)
     ],
@@ -45,8 +45,8 @@ let package = Package(
             targets: ["SafariAdapter"]
         ),
         .executable(
-            name: "macos-data",
-            targets: ["macos-data"]
+            name: "mpia",
+            targets: ["mpia"]
         )
     ],
     targets: [
@@ -124,7 +124,7 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "macos-data",
+            name: "mpia",
             dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter", "ShortcutsAdapter", "SafariAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
@@ -139,7 +139,7 @@ let package = Package(
                     "-Xlinker",
                     "__info_plist",
                     "-Xlinker",
-                    "Sources/macos-data/Info.plist"
+                    "Sources/mpia/Info.plist"
                 ])
             ]
         ),
@@ -208,7 +208,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CLITests",
-            dependencies: ["macos-data"],
+            dependencies: ["mpia"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

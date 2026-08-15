@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRATCH_PATH="${MACOS_DATA_SWIFT_SCRATCH_PATH:-${TMPDIR:-/tmp}/macos-data-cli-swiftpm-tests}"
-CACHE_ROOT="${MACOS_DATA_SWIFT_CACHE_PATH:-${TMPDIR:-/tmp}/macos-data-cli-swiftpm-cache}"
+SCRATCH_PATH="${MPIA_SWIFT_SCRATCH_PATH:-${TMPDIR:-/tmp}/mpia-cli-swiftpm-tests}"
+CACHE_ROOT="${MPIA_SWIFT_CACHE_PATH:-${TMPDIR:-/tmp}/mpia-cli-swiftpm-cache}"
 
 mkdir -p "$SCRATCH_PATH" "$CACHE_ROOT/swiftpm" "$CACHE_ROOT/clang"
 chmod 700 "$SCRATCH_PATH" "$CACHE_ROOT" "$CACHE_ROOT/swiftpm" "$CACHE_ROOT/clang"

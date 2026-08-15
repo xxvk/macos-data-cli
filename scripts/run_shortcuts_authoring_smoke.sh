@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia}"
 SOURCE="$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri"
-TMP_DIR="$(mktemp -d /tmp/macos-data-shortcuts-author.XXXXXX)"
+TMP_DIR="$(mktemp -d /tmp/mpia-shortcuts-author.XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 chmod 700 "$TMP_DIR"
 
@@ -22,7 +22,7 @@ rg -q '"signingMode"[[:space:]]*:[[:space:]]*"people-who-know-me"' "$TMP_DIR/bui
 [[ -s "$TMP_DIR/fixture.shortcut" ]]
 [[ "$(stat -f '%Lp' "$TMP_DIR/fixture.shortcut")" == "600" ]]
 
-if rg -qi '#define|macos data 071 fixture|macos-data 0\.7\.1 fixture' "$TMP_DIR/validate.json" "$TMP_DIR/build.json"; then
+if rg -qi '#define|macos data 071 fixture|mpia 0\.7\.1 fixture' "$TMP_DIR/validate.json" "$TMP_DIR/build.json"; then
   echo "Authoring result leaked source content or the fixture name" >&2
   exit 1
 fi

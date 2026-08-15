@@ -51,22 +51,22 @@ Apple 官方参考：
 - 默认读取选中 source 下所有 lists；`--list` 可以缩小范围。
 - 系统默认 list 只有属于选中 iCloud source 且可写时才能自动用于创建；否则如果只有一个
   可写 iCloud list 就选它；存在多个时必须显式提供 `listID` 并 fail closed。
-- `macos-data resources` 应报告 Reminders 能力，但不得暴露 Apple ID 或账户地址。
+- `mpia resources` 应报告 Reminders 能力，但不得暴露 Apple ID 或账户地址。
 
 ## 建议命令
 
 ```text
-macos-data reminders permission --format json
-macos-data reminders sources --format json
-macos-data reminders lists --format json
-macos-data reminders query [--status incomplete|completed|all] [--due-start <value>] [--due-end <value>] [--list <id|unique-title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
-macos-data reminders get --id <opaque-reminder-id> --format json
-macos-data reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-macos-data reminders edit --id <id> --input <file>|--stdin --dry-run|--apply --format json
-macos-data reminders complete --id <id> --dry-run|--apply --format json
-macos-data reminders reopen --id <id> --dry-run|--apply --format json
-macos-data reminders delete --id <id> --dry-run --format json
-macos-data reminders delete --id <id> --apply --confirm "DELETE REMINDER" --format json
+mpia reminders permission --format json
+mpia reminders sources --format json
+mpia reminders lists --format json
+mpia reminders query [--status incomplete|completed|all] [--due-start <value>] [--due-end <value>] [--list <id|unique-title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
+mpia reminders get --id <opaque-reminder-id> --format json
+mpia reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+mpia reminders edit --id <id> --input <file>|--stdin --dry-run|--apply --format json
+mpia reminders complete --id <id> --dry-run|--apply --format json
+mpia reminders reopen --id <id> --dry-run|--apply --format json
+mpia reminders delete --id <id> --dry-run --format json
+mpia reminders delete --id <id> --apply --confirm "DELETE REMINDER" --format json
 ```
 
 只有 permission 命令可以触发授权请求。

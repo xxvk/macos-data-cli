@@ -179,14 +179,14 @@ FTS；它无法回填历史邮件，而且需要签名 host app 与用户在 Mai
 ## 0.2.0 MVP
 
 ```text
-macos-data mail doctor --format json
-macos-data mail accounts --format json
-macos-data mail mailboxes [--account-id <id>] --format json
-macos-data mail query [filters] [--limit <n>] [--cursor <cursor>] --format json
-macos-data mail get --id <opaque-local-id> [--content metadata|text] --format json
-macos-data mail get --id <opaque-local-id> --content raw --output <file|->
-macos-data mail reveal --id <opaque-local-id> [--format json]
-macos-data mail attachments verify --id <opaque-local-id> --format json
+mpia mail doctor --format json
+mpia mail accounts --format json
+mpia mail mailboxes [--account-id <id>] --format json
+mpia mail query [filters] [--limit <n>] [--cursor <cursor>] --format json
+mpia mail get --id <opaque-local-id> [--content metadata|text] --format json
+mpia mail get --id <opaque-local-id> --content raw --output <file|->
+mpia mail reveal --id <opaque-local-id> [--format json]
+mpia mail attachments verify --id <opaque-local-id> --format json
 ```
 
 首版查询支持 account、mailbox、from、to、subject、received-after/before、
@@ -214,7 +214,7 @@ partial EMLX 永远不能产生 `matched`。
 统一语法是：
 
 ```text
-macos-data <domain> <operation> [selector] [projection] [rendering]
+mpia <domain> <operation> [selector] [projection] [rendering]
 ```
 
 在 Mail 中，`mail` 是数据域；filter 和 `--id` 负责选择；`--content` 决定对选中
@@ -279,7 +279,7 @@ RFC 822 可能不是 UTF-8 且体积很大，因此 raw 不直接嵌入 JSON。`
 
 ## Agent 与 MCP 边界
 
-Mail 的真实实现属于 `macos-data` CLI，不属于 Codex plugin 或 MCP server。路径发现、
+Mail 的真实实现属于 `mpia` CLI，不属于 Codex plugin 或 MCP server。路径发现、
 TCC 诊断、schema 适配、MIME 解析、输出限制和稳定 JSON contract 都由 CLI 统一负责，
 保证人类在 Terminal 与任意 Agent 使用的是同一套经过审计的本地行为。
 
@@ -307,7 +307,7 @@ TCC 诊断、schema 适配、MIME 解析、输出限制和稳定 JSON contract �
 ## 权限模型
 
 - SQLite/EMLX：需要把 Full Disk Access 授予真正启动 CLI 的 responsible process，
-  可能是 `macos-data.app`、Terminal 或 Agent host。
+  可能是 `mpia.app`、Terminal 或 Agent host。
 - Mail.app fallback / reveal：需要 Automation 权限。
 - app 的 Info.plist 必须包含 `NSAppleEventsUsageDescription`；启用 Hardened Runtime 的
   签名 app 还需要 `com.apple.security.automation.apple-events` entitlement。

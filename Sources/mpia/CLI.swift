@@ -11,7 +11,7 @@ import NotesAdapter
 import SafariAdapter
 
 @main
-struct MacosDataCLI {
+struct MpiaCLI {
     static func main() async {
         let rawArguments = Array(CommandLine.arguments.dropFirst())
         let jsonRequested = rawArguments.contains("--format") && rawArguments.contains("json")
@@ -78,6 +78,8 @@ struct MacosDataCLI {
             let safariPermission = SafariPermissionService()
             let safariStore = SafariStore()
             switch arguments {
+            case ["manifest"]:
+                emitJSONSuccess(CommandRegistry.standard(version: CLIVersion.current))
             case ["resources"]:
                 emitJSONSuccess(makeResourcesResult(
                     permission: permission,
@@ -155,11 +157,11 @@ struct MacosDataCLI {
 #if DEBUG
             case ["shortcuts", "edit", "_ax-fixture-gate"]:
                 let environment = ProcessInfo.processInfo.environment
-                guard let mode = environment["MACOS_DATA_SHORTCUTS_AX_FIXTURE_GATE"],
-                      let nameHash = environment["MACOS_DATA_SHORTCUTS_AX_NAME_SHA256"],
-                      let textHash = environment["MACOS_DATA_SHORTCUTS_AX_TEXT_SHA256"],
-                      let commentHash = environment["MACOS_DATA_SHORTCUTS_AX_COMMENT_SHA256"],
-                      let confirmation = environment["MACOS_DATA_SHORTCUTS_AX_CONFIRM"] else {
+                guard let mode = environment["MPIA_SHORTCUTS_AX_FIXTURE_GATE"],
+                      let nameHash = environment["MPIA_SHORTCUTS_AX_NAME_SHA256"],
+                      let textHash = environment["MPIA_SHORTCUTS_AX_TEXT_SHA256"],
+                      let commentHash = environment["MPIA_SHORTCUTS_AX_COMMENT_SHA256"],
+                      let confirmation = environment["MPIA_SHORTCUTS_AX_CONFIRM"] else {
                     throw ShortcutsError.editConfirmationRequired
                 }
                 if mode == "copy-delete" {
@@ -177,7 +179,7 @@ struct MacosDataCLI {
                         confirmation: confirmation
                     ))
                 } else if mode == "copy-delete-readback" {
-                    guard let copyNameHash = environment["MACOS_DATA_SHORTCUTS_AX_COPY_NAME_SHA256"] else {
+                    guard let copyNameHash = environment["MPIA_SHORTCUTS_AX_COPY_NAME_SHA256"] else {
                         throw ShortcutsError.editConfirmationRequired
                     }
                     emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().verifyExistingDeletedCopy(
@@ -187,7 +189,7 @@ struct MacosDataCLI {
                         confirmation: confirmation
                     ))
                 } else if mode == "copy-move-readback" {
-                    guard let copyNameHash = environment["MACOS_DATA_SHORTCUTS_AX_COPY_NAME_SHA256"] else {
+                    guard let copyNameHash = environment["MPIA_SHORTCUTS_AX_COPY_NAME_SHA256"] else {
                         throw ShortcutsError.editConfirmationRequired
                     }
                     emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().verifyExistingMovedCopy(
@@ -199,7 +201,7 @@ struct MacosDataCLI {
                     ))
                 } else {
                     guard mode == "copy-replace",
-                          let replacement = environment["MACOS_DATA_SHORTCUTS_AX_REPLACEMENT"] else {
+                          let replacement = environment["MPIA_SHORTCUTS_AX_REPLACEMENT"] else {
                         throw ShortcutsError.editConfirmationRequired
                     }
                     emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().mutateCopy(
@@ -212,10 +214,10 @@ struct MacosDataCLI {
                 }
             case ["shortcuts", "edit", "_ax-fixture-verify-original"]:
                 let environment = ProcessInfo.processInfo.environment
-                guard environment["MACOS_DATA_SHORTCUTS_AX_FIXTURE_GATE"] == "verify-original",
-                      let nameHash = environment["MACOS_DATA_SHORTCUTS_AX_NAME_SHA256"],
-                      let textHash = environment["MACOS_DATA_SHORTCUTS_AX_TEXT_SHA256"],
-                      let commentHash = environment["MACOS_DATA_SHORTCUTS_AX_COMMENT_SHA256"] else {
+                guard environment["MPIA_SHORTCUTS_AX_FIXTURE_GATE"] == "verify-original",
+                      let nameHash = environment["MPIA_SHORTCUTS_AX_NAME_SHA256"],
+                      let textHash = environment["MPIA_SHORTCUTS_AX_TEXT_SHA256"],
+                      let commentHash = environment["MPIA_SHORTCUTS_AX_COMMENT_SHA256"] else {
                     throw ShortcutsError.editConfirmationRequired
                 }
                 emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().verifyOriginal(
@@ -225,12 +227,12 @@ struct MacosDataCLI {
                 ))
             case ["shortcuts", "edit", "_ax-fixture-resume-copy"]:
                 let environment = ProcessInfo.processInfo.environment
-                guard let mode = environment["MACOS_DATA_SHORTCUTS_AX_FIXTURE_GATE"],
-                      let originalNameHash = environment["MACOS_DATA_SHORTCUTS_AX_NAME_SHA256"],
-                      let copyNameHash = environment["MACOS_DATA_SHORTCUTS_AX_COPY_NAME_SHA256"],
-                      let textHash = environment["MACOS_DATA_SHORTCUTS_AX_TEXT_SHA256"],
-                      let commentHash = environment["MACOS_DATA_SHORTCUTS_AX_COMMENT_SHA256"],
-                      let confirmation = environment["MACOS_DATA_SHORTCUTS_AX_CONFIRM"] else {
+                guard let mode = environment["MPIA_SHORTCUTS_AX_FIXTURE_GATE"],
+                      let originalNameHash = environment["MPIA_SHORTCUTS_AX_NAME_SHA256"],
+                      let copyNameHash = environment["MPIA_SHORTCUTS_AX_COPY_NAME_SHA256"],
+                      let textHash = environment["MPIA_SHORTCUTS_AX_TEXT_SHA256"],
+                      let commentHash = environment["MPIA_SHORTCUTS_AX_COMMENT_SHA256"],
+                      let confirmation = environment["MPIA_SHORTCUTS_AX_CONFIRM"] else {
                     throw ShortcutsError.editConfirmationRequired
                 }
                 if mode == "resume-copy-move" {
@@ -243,7 +245,7 @@ struct MacosDataCLI {
                     ))
                 } else {
                     guard mode == "resume-copy-replace",
-                          let replacement = environment["MACOS_DATA_SHORTCUTS_AX_REPLACEMENT"] else {
+                          let replacement = environment["MPIA_SHORTCUTS_AX_REPLACEMENT"] else {
                         throw ShortcutsError.editConfirmationRequired
                     }
                     emitJSONSuccess(try ShortcutAXReplaceTextFixtureGate().resumeExistingCopy(
@@ -1719,7 +1721,7 @@ struct MacosDataCLI {
 
     private static func makeValidatedMailStore() throws -> ValidatedMailStore {
         let report = MailDoctor(databaseProbe: SQLiteMailDatabaseProbe(performQuickCheck: false)).run()
-        let forceMailApp = ProcessInfo.processInfo.environment["MACOS_DATA_MAIL_FORCE_APP_FALLBACK"] == "1"
+        let forceMailApp = ProcessInfo.processInfo.environment["MPIA_MAIL_FORCE_APP_FALLBACK"] == "1"
         switch MailBackendSelector.select(report: report, forceMailAppFallback: forceMailApp) {
         case .sqlite:
             return .sqlite(SQLiteMailStore(databaseURL: try MailStoreLocator().locate().databaseURL))
@@ -2537,19 +2539,20 @@ struct MacosDataCLI {
 
     private static func printHelp() {
         print("""
-        macos-data \(CLIVersion.current) — local macOS data CLI for agents and developers
+        mpia \(CLIVersion.current) — local macOS data CLI for agents and developers
 
         Usage:
-          macos-data --version | -v
-          macos-data resources --format json
-          macos-data contacts <command> [options]
-          macos-data mail <command> [options]
-          macos-data calendar <command> [options]
-          macos-data reminders <command> [options]
-          macos-data photos <command> [options]
-          macos-data notes <command> [options]
-          macos-data shortcuts <command> [options]
-          macos-data safari <command> [options]
+          mpia --version | -v
+          mpia manifest --format json
+          mpia resources --format json
+          mpia contacts <command> [options]
+          mpia mail <command> [options]
+          mpia calendar <command> [options]
+          mpia reminders <command> [options]
+          mpia photos <command> [options]
+          mpia notes <command> [options]
+          mpia shortcuts <command> [options]
+          mpia safari <command> [options]
 
         Unified resources:
           resources --format json                List Contacts, Mail, Calendar, Reminders, Photos, Notes, Shortcuts, and Safari resources

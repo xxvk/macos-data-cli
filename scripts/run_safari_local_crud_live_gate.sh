@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia}"
 SOURCE="$HOME/Library/Safari/Bookmarks.plist"
-STATE_DIR="$HOME/Library/Application Support/macos-data-cli/recovery/safari-local-live-gate"
+STATE_DIR="$HOME/Library/Application Support/mpia-cli/recovery/safari-local-live-gate"
 RECEIPT="$STATE_DIR/receipt.json"
 PHASE="${1:-}"
 CONFIRMATION="${2:-}"
@@ -63,7 +63,7 @@ case "$PHASE" in
     parent_a="$(jq -er '.data.items[] | select(.kind == "folder") | .id' "$TMP_DIR/before.bookmarks" | sed -n '1p')"
     parent_b="$(jq -er --arg first "$parent_a" '.data.items[] | select(.kind == "folder" and .id != $first) | .id' "$TMP_DIR/before.bookmarks" | sed -n '1p')"
     [[ -n "$parent_a" && -n "$parent_b" ]] || fail "two writable folder candidates were not found"
-    marker="macos-data-083-local-$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    marker="mpia-083-local-$(uuidgen | tr '[:upper:]' '[:lower:]')"
 
     jq -n --arg parent "$parent_a" --arg title "$marker-folder" '{parentID:$parent,index:0,title:$title}' >"$TMP_DIR/folder-create.json"
     apply_json folders create "$TMP_DIR/folder-create.json"

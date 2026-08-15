@@ -54,7 +54,7 @@ protocol AuthorCommandRunning: Sendable {
 struct SystemAuthorCommandRunner: AuthorCommandRunning {
     func run(executable: URL, arguments: [String], currentDirectory: URL, timeoutSeconds: TimeInterval) throws -> AuthorCommandResult {
         let fileManager = FileManager.default
-        let captureDirectory = fileManager.temporaryDirectory.appendingPathComponent("macos-data-author-capture-\(UUID().uuidString)", isDirectory: true)
+        let captureDirectory = fileManager.temporaryDirectory.appendingPathComponent("mpia-author-capture-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: captureDirectory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         defer { try? fileManager.removeItem(at: captureDirectory) }
         let stdoutURL = captureDirectory.appendingPathComponent("stdout")
@@ -207,7 +207,7 @@ public struct CherriAuthoringBridge: ShortcutsAuthoringBuilding, @unchecked Send
         let version = try compilerVersion(executable: executable)
         guard version.hasPrefix("2.3.") else { throw ShortcutsError.cherriUnsupported }
 
-        let directory = fileManager.temporaryDirectory.appendingPathComponent("macos-data-cherri-\(UUID().uuidString)", isDirectory: true)
+        let directory = fileManager.temporaryDirectory.appendingPathComponent("mpia-cherri-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         var keep = false
         defer { if !keep { try? fileManager.removeItem(at: directory) } }
@@ -231,7 +231,7 @@ public struct CherriAuthoringBridge: ShortcutsAuthoringBuilding, @unchecked Send
 
     private func resolveCherri() throws -> URL {
         if let cherriURL, fileManager.isExecutableFile(atPath: cherriURL.path) { return cherriURL }
-        if let configured = ProcessInfo.processInfo.environment["MACOS_DATA_CHERRI"], configured.hasPrefix("/"), fileManager.isExecutableFile(atPath: configured) {
+        if let configured = ProcessInfo.processInfo.environment["MPIA_CHERRI"], configured.hasPrefix("/"), fileManager.isExecutableFile(atPath: configured) {
             return URL(fileURLWithPath: configured).resolvingSymlinksInPath()
         }
         let path = ProcessInfo.processInfo.environment["PATH"] ?? ""

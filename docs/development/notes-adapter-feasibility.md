@@ -32,14 +32,14 @@ delete remain deferred until their separate destructive/rich-content gates pass.
 ## Proposed 0.6 MVP
 
 ```text
-macos-data notes permission [--request] --format json
-macos-data notes accounts --format json
-macos-data notes folders [--account-id ID] [--parent-id ID]
+mpia notes permission [--request] --format json
+mpia notes accounts --format json
+mpia notes folders [--account-id ID] [--parent-id ID]
   [--limit N] [--cursor C] --format json
-macos-data notes query [--account-id ID] [--folder-id ID]
+mpia notes query [--account-id ID] [--folder-id ID]
   [--title TEXT] [--modified-after ISO-8601]
   [--limit N] [--cursor C] --format json
-macos-data notes get --id <opaque-note-id>
+mpia notes get --id <opaque-note-id>
   [--body none|plaintext|html] [--include-attachments] --format json
 ```
 

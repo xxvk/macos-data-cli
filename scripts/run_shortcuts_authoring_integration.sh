@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data.app/Contents/MacOS/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia.app/Contents/MacOS/mpia}"
 SOURCE="$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri"
 UPDATED_SOURCE="$ROOT_DIR/Tests/Fixtures/Shortcuts/echo-updated.cherri"
 FIXTURE_NAME="Macos Data 071 Fixture"
@@ -27,10 +27,10 @@ command -v jq >/dev/null || { echo "Shortcuts authoring integration requires jq.
 [[ -x "$CLI" ]] || { echo "Signed Debug CLI not found: $CLI" >&2; exit 1; }
 [[ -f "$SOURCE" && -f "$UPDATED_SOURCE" ]] || { echo "Shortcuts authoring fixtures are missing." >&2; exit 1; }
 
-TMP_DIR="$(mktemp -d /tmp/macos-data-shortcuts-authoring-gate.XXXXXX)"
+TMP_DIR="$(mktemp -d /tmp/mpia-shortcuts-authoring-gate.XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 chmod 700 "$TMP_DIR"
-printf '%s' 'macos-data-071-sentinel' >"$TMP_DIR/input.txt"
+printf '%s' 'mpia-071-sentinel' >"$TMP_DIR/input.txt"
 chmod 600 "$TMP_DIR/input.txt"
 
 "$CLI" shortcuts author validate --source "$SOURCE" --format json >"$TMP_DIR/validate-created.json"
@@ -49,7 +49,7 @@ jq -e --arg hash "$SOURCE_SHA" '
 ' "$TMP_DIR/create-preview.json" >/dev/null
 
 "$CLI" shortcuts list --limit 200 --format json >"$TMP_DIR/before.json"
-jq -e --arg name "$FIXTURE_NAME" '[.data.items[] | select(.name == $name or (.name | startswith($name + " (macos-data ")))] | length == 0' "$TMP_DIR/before.json" >/dev/null || {
+jq -e --arg name "$FIXTURE_NAME" '[.data.items[] | select(.name == $name or (.name | startswith($name + " (mpia ")))] | length == 0' "$TMP_DIR/before.json" >/dev/null || {
   echo "Refusing to run: a Shortcut with the disposable fixture name already exists." >&2
   exit 1
 }
@@ -72,7 +72,7 @@ jq -e --arg id "$SHORTCUT_ID" --arg name "$FIXTURE_NAME" '
 
 "$CLI" shortcuts run --id "$SHORTCUT_ID" --input-path "$TMP_DIR/input.txt" \
   --apply --confirm "RUN SHORTCUT" --format json >"$TMP_DIR/run-created.json"
-jq -e '.ok == true and .data.verification == "completed" and .data.output == "macos-data-071-sentinel"' "$TMP_DIR/run-created.json" >/dev/null
+jq -e '.ok == true and .data.verification == "completed" and .data.output == "mpia-071-sentinel"' "$TMP_DIR/run-created.json" >/dev/null
 
 "$CLI" shortcuts update --id "$SHORTCUT_ID" --source "$UPDATED_SOURCE" \
   --expected-source-sha256 "$SOURCE_SHA" --strategy retain-old --dry-run --format json >"$TMP_DIR/update-preview.json"
@@ -94,7 +94,7 @@ jq -e --arg old "$SHORTCUT_ID" --arg hash "$UPDATED_SOURCE_SHA" '
   and .data.registrySaved == true and (.data.shortcutID | startswith("shortcut_"))
 ' "$TMP_DIR/updated.json" >/dev/null
 UPDATED_SHORTCUT_ID="$(jq -er '.data.shortcutID' "$TMP_DIR/updated.json")"
-UPDATED_FIXTURE_NAME="$FIXTURE_NAME (macos-data ${UPDATED_SOURCE_SHA:0:8})"
+UPDATED_FIXTURE_NAME="$FIXTURE_NAME (mpia ${UPDATED_SOURCE_SHA:0:8})"
 
 "$CLI" shortcuts get --id "$UPDATED_SHORTCUT_ID" --format json >"$TMP_DIR/get-updated.json"
 jq -e --arg id "$UPDATED_SHORTCUT_ID" --arg name "$UPDATED_FIXTURE_NAME" '
@@ -103,13 +103,13 @@ jq -e --arg id "$UPDATED_SHORTCUT_ID" --arg name "$UPDATED_FIXTURE_NAME" '
 
 "$CLI" shortcuts run --id "$UPDATED_SHORTCUT_ID" --input-path "$TMP_DIR/input.txt" \
   --apply --confirm "RUN SHORTCUT" --format json >"$TMP_DIR/run-updated.json"
-jq -e '.ok == true and .data.verification == "completed" and .data.output == "macos-data-071-sentinel"' "$TMP_DIR/run-updated.json" >/dev/null
+jq -e '.ok == true and .data.verification == "completed" and .data.output == "mpia-071-sentinel"' "$TMP_DIR/run-updated.json" >/dev/null
 
 echo "Create, run, retain-old update, and read-back passed. Delete both disposable fixture Shortcuts in Shortcuts.app, then press Return here."
 read -r _
 
 "$CLI" shortcuts list --limit 200 --format json >"$TMP_DIR/after-ui-delete.json"
-jq -e --arg name "$FIXTURE_NAME" '[.data.items[] | select(.name == $name or (.name | startswith($name + " (macos-data ")))] | length == 0' "$TMP_DIR/after-ui-delete.json" >/dev/null || {
+jq -e --arg name "$FIXTURE_NAME" '[.data.items[] | select(.name == $name or (.name | startswith($name + " (mpia ")))] | length == 0' "$TMP_DIR/after-ui-delete.json" >/dev/null || {
   echo "Cleanup is not confirmed: at least one disposable Shortcut is still present." >&2
   exit 1
 }

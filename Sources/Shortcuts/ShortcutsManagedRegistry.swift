@@ -33,7 +33,7 @@ public final class ShortcutsManagedRegistry: @unchecked Sendable {
 
     public init(
         directory: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/macos-data-cli/shortcuts", isDirectory: true),
+            .appendingPathComponent("Library/Application Support/mpia-cli/shortcuts", isDirectory: true),
         now: @escaping () -> Date = Date.init
     ) {
         self.directory = directory

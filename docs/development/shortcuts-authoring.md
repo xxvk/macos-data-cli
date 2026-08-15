@@ -10,7 +10,7 @@ code into this MIT-licensed repository.
 Cherri is an optional GPL-2.0 command-line dependency. The adapter invokes an
 installed Cherri 2.3.x binary as a separate process. It always passes
 `--skip-sign`, `--derive-uuids`, and `--no-ansi`; HubSign and custom signing
-servers are never used. macos-data signs the generated unsigned artifact with
+servers are never used. mpia signs the generated unsigned artifact with
 the system `/usr/bin/shortcuts sign` command.
 
 ## Source policy
@@ -35,27 +35,27 @@ the system `/usr/bin/shortcuts sign` command.
 ## 0.7.1 commands
 
 ```text
-macos-data shortcuts author validate --source <file.cherri> --format json
+mpia shortcuts author validate --source <file.cherri> --format json
 
-macos-data shortcuts author build --source <file.cherri> \
+mpia shortcuts author build --source <file.cherri> \
   --output <file.shortcut> \
   [--signing-mode people-who-know-me|anyone] --format json
 
-macos-data shortcuts create --source <file.cherri> [--idempotent] \
+mpia shortcuts create --source <file.cherri> [--idempotent] \
   [--dry-run] --format json
-macos-data shortcuts create --source <file.cherri> [--idempotent] \
+mpia shortcuts create --source <file.cherri> [--idempotent] \
   --apply --confirm "CREATE MANAGED SHORTCUT" --format json
 
-macos-data shortcuts update --id <managed-opaque-id> --source <file.cherri> \
+mpia shortcuts update --id <managed-opaque-id> --source <file.cherri> \
   --expected-source-sha256 <sha256> --strategy replace|retain-old \
   [--dry-run] --format json
-macos-data shortcuts update --id <managed-opaque-id> --source <file.cherri> \
+mpia shortcuts update --id <managed-opaque-id> --source <file.cherri> \
   --expected-source-sha256 <sha256> --strategy replace|retain-old \
   --apply --confirm "UPDATE MANAGED SHORTCUT" --format json
 
-macos-data shortcuts managed list --format json
-macos-data shortcuts managed forget --id <managed-opaque-id> [--dry-run] --format json
-macos-data shortcuts managed forget --id <managed-opaque-id> --apply \
+mpia shortcuts managed list --format json
+mpia shortcuts managed forget --id <managed-opaque-id> [--dry-run] --format json
+mpia shortcuts managed forget --id <managed-opaque-id> --apply \
   --confirm "FORGET MANAGED SHORTCUT" --format json
 ```
 
@@ -76,7 +76,7 @@ source SHA-256 as an optimistic concurrency token. `replace` keeps the visible
 name and is allowed only when the previous public count equals the compiled
 registry count and the new count changes. A mismatch makes replace
 unverifiable and fails closed. `retain-old` compiles a separately named visible candidate using the
-suffix ` (macos-data <source-hash-prefix>)`; the registry continues to track the
+suffix ` (mpia <source-hash-prefix>)`; the registry continues to track the
 original `.cherri` source hash, not the temporary renamed compiler input. The
 old Shortcut is never deleted first. `managed forget` removes only private
 registry/receipt state and never deletes a Shortcut.
@@ -100,7 +100,7 @@ The disposable visible lifecycle gate is intentionally separate and requires
 explicit current-task authorization plus its exact outer confirmation:
 
 ```text
-MACOS_DATA_CLI=.build/debug/macos-data.app/Contents/MacOS/macos-data \
+MPIA_CLI=.build/debug/mpia.app/Contents/MacOS/mpia \
   bash scripts/run_shortcuts_authoring_integration.sh \
   --apply --confirm "SHORTCUTS AUTHORING CRUD TEST"
 ```

@@ -6,12 +6,12 @@
 copy-first mutation：
 
 ```text
-macos-data shortcuts edit inspect --input <local.cherri|local.shortcut> --format json
-macos-data shortcuts edit plan --input <local.shortcut> --patch <plan.json>|--stdin --format json
-macos-data shortcuts edit copy --input <local.shortcut> --patch <plan.json>|--stdin \
+mpia shortcuts edit inspect --input <local.cherri|local.shortcut> --format json
+mpia shortcuts edit plan --input <local.shortcut> --patch <plan.json>|--stdin --format json
+mpia shortcuts edit copy --input <local.shortcut> --patch <plan.json>|--stdin \
   --expected-editor-name-sha256 <sha256> --dry-run|--apply \
   [--confirm "EDIT SHORTCUT COPY"] --format json
-macos-data shortcuts edit ui-inspect --format json
+mpia shortcuts edit ui-inspect --format json
 ```
 
 inspect、plan、UI inspection 和 edit-copy dry-run 都不会修改对象。plan 只读取 artifact 一次，核对

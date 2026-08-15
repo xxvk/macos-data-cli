@@ -49,7 +49,7 @@ public struct ContactsMapper: Sendable {
         contact.phoneNumbers = payload.phones.map { CNLabeledValue(label: $0.label, value: CNPhoneNumber(stringValue: $0.value)) }
         var urls = payload.urls
         if let externalID = payload.externalID, !urls.contains(where: { Self.externalID(from: $0) == externalID }) {
-            urls.append(LabeledValue(label: "macos-data-cli", value: "x-macos-data://external-id/\(externalID)"))
+            urls.append(LabeledValue(label: "mpia-cli", value: "mpia://ext-id/\(externalID)"))
         }
         contact.urlAddresses = urls.map { CNLabeledValue(label: $0.label, value: $0.value as NSString) }
         contact.postalAddresses = payload.addresses.map {
@@ -110,7 +110,7 @@ public struct ContactsMapper: Sendable {
         if patch.has("jobTitle") { contact.jobTitle = patch.jobTitle ?? "" }
         if patch.has("emails") { contact.emailAddresses = (patch.emails ?? []).map { CNLabeledValue(label: $0.label, value: $0.value as NSString) } }
         if patch.has("phones") { contact.phoneNumbers = (patch.phones ?? []).map { CNLabeledValue(label: $0.label, value: CNPhoneNumber(stringValue: $0.value)) } }
-        if patch.has("urls") { contact.urlAddresses = (patch.urls ?? []).filter { ContactsMapper.externalID(from: $0) == nil }.map { CNLabeledValue(label: $0.label, value: $0.value as NSString) } + [CNLabeledValue(label: "macos-data-cli", value: "x-macos-data://external-id/\(externalID)" as NSString)] }
+        if patch.has("urls") { contact.urlAddresses = (patch.urls ?? []).filter { ContactsMapper.externalID(from: $0) == nil }.map { CNLabeledValue(label: $0.label, value: $0.value as NSString) } + [CNLabeledValue(label: "mpia-cli", value: "mpia://ext-id/\(externalID)" as NSString)] }
         if patch.has("addresses") { contact.postalAddresses = (patch.addresses ?? []).map { p in let a = CNMutablePostalAddress(); a.street = p.street ?? ""; a.city = p.city ?? ""; a.state = p.state ?? ""; a.postalCode = p.postalCode ?? ""; a.country = p.country ?? ""; return CNLabeledValue(label: p.label, value: a) } }
     }
 
@@ -119,10 +119,10 @@ public struct ContactsMapper: Sendable {
     }
 
     public static func externalID(from url: LabeledValue) -> String? {
-        guard url.label == "macos-data-cli" else { return nil }
+        guard url.label == "mpia-cli" else { return nil }
         guard let parsed = URL(string: url.value),
-              parsed.scheme == "x-macos-data",
-              parsed.host == "external-id" else { return nil }
+              parsed.scheme == "mpia",
+              parsed.host == "ext-id" else { return nil }
         let value = parsed.pathComponents.dropFirst().joined(separator: "/")
         return value.isEmpty ? nil : value
     }
@@ -134,7 +134,7 @@ public struct ContactsMapper: Sendable {
             let value = item.value as String
             guard Self.externalID(from: LabeledValue(label: item.label, value: value)) == oldID else { return item }
             found = true
-            return CNLabeledValue(label: item.label, value: "x-macos-data://external-id/\(newID)" as NSString)
+            return CNLabeledValue(label: item.label, value: "mpia://ext-id/\(newID)" as NSString)
         }
         guard found else { throw ContactsQueryError.notFound }
     }

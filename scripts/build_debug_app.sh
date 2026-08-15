@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$ROOT_DIR/.build/debug/macos-data.app"
+APP_DIR="$ROOT_DIR/.build/debug/mpia.app"
 BUILD_CACHE_DIR="$ROOT_DIR/.build/local-cache"
 
 DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
@@ -17,9 +17,9 @@ mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 swift build
 
 mkdir -p "$APP_DIR/Contents/MacOS"
-cp "$ROOT_DIR/.build/debug/macos-data" "$APP_DIR/Contents/MacOS/macos-data"
-cp "$ROOT_DIR/scripts/macos-data-app-Info.plist" "$APP_DIR/Contents/Info.plist"
+cp "$ROOT_DIR/.build/debug/mpia" "$APP_DIR/Contents/MacOS/mpia"
+cp "$ROOT_DIR/scripts/mpia-app-Info.plist" "$APP_DIR/Contents/Info.plist"
 xattr -cr "$APP_DIR"
-codesign --force --sign - --entitlements "$ROOT_DIR/scripts/macos-data.entitlements" "$APP_DIR"
+codesign --force --sign - --entitlements "$ROOT_DIR/scripts/mpia.entitlements" "$APP_DIR"
 
 echo "$APP_DIR"

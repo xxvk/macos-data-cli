@@ -108,7 +108,7 @@ public struct ShortcutsAuthoringService: Sendable {
             }
         }
 
-        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("macos-data-shortcuts-create-\(UUID().uuidString)", isDirectory: true)
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("mpia-shortcuts-create-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         defer { try? FileManager.default.removeItem(at: temporary) }
         let artifact = temporary.appendingPathComponent("\(inspection.declaredName).shortcut")
@@ -165,7 +165,7 @@ public struct ShortcutsAuthoringService: Sendable {
             return ShortcutAuthoringUpdateResult(operation: "update", dryRun: false, changed: false, verification: receipt.state == .saved ? .idempotencyReceiptPending : .outcomeUnknown, previousShortcutID: id, shortcutID: receipt.shortcutID, sourceSHA256: inspection.sourceSHA256, compiledSHA256: receipt.compiledSHA256, actionCount: receipt.actionCount, observedActionCount: nil, strategy: strategy, oldRetained: true, registrySaved: false, nextAction: "A recent managed update import may already exist. Do not retry automatically; inspect Shortcuts.app and the registry first.")
         }
 
-        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("macos-data-shortcuts-update-\(UUID().uuidString)", isDirectory: true)
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("mpia-shortcuts-update-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         defer { try? FileManager.default.removeItem(at: temporary) }
         let expectedImportName = strategy == .replace ? previous.name : candidateName(base: inspection.declaredName, sourceSHA256: inspection.sourceSHA256)
@@ -246,7 +246,7 @@ public struct ShortcutsAuthoringService: Sendable {
     }
 
     private func candidateName(base: String, sourceSHA256: String) -> String {
-        let suffix = " (macos-data \(sourceSHA256.prefix(8)))"
+        let suffix = " (mpia \(sourceSHA256.prefix(8)))"
         var prefix = base
         while Data((prefix + suffix).utf8).count > 240, !prefix.isEmpty { prefix.removeLast() }
         return prefix + suffix

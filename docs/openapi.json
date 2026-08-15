@@ -1,0 +1,855 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "mpia",
+    "version": "0.9.0",
+    "description": "Documentation-only OpenAPI view of the mpia macOS data CLI. Paths are CLI subcommands, not HTTP routes; query parameters are CLI flags. Write-safety (dry-run/apply/confirmation) and exit codes are preserved as x-* extensions."
+  },
+  "paths": {
+    "/resources": {
+      "get": {
+        "summary": "resources",
+        "description": "List every data resource with selection, permission, and limitations.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": []
+      }
+    },
+    "/contacts/permission": {
+      "get": {
+        "summary": "permission",
+        "description": "Check Contacts authorization.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          }
+        ]
+      }
+    },
+    "/contacts/count": {
+      "get": {
+        "summary": "count",
+        "description": "Count contacts.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          }
+        ]
+      }
+    },
+    "/contacts/list": {
+      "get": {
+        "summary": "list",
+        "description": "List contacts with pagination.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          }
+        ]
+      }
+    },
+    "/contacts/get": {
+      "get": {
+        "summary": "get",
+        "description": "Get one contact by external ID.",
+        "parameters": [
+          {
+            "name": "external-id",
+            "in": "query",
+            "description": "External ID",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactPayload"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          },
+          {
+            "code": 3,
+            "description": "Contact lookup error",
+            "errorCode": "CONTACT_QUERY_ERROR"
+          }
+        ]
+      }
+    },
+    "/contacts/query": {
+      "get": {
+        "summary": "query",
+        "description": "Query contacts with AND semantics.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Name filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "description": "Email filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "phone",
+            "in": "query",
+            "description": "Phone filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "organization",
+            "in": "query",
+            "description": "Organization filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postal-code",
+            "in": "query",
+            "description": "Postal code filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "person|organization",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          },
+          {
+            "code": 3,
+            "description": "Contact lookup error",
+            "errorCode": "CONTACT_QUERY_ERROR"
+          }
+        ]
+      }
+    },
+    "/contacts/create": {
+      "post": {
+        "summary": "create",
+        "description": "Create a contact.",
+        "parameters": [
+          {
+            "name": "input",
+            "in": "query",
+            "description": "JSON file",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stdin",
+            "in": "query",
+            "description": "Read JSON from stdin",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "apply",
+            "in": "query",
+            "description": "Persist (else dry-run)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "idempotent",
+            "in": "query",
+            "description": "Opt-in create retry",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactWriteResult"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": true,
+          "dryRun": true
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactPayload"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/edit": {
+      "post": {
+        "summary": "edit",
+        "description": "Partially edit a contact.",
+        "parameters": [
+          {
+            "name": "external-id",
+            "in": "query",
+            "description": "External ID",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "input",
+            "in": "query",
+            "description": "JSON file",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stdin",
+            "in": "query",
+            "description": "Read JSON from stdin",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": true,
+          "dryRun": true
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          },
+          {
+            "code": 3,
+            "description": "Contact lookup error",
+            "errorCode": "CONTACT_QUERY_ERROR"
+          }
+        ]
+      }
+    },
+    "/contacts/delete": {
+      "post": {
+        "summary": "delete",
+        "description": "Delete a contact.",
+        "parameters": [
+          {
+            "name": "external-id",
+            "in": "query",
+            "description": "External ID",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "ignore-not-found",
+            "in": "query",
+            "description": "Opt-in delete retry",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": true,
+          "confirmation": "DELETE CONTACT",
+          "dryRun": true
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          },
+          {
+            "code": 3,
+            "description": "Contact lookup error",
+            "errorCode": "CONTACT_QUERY_ERROR"
+          }
+        ]
+      }
+    },
+    "/contacts/export": {
+      "get": {
+        "summary": "export",
+        "description": "Export a full JSON snapshot.",
+        "parameters": [
+          {
+            "name": "output",
+            "in": "query",
+            "description": "Output file",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 2,
+            "description": "Contacts/permission/input error",
+            "errorCode": "CONTACTS_ERROR"
+          }
+        ]
+      }
+    },
+    "/mail/doctor": {
+      "get": {
+        "summary": "doctor",
+        "description": "Probe Mail-store and capability status without reading messages.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 4,
+            "description": "Mail adapter error",
+            "errorCode": "MAIL_ERROR"
+          }
+        ]
+      }
+    },
+    "/calendar/permission": {
+      "get": {
+        "summary": "permission",
+        "description": "Check Calendar full-access authorization.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 5,
+            "description": "Calendar adapter error",
+            "errorCode": "CALENDAR_ERROR"
+          }
+        ]
+      }
+    },
+    "/reminders/permission": {
+      "get": {
+        "summary": "permission",
+        "description": "Check Reminders full-access authorization.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 6,
+            "description": "Reminders adapter error",
+            "errorCode": "REMINDERS_ERROR"
+          }
+        ]
+      }
+    },
+    "/photos/permission": {
+      "get": {
+        "summary": "permission",
+        "description": "Check Photos authorization (status only).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 7,
+            "description": "Photos adapter error",
+            "errorCode": "PHOTOS_ERROR"
+          }
+        ]
+      }
+    },
+    "/notes/permission": {
+      "get": {
+        "summary": "permission",
+        "description": "Check Notes Automation consent (status only).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 8,
+            "description": "Notes adapter error",
+            "errorCode": "NOTES_ERROR"
+          }
+        ]
+      }
+    },
+    "/shortcuts/permission": {
+      "get": {
+        "summary": "permission",
+        "description": "Check Shortcuts Events consent (status only).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 9,
+            "description": "Shortcuts adapter error",
+            "errorCode": "SHORTCUTS_ERROR"
+          }
+        ]
+      }
+    },
+    "/safari/permission": {
+      "get": {
+        "summary": "permission",
+        "description": "Check Safari readability and Automation status.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success envelope (ok=true, contractVersion, data).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-safety": {
+          "apply": false,
+          "dryRun": false
+        },
+        "x-exit-codes": [
+          {
+            "code": 10,
+            "description": "Safari adapter error",
+            "errorCode": "SAFARI_ERROR"
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ContactPayload": {
+        "description": "Adapter-neutral contact payload exchanged with agents and scripts.",
+        "properties": {
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/PostalAddress"
+            },
+            "type": "array"
+          },
+          "department": {
+            "description": "Department.",
+            "type": "string"
+          },
+          "emails": {
+            "items": {
+              "$ref": "#/components/schemas/LabeledValue"
+            },
+            "type": "array"
+          },
+          "externalID": {
+            "description": "Stable external ID; required for every CLI-created contact.",
+            "type": "string"
+          },
+          "familyName": {
+            "description": "Family name.",
+            "type": "string"
+          },
+          "givenName": {
+            "description": "Given name.",
+            "type": "string"
+          },
+          "imageAvailable": {
+            "description": "Read-only avatar availability.",
+            "type": "boolean"
+          },
+          "jobTitle": {
+            "description": "Job title.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Contact kind.",
+            "enum": [
+              "person",
+              "organization"
+            ],
+            "type": "string"
+          },
+          "metadata": {
+            "description": "Arbitrary string metadata; preserved in JSON but not persisted by the Contacts adapter.",
+            "properties": {},
+            "required": [],
+            "type": "object"
+          },
+          "organizationName": {
+            "description": "Organization name.",
+            "type": "string"
+          },
+          "phones": {
+            "items": {
+              "$ref": "#/components/schemas/LabeledValue"
+            },
+            "type": "array"
+          },
+          "phoneticFamilyName": {
+            "description": "Phonetic family name.",
+            "type": "string"
+          },
+          "phoneticGivenName": {
+            "description": "Phonetic given name.",
+            "type": "string"
+          },
+          "urls": {
+            "items": {
+              "$ref": "#/components/schemas/LabeledValue"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ContactPayload",
+        "type": "object"
+      },
+      "ContactWriteResult": {
+        "description": "Final saved state after a Contacts write.",
+        "properties": {
+          "contact": {
+            "$ref": "#/components/schemas/ContactPayload"
+          },
+          "operation": {
+            "description": "Write operation name.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "LabeledValue": {
+        "description": "A labeled string value.",
+        "properties": {
+          "label": {
+            "description": "Optional label.",
+            "type": "string"
+          },
+          "value": {
+            "description": "Value.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "PostalAddress": {
+        "description": "A postal address.",
+        "properties": {
+          "city": {
+            "description": "City.",
+            "type": "string"
+          },
+          "country": {
+            "description": "Country.",
+            "type": "string"
+          },
+          "label": {
+            "description": "Optional label.",
+            "type": "string"
+          },
+          "postalCode": {
+            "description": "Postal code.",
+            "type": "string"
+          },
+          "state": {
+            "description": "State or region.",
+            "type": "string"
+          },
+          "street": {
+            "description": "Street line.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    }
+  }
+}

@@ -50,7 +50,7 @@ final class ContactsStoreTests: XCTestCase {
 
     func testMapperExtractsExternalIDFromReservedURL() {
         let contact = CNMutableContact()
-        contact.urlAddresses = [CNLabeledValue(label: "macos-data-cli", value: "x-macos-data://external-id/xvk-test-contacts-001" as NSString)]
+        contact.urlAddresses = [CNLabeledValue(label: "mpia-cli", value: "mpia://ext-id/xvk-test-contacts-001" as NSString)]
 
         let payload = ContactsMapper().map(contact)
 
@@ -59,7 +59,7 @@ final class ContactsStoreTests: XCTestCase {
 
     func testMapperDoesNotTreatOtherURLLabelsAsExternalID() {
         let contact = CNMutableContact()
-        contact.urlAddresses = [CNLabeledValue(label: CNLabelURLAddressHomePage, value: "x-macos-data://external-id/should-not-match" as NSString)]
+        contact.urlAddresses = [CNLabeledValue(label: CNLabelURLAddressHomePage, value: "mpia://ext-id/should-not-match" as NSString)]
 
         XCTAssertNil(ContactsMapper().map(contact).externalID)
     }
@@ -78,8 +78,8 @@ final class ContactsStoreTests: XCTestCase {
 
         XCTAssertEqual(contact.contactType, .organization)
         XCTAssertEqual(contact.organizationName, "Example Inc.")
-        XCTAssertEqual(contact.urlAddresses.first?.label, "macos-data-cli")
-        XCTAssertEqual(contact.urlAddresses.first?.value as? String, "x-macos-data://external-id/org-create-001")
+        XCTAssertEqual(contact.urlAddresses.first?.label, "mpia-cli")
+        XCTAssertEqual(contact.urlAddresses.first?.value as? String, "mpia://ext-id/org-create-001")
     }
 
     func testMapperSetsImageData() {

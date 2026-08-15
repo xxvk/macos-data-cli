@@ -2,7 +2,7 @@
 
 ## Our standard
 
-We want participation in `macos-data-cli` to be respectful, constructive, and
+We want participation in `mpia-cli` to be respectful, constructive, and
 safe. Be considerate of different backgrounds and experience levels, discuss
 technical disagreements without personal attacks, and respect other people's
 privacy.

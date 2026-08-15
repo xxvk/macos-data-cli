@@ -66,7 +66,7 @@ struct SafariPlistAtomicMutationWriter {
         try validateRecovery(safety)
 
         let candidate = source.deletingLastPathComponent()
-            .appendingPathComponent(".macos-data-safari-swap-" + UUID().uuidString.lowercased())
+            .appendingPathComponent(".mpia-safari-swap-" + UUID().uuidString.lowercased())
         var candidateExists = false
         var swapped = false
         defer {

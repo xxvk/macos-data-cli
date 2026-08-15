@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data.app/Contents/MacOS/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia.app/Contents/MacOS/mpia}"
 WITH_WRITES=false
 CONFIRMATION=""
 
@@ -42,11 +42,11 @@ END="$(date -u -v+7d -v+1H '+%Y-%m-%dT%H:%M:%SZ')"
 SUFFIX="$(date -u '+%Y%m%dT%H%M%SZ')-$$"
 
 jq -n --arg start "$START" --arg end "$END" --arg suffix "$SUFFIX" '{
-  title: ("macos-data disposable Calendar integration " + $suffix),
+  title: ("mpia disposable Calendar integration " + $suffix),
   startDate: $start,
   endDate: $end,
   timeZone: "Asia/Tokyo",
-  notes: "Disposable macos-data integration fixture; safe to delete."
+  notes: "Disposable mpia integration fixture; safe to delete."
 }' >"$TMP_DIR/create.json"
 
 "$CLI" calendar create --input "$TMP_DIR/create.json" --apply --format json >"$TMP_DIR/created.json"
@@ -56,13 +56,13 @@ EVENT_ID="$(jq -r '.data.event.id' "$TMP_DIR/created.json")"
 "$CLI" calendar get --id "$EVENT_ID" --format json >"$TMP_DIR/read-created.json"
 jq -e --arg id "$EVENT_ID" '.ok == true and .data.id == $id' "$TMP_DIR/read-created.json" >/dev/null
 
-jq -n --arg suffix "$SUFFIX" '{title: ("macos-data disposable Calendar integration updated " + $suffix)}' >"$TMP_DIR/patch.json"
+jq -n --arg suffix "$SUFFIX" '{title: ("mpia disposable Calendar integration updated " + $suffix)}' >"$TMP_DIR/patch.json"
 "$CLI" calendar edit --id "$EVENT_ID" --input "$TMP_DIR/patch.json" --apply --format json >"$TMP_DIR/updated.json"
 jq -e '.ok == true and .data.operation == "updated"' "$TMP_DIR/updated.json" >/dev/null
 EVENT_ID="$(jq -r '.data.event.id' "$TMP_DIR/updated.json")"
 
 "$CLI" calendar get --id "$EVENT_ID" --format json >"$TMP_DIR/read-updated.json"
-jq -e --arg suffix "$SUFFIX" '.ok == true and .data.title == ("macos-data disposable Calendar integration updated " + $suffix)' "$TMP_DIR/read-updated.json" >/dev/null
+jq -e --arg suffix "$SUFFIX" '.ok == true and .data.title == ("mpia disposable Calendar integration updated " + $suffix)' "$TMP_DIR/read-updated.json" >/dev/null
 
 "$CLI" calendar delete --id "$EVENT_ID" --apply --confirm "DELETE EVENT" --format json >"$TMP_DIR/deleted.json"
 jq -e '.ok == true and .data.operation == "deleted"' "$TMP_DIR/deleted.json" >/dev/null

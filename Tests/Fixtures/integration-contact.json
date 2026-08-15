@@ -1,9 +1,9 @@
 {
   "kind": "organization",
   "externalID": "xvk-integration-20260716-001",
-  "organizationName": "macos-data Integration Temporary",
+  "organizationName": "mpia Integration Temporary",
   "emails": [
-    { "label": "work", "value": "macos-data-integration@example.invalid" }
+    { "label": "work", "value": "mpia-integration@example.invalid" }
   ],
   "metadata": {
     "fixture": "crud-integration",

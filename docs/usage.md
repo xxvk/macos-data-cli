@@ -1,6 +1,6 @@
 # Usage
 
-`macos-data` is a local Terminal CLI. It uses Apple public frameworks and
+`mpia` is a local Terminal CLI. It uses Apple public frameworks and
 explicitly documented app Automation interfaces; agents do not need a special
 integration.
 
@@ -11,7 +11,7 @@ Notes, Shortcuts, and Safari resource scopes in one
 machine-readable response:
 
 ```text
-macos-data resources --format json
+mpia resources --format json
 ```
 
 Each resource reports an adapter-owned opaque `id`, `kind`, `provider`,
@@ -41,8 +41,8 @@ snapshot. Reads may require Full Disk Access for the stable app or Terminal host
 Permission status never prompts unless `--request` is explicit:
 
 ```bash
-macos-data safari permission --format json
-macos-data safari permission --request --format json
+mpia safari permission --format json
+mpia safari permission --request --format json
 ```
 
 Ordinary bookmark commands exclude Safari proxy nodes and the Reading List
@@ -51,15 +51,15 @@ pages default to 50 and cap at 200. Cursors become stale whenever the underlying
 plist changes.
 
 ```bash
-macos-data safari bookmarks list --limit 50 --format json
-macos-data safari bookmarks query --text "reference" --format json
-macos-data safari bookmarks query --url "https://example.com" \
+mpia safari bookmarks list --limit 50 --format json
+mpia safari bookmarks query --text "reference" --format json
+mpia safari bookmarks query --url "https://example.com" \
   --folder-id <opaque-folder-id> --format json
-macos-data safari bookmarks get --id <opaque-bookmark-or-folder-id> --format json
+mpia safari bookmarks get --id <opaque-bookmark-or-folder-id> --format json
 
-macos-data safari reading-list list --read false --limit 50 --format json
-macos-data safari reading-list query --text "article" --format json
-macos-data safari reading-list get --id <opaque-reading-list-id> --format json
+mpia safari reading-list list --read false --limit 50 --format json
+mpia safari reading-list query --text "article" --format json
+mpia safari reading-list get --id <opaque-reading-list-id> --format json
 ```
 
 Reading List creation accepts strict JSON only. The result does not echo the
@@ -67,10 +67,10 @@ URL, title, or preview; it returns a URL SHA-256 and optional opaque read-back I
 
 ```bash
 printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
-  | macos-data safari reading-list add --stdin --dry-run --format json
+  | mpia safari reading-list add --stdin --dry-run --format json
 
 printf '%s' '{"url":"https://example.com/article","title":"Example"}' \
-  | macos-data safari reading-list add --stdin --apply --format json
+  | mpia safari reading-list add --stdin --apply --format json
 ```
 
 An existing normalized URL is a safe no-op. `save_accepted_readback_pending`
@@ -90,13 +90,13 @@ fully quit and private recovery, atomic swap, and read-back all succeed.
 
 ```bash
 printf '%s' '{"parentID":"<opaque-folder-id>","index":0,"title":"Example","url":"https://example.com"}' \
-  | macos-data safari bookmarks create --stdin --format json
+  | mpia safari bookmarks create --stdin --format json
 
 printf '%s' '{"id":"<opaque-bookmark-id>","title":"Updated","url":"https://example.com/updated","expectedSourceSHA256":"<dry-run-source-hash>"}' \
-  | macos-data safari bookmarks edit --stdin --apply --format json
+  | mpia safari bookmarks edit --stdin --apply --format json
 
 printf '%s' '{"id":"<opaque-bookmark-id>","expectedSourceSHA256":"<dry-run-source-hash>"}' \
-  | macos-data safari bookmarks delete --stdin --apply \
+  | mpia safari bookmarks delete --stdin --apply \
       --confirm "DELETE SAFARI BOOKMARK" --format json
 ```
 
@@ -116,22 +116,22 @@ error. The standalone permission probe may still report `targetNotRunning` while
 the helper is idle.
 
 ```bash
-macos-data shortcuts permission --format json
-macos-data shortcuts permission --request --format json
-macos-data shortcuts list --limit 50 --format json
-macos-data shortcuts folders --limit 50 --format json
-macos-data shortcuts get --id <opaque-shortcut-id> --format json
-macos-data shortcuts list --folder-id <opaque-folder-id> --limit 50 --format json
+mpia shortcuts permission --format json
+mpia shortcuts permission --request --format json
+mpia shortcuts list --limit 50 --format json
+mpia shortcuts folders --limit 50 --format json
+mpia shortcuts get --id <opaque-shortcut-id> --format json
+mpia shortcuts list --folder-id <opaque-folder-id> --limit 50 --format json
 ```
 
 Move defaults to preview. Apply requires the exact phrase and reads the folder ID
 back within the bounded Apple Event:
 
 ```bash
-macos-data shortcuts move --id <opaque-shortcut-id> \
+mpia shortcuts move --id <opaque-shortcut-id> \
   --destination-folder-id <opaque-folder-id> --dry-run --format json
 
-macos-data shortcuts move --id <opaque-shortcut-id> \
+mpia shortcuts move --id <opaque-shortcut-id> \
   --destination-folder-id <opaque-folder-id> \
   --apply --confirm "MOVE SHORTCUT" --format json
 ```
@@ -142,12 +142,12 @@ deadline is 1...300 seconds. Inline output defaults to UTF-8 text capped at
 256 KiB; binary or larger output requires a nonexistent `--output-path`, and
 overwrite is refused. A timeout means side effects may already have happened;
 Agents must not retry automatically.
-Plaintext results are emitted by Apple's CLI on stdout, so macos-data captures
+Plaintext results are emitted by Apple's CLI on stdout, so mpia captures
 stdout privately, applies the size/UTF-8/hash checks, and only then returns JSON
 or atomically writes the requested output file.
 
 ```bash
-macos-data shortcuts run --id <opaque-shortcut-id> \
+mpia shortcuts run --id <opaque-shortcut-id> \
   --input-path ./input.txt --output-type public.utf8-plain-text --timeout 30 \
   --apply --confirm "RUN SHORTCUT" --format json
 ```
@@ -157,15 +157,15 @@ update, and local
 registry lifecycle commands:
 
 ```bash
-macos-data shortcuts author validate --source ./managed.cherri --format json
-macos-data shortcuts author build --source ./managed.cherri \
+mpia shortcuts author validate --source ./managed.cherri --format json
+mpia shortcuts author build --source ./managed.cherri \
   --output ./managed.shortcut --signing-mode people-who-know-me --format json
-macos-data shortcuts create --source ./managed.cherri --idempotent --dry-run --format json
-macos-data shortcuts create --source ./managed.cherri --idempotent --apply \
+mpia shortcuts create --source ./managed.cherri --idempotent --dry-run --format json
+mpia shortcuts create --source ./managed.cherri --idempotent --apply \
   --confirm "CREATE MANAGED SHORTCUT" --format json
-macos-data shortcuts update --id <managed-opaque-id> --source ./managed-v2.cherri \
+mpia shortcuts update --id <managed-opaque-id> --source ./managed-v2.cherri \
   --expected-source-sha256 <sha256> --strategy replace --dry-run --format json
-macos-data shortcuts managed list --format json
+mpia shortcuts managed list --format json
 ```
 
 These commands require optional Cherri 2.3.x, never use remote signing, refuse
@@ -182,16 +182,16 @@ from compiled counts and cannot prove the action graph. Experimental editing of 
 starts with read-only local acquisition classification and planning:
 
 ```bash
-macos-data shortcuts edit inspect --input ./candidate.shortcut --format json
-macos-data shortcuts edit inspect --input ./candidate.cherri --format json
-macos-data shortcuts edit plan --input ./candidate.shortcut --patch ./plan.json --format json
+mpia shortcuts edit inspect --input ./candidate.shortcut --format json
+mpia shortcuts edit inspect --input ./candidate.cherri --format json
+mpia shortcuts edit plan --input ./candidate.shortcut --patch ./plan.json --format json
 # or: ... --stdin --format json
-macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+mpia shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
   --expected-editor-name-sha256 <sha256> --dry-run --format json
-macos-data shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
+mpia shortcuts edit copy --input ./candidate.shortcut --patch ./plan.json \
   --expected-editor-name-sha256 <sha256> --apply \
   --confirm "EDIT SHORTCUT COPY" --format json
-macos-data shortcuts edit ui-inspect --format json
+mpia shortcuts edit ui-inspect --format json
 ```
 
 The input must be one non-symlink local regular file no larger than 10 MiB.
@@ -268,13 +268,13 @@ described above.
 Inspect Notes.app Automation status without prompting:
 
 ```text
-macos-data notes permission --format json
+mpia notes permission --format json
 ```
 
 Only an explicit request may ask macOS for consent:
 
 ```text
-macos-data notes permission --request --format json
+mpia notes permission --request --format json
 ```
 
 The response contains `access`, `readable`, `complete`, and `requested`.
@@ -285,8 +285,8 @@ Discover bounded account and nested-folder structure without reading note titles
 or bodies:
 
 ```text
-macos-data notes accounts --format json
-macos-data notes folders [--account-id <opaque-id>] [--parent-id <opaque-id>] \
+mpia notes accounts --format json
+mpia notes folders [--account-id <opaque-id>] [--parent-id <opaque-id>] \
   [--limit <1...200>] [--cursor <opaque-cursor>] --format json
 ```
 
@@ -297,7 +297,7 @@ filter and stale or cross-filter reuse fails closed.
 Query bounded note metadata without reading note bodies:
 
 ```text
-macos-data notes query [--account-id <opaque-id>] [--folder-id <opaque-id>] \
+mpia notes query [--account-id <opaque-id>] [--folder-id <opaque-id>] \
   [--title <substring>] [--modified-after <iso8601>] \
   [--limit <1...200>] [--cursor <opaque-cursor>] --format json
 ```
@@ -316,10 +316,10 @@ never reads private Notes stores or CloudKit containers. See the
 Read one selected note. Metadata is the default and does not fetch a body:
 
 ```text
-macos-data notes get --id <opaque-note-id> --format json
-macos-data notes get --id <opaque-note-id> --body plaintext --format json
-macos-data notes get --id <opaque-note-id> --body html --format json
-macos-data notes get --id <opaque-note-id> --include-attachments --format json
+mpia notes get --id <opaque-note-id> --format json
+mpia notes get --id <opaque-note-id> --body plaintext --format json
+mpia notes get --id <opaque-note-id> --body html --format json
+mpia notes get --id <opaque-note-id> --include-attachments --format json
 ```
 
 `plaintext` and `html` are explicit sensitive-data opt-ins. Returned UTF-8 body
@@ -343,9 +343,9 @@ iCloud write account. This is a user attestation because the Notes scripting
 dictionary exposes no stable account-type field:
 
 ```text
-macos-data notes write-account status --format json
-macos-data notes write-account bind --account-id <notesaccount-id> --dry-run --format json
-macos-data notes write-account bind --account-id <notesaccount-id> --apply \
+mpia notes write-account status --format json
+mpia notes write-account bind --account-id <notesaccount-id> --dry-run --format json
+mpia notes write-account bind --account-id <notesaccount-id> --apply \
   --confirm "BIND ICLOUD NOTES" --format json
 ```
 
@@ -359,18 +359,18 @@ Create JSON is supplied only through a file or stdin:
 ```
 
 ```text
-macos-data notes create --stdin --dry-run --format json
-macos-data notes create --stdin --apply --idempotent --format json
+mpia notes create --stdin --dry-run --format json
+mpia notes create --stdin --apply --idempotent --format json
 ```
 
 Rename and move require the exact ISO-8601 `modificationDate` returned by the
 latest query/get:
 
 ```text
-macos-data notes rename --id <note-id> --stdin --dry-run --format json
+mpia notes rename --id <note-id> --stdin --dry-run --format json
 # stdin: {"title":"New title","expectedModificationDate":"2026-08-14T00:00:00Z"}
 
-macos-data notes move --id <note-id> --stdin --apply --format json
+mpia notes move --id <note-id> --stdin --apply --format json
 # stdin: {"destinationFolderID":"notesfolder_...","expectedModificationDate":"2026-08-14T00:00:00Z"}
 ```
 
@@ -378,8 +378,8 @@ The in-development recoverable delete requires the latest whole-second
 modification date and an exact confirmation phrase:
 
 ```text
-macos-data notes delete --id <note-id> --stdin --dry-run --format json
-macos-data notes delete --id <note-id> --stdin --apply --confirm "DELETE NOTE" --format json
+mpia notes delete --id <note-id> --stdin --dry-run --format json
+mpia notes delete --id <note-id> --stdin --apply --confirm "DELETE NOTE" --format json
 # stdin: {"expectedModificationDate":"2026-08-14T00:00:00Z"}
 ```
 
@@ -393,7 +393,7 @@ plaintext`. This second precondition detects body drift independently of the
 whole-second modification date:
 
 ```text
-macos-data notes edit-body --id <note-id> --stdin --dry-run --format json
+mpia notes edit-body --id <note-id> --stdin --dry-run --format json
 # stdin: {"bodyFormat":"plaintext","body":"Replacement body","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"<64-lowercase-hex>"}
 ```
 
@@ -410,19 +410,19 @@ folder IDs. JSON `null` explicitly means the bound account root; omitting a
 parent field is an error:
 
 ```text
-macos-data notes folder create --stdin --dry-run --format json
+mpia notes folder create --stdin --dry-run --format json
 # stdin: {"name":"Projects","parentFolderID":null}
 
-macos-data notes folder rename --id <folder-id> --stdin --dry-run --format json
+mpia notes folder rename --id <folder-id> --stdin --dry-run --format json
 # stdin: {"name":"Archive","expectedNameSHA256":"<64-lowercase-hex>"}
 
-macos-data notes folder move --id <folder-id> --stdin --dry-run --format json
+mpia notes folder move --id <folder-id> --stdin --dry-run --format json
 # stdin: {"destinationParentFolderID":null,"expectedParentFolderID":"notesfolder_...","expectedNameSHA256":"<64-lowercase-hex>"}
 
-macos-data notes folder delete --id <folder-id> --stdin --dry-run --format json
+mpia notes folder delete --id <folder-id> --stdin --dry-run --format json
 # stdin: {"expectedParentFolderID":null,"expectedNameSHA256":"<64-lowercase-hex>"}
 
-macos-data notes folder delete --id <folder-id> --stdin --apply \
+mpia notes folder delete --id <folder-id> --stdin --apply \
   --confirm "DELETE EMPTY NOTES FOLDER" --format json
 # apply returns NOTES_FOLDER_DELETE_UNSUPPORTED on Notes 4.13
 ```
@@ -463,13 +463,13 @@ shared/locked writes, and cross-account moves are unsupported.
 Inspect authorization without triggering a prompt:
 
 ```text
-macos-data photos permission --format json
+mpia photos permission --format json
 ```
 
 Request read/write Photos authorization explicitly:
 
 ```text
-macos-data photos permission --request --format json
+mpia photos permission --request --format json
 ```
 
 The response includes `access`, `readable`, `complete`, and `requested`.
@@ -477,8 +477,8 @@ The response includes `access`, `readable`, `complete`, and `requested`.
 can enumerate album metadata after authorization:
 
 ```text
-macos-data photos albums --kind all --limit 50 --format json
-macos-data photos albums --kind user --limit 50 --cursor <opaque-cursor> --format json
+mpia photos albums --kind all --limit 50 --format json
+mpia photos albums --kind user --limit 50 --cursor <opaque-cursor> --format json
 ```
 
 Results preserve user folder hierarchy, distinguish user and smart albums, and
@@ -487,11 +487,11 @@ selection. Query bounded asset metadata by creation date, with hidden assets and
 exact location excluded by default:
 
 ```text
-macos-data photos query --start 2026-08-01T00:00:00Z --end 2026-08-15T00:00:00Z \
+mpia photos query --start 2026-08-01T00:00:00Z --end 2026-08-15T00:00:00Z \
   [--album-id <opaque-album-id>] [--media image|video|audio|unknown] \
   [--favorite true|false] [--include-hidden] [--include-location] \
   [--limit <1...200>] [--cursor <opaque-cursor>] --format json
-macos-data photos get --id <opaque-asset-id> [--include-location] --format json
+mpia photos get --id <opaque-asset-id> [--include-location] --format json
 ```
 
 The range must be ordered and at most 366 days. Query/get return metadata and
@@ -501,7 +501,7 @@ downloads. `contentAvailability` remains `unknown` in this slice.
 Export one explicit resource to a new local file:
 
 ```text
-macos-data photos export --id <opaque-asset-id> --output <file> \
+mpia photos export --id <opaque-asset-id> --output <file> \
   [--variant original|current|paired-video|adjustment-data] \
   [--allow-network] --format json
 ```
@@ -520,16 +520,16 @@ See the [Photos 0.5 architecture](development/photos-adapter-architecture.md).
 ## Calendar (0.3)
 
 ```text
-macos-data calendar permission --format json
-macos-data calendar sources --format json
-macos-data calendar calendars --format json
-macos-data calendar query --start <iso8601> --end <iso8601> [--calendar <id|unique-title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
-macos-data calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|unique-title>] --format json
-macos-data calendar get --id <calevent-id> --format json
-macos-data calendar create --input event.json --dry-run|--apply [--idempotent] --format json
-macos-data calendar edit --id <id> --input patch.json --dry-run|--apply [--span this|future] --format json
-macos-data calendar delete --id <id> --dry-run [--span this|future] --format json
-macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+mpia calendar permission --format json
+mpia calendar sources --format json
+mpia calendar calendars --format json
+mpia calendar query --start <iso8601> --end <iso8601> [--calendar <id|unique-title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
+mpia calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|unique-title>] --format json
+mpia calendar get --id <calevent-id> --format json
+mpia calendar create --input event.json --dry-run|--apply [--idempotent] --format json
+mpia calendar edit --id <id> --input patch.json --dry-run|--apply [--span this|future] --format json
+mpia calendar delete --id <id> --dry-run [--span this|future] --format json
+mpia calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
 ```
 
 Reads require EventKit full access; write-only access is insufficient. The
@@ -565,18 +565,18 @@ The current source tree implements permission, iCloud list discovery, bounded
 query/get, create, partial edit, complete/reopen, and single-item delete:
 
 ```text
-macos-data reminders permission --format json
-macos-data reminders sources --format json
-macos-data reminders lists --format json
-macos-data reminders query [--status incomplete|completed|all] \
+mpia reminders permission --format json
+mpia reminders sources --format json
+mpia reminders lists --format json
+mpia reminders query [--status incomplete|completed|all] \
   [--due-start <iso8601>] [--due-end <iso8601>] \
   [--list <id|unique-title>] [--title <text>] \
   [--limit <1...200>] [--cursor <cursor>] --format json
-macos-data reminders get --id <opaque-reminder-id> --format json
-macos-data reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-macos-data reminders edit --id <opaque-reminder-id> --input <file>|--stdin --dry-run|--apply --format json
-macos-data reminders complete --id <opaque-reminder-id> --dry-run|--apply --format json
-macos-data reminders reopen --id <opaque-reminder-id> --dry-run|--apply --format json
+mpia reminders get --id <opaque-reminder-id> --format json
+mpia reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+mpia reminders edit --id <opaque-reminder-id> --input <file>|--stdin --dry-run|--apply --format json
+mpia reminders complete --id <opaque-reminder-id> --dry-run|--apply --format json
+mpia reminders reopen --id <opaque-reminder-id> --dry-run|--apply --format json
 ```
 
 Add `--source iCloud` or an exact source identifier when explicit selection is
@@ -637,8 +637,8 @@ bash scripts/run_reminders_recurrence_integration.sh --confirm "REMINDERS RECURR
 Delete requires a preview or the exact confirmation phrase:
 
 ```text
-macos-data reminders delete --id <opaque-reminder-id> --dry-run --format json
-macos-data reminders delete --id <opaque-reminder-id> --apply --confirm "DELETE REMINDER" --format json
+mpia reminders delete --id <opaque-reminder-id> --dry-run --format json
+mpia reminders delete --id <opaque-reminder-id> --apply --confirm "DELETE REMINDER" --format json
 ```
 
 `absence_confirmed` means the removed opaque ID no longer resolves.
@@ -679,7 +679,7 @@ data is accessed.
 Run the read-only capability check:
 
 ```text
-macos-data mail doctor --format json
+mpia mail doctor --format json
 ```
 
 `doctor` dynamically discovers the highest numeric `~/Library/Mail/V*`, opens
@@ -696,9 +696,9 @@ disable SQLite, but means text fallback or `mail reveal` is not currently availa
 Discover privacy-safe account scopes and mailboxes:
 
 ```text
-macos-data mail accounts --format json
-macos-data mail mailboxes --format json
-macos-data mail mailboxes --account-id <opaque-account-id> --format json
+mpia mail accounts --format json
+mpia mail mailboxes --format json
+mpia mail mailboxes --account-id <opaque-account-id> --format json
 ```
 
 Account IDs are derived opaque local scopes; raw account authorities and full
@@ -708,7 +708,7 @@ be treated as adapter-owned values.
 List conversation groups reported by the local Mail schema:
 
 ```text
-macos-data mail threads --limit 50 --format json
+mpia mail threads --limit 50 --format json
 ```
 
 Only explicit positive `conversation_id` values are grouped. The response
@@ -719,7 +719,7 @@ fallback does not provide this command.
 Search cached message bodies without launching Mail.app:
 
 ```text
-macos-data mail search --text "project alpha" --limit 20 --format json
+mpia mail search --text "project alpha" --limit 20 --format json
 ```
 
 This command reads only locally cached EMLX text. It scans at most 200 metadata
@@ -739,10 +739,10 @@ with SQLite IDs. Raw export and attachment verification remain fast-path-only.
 Query bounded message metadata:
 
 ```text
-macos-data mail query --unread --limit 50 --format json
-macos-data mail query --mailbox-id <id> --subject <text> --format json
-macos-data mail query --from <text> --received-after 2026-07-01 --format json
-macos-data mail query --cursor <cursor> --limit 50 --format json
+mpia mail query --unread --limit 50 --format json
+mpia mail query --mailbox-id <id> --subject <text> --format json
+mpia mail query --from <text> --received-after 2026-07-01 --format json
+mpia mail query --cursor <cursor> --limit 50 --format json
 ```
 
 Filters use AND semantics. Supported filters are `--account-id`, `--mailbox-id`,
@@ -765,10 +765,10 @@ report `sqlite_emlx` or `mail_app` according to the observed source.
 Read one message by the opaque ID returned from `mail query`:
 
 ```text
-macos-data mail get --id <id> --format json
-macos-data mail get --id <id> --content text --format json
-macos-data mail get --id <id> --content raw --output message.eml --format json
-macos-data mail get --id <id> --content raw --output -
+mpia mail get --id <id> --format json
+mpia mail get --id <id> --content text --format json
+mpia mail get --id <id> --content raw --output message.eml --format json
+mpia mail get --id <id> --content raw --output -
 ```
 
 The default projection is `metadata` and does not read the EMLX payload.
@@ -793,7 +793,7 @@ message.
 Reveal one result visibly in Mail.app:
 
 ```text
-macos-data mail reveal --id <id> --format json
+mpia mail reveal --id <id> --format json
 ```
 
 `reveal` may launch and activate Mail.app. It uses the same opaque local ID and
@@ -802,7 +802,7 @@ does not intentionally change read, flag, mailbox, or message data.
 Cross-check attachment metadata without exporting attachments:
 
 ```text
-macos-data mail attachments verify --id <id> --format json
+mpia mail attachments verify --id <id> --format json
 ```
 
 The verifier returns only SQLite and MIME counts, cache state, and whether a
@@ -813,7 +813,7 @@ currently visible counts happen to agree.
 Export cached attachments explicitly:
 
 ```text
-macos-data mail attachments export --id <id> --output ./attachments --format json
+mpia mail attachments export --id <id> --output ./attachments --format json
 ```
 
 Export requires the SQLite/EMLX fast path, creates the output directory if
@@ -826,7 +826,7 @@ remote attachments are never used.
 List available Contacts containers:
 
 ```text
-macos-data contacts containers --format json
+mpia contacts containers --format json
 ```
 
 The default selector is the verified iCloud container. A command may select it
@@ -834,8 +834,8 @@ explicitly with `--container iCloud`, or use the exact iCloud container identifi
 the list:
 
 ```text
-macos-data contacts list --container iCloud --format json
-macos-data contacts get --external-id <id> --container <icloud-container-id> --format json
+mpia contacts list --container iCloud --format json
+mpia contacts get --external-id <id> --container <icloud-container-id> --format json
 ```
 
 An unknown or non-iCloud container is an error; the CLI never silently falls
@@ -844,7 +844,7 @@ back to a local or Exchange account.
 The current version writes only to the iCloud Contacts container:
 
 ```text
-macos-data contacts container
+mpia contacts container
 ```
 
 If no iCloud container is available, all writes are rejected rather than falling back to a local or other account.
@@ -852,8 +852,8 @@ If no iCloud container is available, all writes are rejected rather than falling
 Export a JSON snapshot:
 
 ```text
-macos-data contacts export --format json
-macos-data contacts export --format json --output contacts-snapshot.json
+mpia contacts export --format json
+mpia contacts export --format json --output contacts-snapshot.json
 ```
 
 `list` is for live reads; `export` is for a saved snapshot used for audit or batch agent processing.
@@ -878,9 +878,9 @@ the `from` and `to` identifiers.
 Check authorization and count records:
 
 ```text
-macos-data contacts permission
-macos-data contacts count
-macos-data contacts count --format json
+mpia contacts permission
+mpia contacts count
+mpia contacts count --format json
 ```
 
 JSON responses use contract version `0.1`, independent of the CLI release
@@ -890,16 +890,16 @@ errors contain `ok`, `contractVersion`, and `error`.
 Read records as JSON:
 
 ```text
-macos-data contacts list --format json
-macos-data contacts get --external-id <id> --format json
+mpia contacts list --format json
+mpia contacts get --external-id <id> --format json
 ```
 
 Bounded Contacts pages use the shared pagination contract:
 
 ```text
-macos-data contacts list --limit 50 --format json
-macos-data contacts list --limit 50 --cursor <opaque-cursor> --format json
-macos-data contacts query --kind organization --limit 50 --format json
+mpia contacts list --limit 50 --format json
+mpia contacts list --limit 50 --cursor <opaque-cursor> --format json
+mpia contacts query --kind organization --limit 50 --format json
 ```
 
 Paged responses contain `items`, `limit`, `nextCursor`, `truncated`, and
@@ -914,13 +914,13 @@ limitations explain why pagination cannot resume in that backend.
 Search with one or more conditions. Conditions use AND semantics; at most three distinct fields are allowed:
 
 ```text
-macos-data contacts query --name "Ada"
-macos-data contacts query --kind organization
-macos-data contacts query --phone "+1 555"
-macos-data contacts query --email "ada@example.com"
-macos-data contacts query --url "example.com"
-macos-data contacts query --organization "Example"
-macos-data contacts query --postal-code "10001"
+mpia contacts query --name "Ada"
+mpia contacts query --kind organization
+mpia contacts query --phone "+1 555"
+mpia contacts query --email "ada@example.com"
+mpia contacts query --url "example.com"
+mpia contacts query --organization "Example"
+mpia contacts query --postal-code "10001"
 ```
 
 Create from JSON. Always inspect a dry run before applying:
@@ -930,16 +930,16 @@ Contacts that originated outside the CLI may still be read without an external
 ID, but the CLI will not create or manage a new record without one.
 
 ```text
-macos-data contacts create --input contact.json --dry-run
-macos-data contacts create --input contact.json --apply
-cat contact.json | macos-data contacts create --stdin --dry-run
-cat contact.json | macos-data contacts create --stdin --apply --idempotent
-macos-data contacts edit --external-id <id> --input contact.json --dry-run
-macos-data contacts edit --external-id <id> --input contact.json --apply
-cat patch.json | macos-data contacts edit --external-id <id> --stdin --dry-run
+mpia contacts create --input contact.json --dry-run
+mpia contacts create --input contact.json --apply
+cat contact.json | mpia contacts create --stdin --dry-run
+cat contact.json | mpia contacts create --stdin --apply --idempotent
+mpia contacts edit --external-id <id> --input contact.json --dry-run
+mpia contacts edit --external-id <id> --input contact.json --apply
+cat patch.json | mpia contacts edit --external-id <id> --stdin --dry-run
 ```
 
-The first Contacts version distinguishes `person` and `organization`. `external_id` is stored only in a URL labeled `macos-data-cli`, using the form `x-macos-data://external-id/<id>`. Other URL labels are ordinary URLs. The CLI selects the verified iCloud container by default; `--container iCloud` or the exact identifier can be used explicitly.
+The first Contacts version distinguishes `person` and `organization`. `external_id` is stored only in a URL labeled `mpia-cli`, using the form `mpia://ext-id/<id>`. Other URL labels are ordinary URLs. The CLI selects the verified iCloud container by default; `--container iCloud` or the exact identifier can be used explicitly.
 
 Retries are strict by default. Add `--idempotent` to a create retry only when
 an existing contact with the same external ID should be accepted if all
@@ -958,19 +958,19 @@ and do not automatically retry, delete, or recreate the contact.
 
 During a regular edit, `external_id` is immutable. If the input contains an `externalID`, it must equal the ID in `--external-id`; changing an external ID requires a separate migration feature.
 
-If a write reports CoreData error `134092`, macOS may have a corrupted or unsavable Contacts record. Preserve the JSON representation, then explicitly delete and recreate the contact before retrying. `macos-data` never performs that destructive recovery automatically.
+If a write reports CoreData error `134092`, macOS may have a corrupted or unsavable Contacts record. Preserve the JSON representation, then explicitly delete and recreate the contact before retrying. `mpia` never performs that destructive recovery automatically.
 
 Set a contact image through a separate argument instead of embedding image data in the regular contact JSON:
 
 ```text
-macos-data contacts edit --external-id <id> --image ./avatar.png --dry-run
-macos-data contacts edit --external-id <id> --image ./avatar.png --apply
+mpia contacts edit --external-id <id> --image ./avatar.png --dry-run
+mpia contacts edit --external-id <id> --image ./avatar.png --apply
 ```
 
 To verify an existing avatar without writing anything:
 
 ```text
-macos-data contacts avatar verify --external-id <id> --format json
+mpia contacts avatar verify --external-id <id> --format json
 ```
 
 The result is `readback_confirmed`, `not_available`, or
@@ -982,8 +982,8 @@ separate replacement flow. It preserves the JSON contact fields but creates a
 new Contacts record, so it requires an explicit confirmation:
 
 ```text
-macos-data contacts avatar replace --external-id <id> --image ./avatar.png --dry-run
-macos-data contacts avatar replace --external-id <id> --image ./avatar.png --apply --confirm "RECREATE CONTACT"
+mpia contacts avatar replace --external-id <id> --image ./avatar.png --dry-run
+mpia contacts avatar replace --external-id <id> --image ./avatar.png --apply --confirm "RECREATE CONTACT"
 ```
 
 Images are limited to 10 MB on input. The processed image is kept within 1024 px on its longest side and 200 KB. Invalid, oversized, or uncompressible images are rejected before the contact is modified.
@@ -997,20 +997,20 @@ Regular edits are partial updates: omitted fields are preserved, while an explic
 Delete one contact by external ID. Preview first:
 
 ```text
-macos-data contacts delete --external-id <id> --dry-run
+mpia contacts delete --external-id <id> --dry-run
 ```
 
 Apply only with the exact confirmation phrase:
 
 ```text
-macos-data contacts delete --external-id <id> --apply --confirm "DELETE CONTACT"
+mpia contacts delete --external-id <id> --apply --confirm "DELETE CONTACT"
 ```
 
 Use a separate migration command to change an external ID:
 
 ```text
-macos-data contacts external-id migrate --from <old-id> --to <new-id> --dry-run
-macos-data contacts external-id migrate --from <old-id> --to <new-id> --apply --confirm "CHANGE EXTERNAL ID"
+mpia contacts external-id migrate --from <old-id> --to <new-id> --dry-run
+mpia contacts external-id migrate --from <old-id> --to <new-id> --apply --confirm "CHANGE EXTERNAL ID"
 ```
 
 For the complete payload shape, error behavior, and safety rules, see [development rules](development/rules.md). For local verification records, see [local Contacts fixture](development/local-contacts-fixture.md).

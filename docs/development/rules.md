@@ -60,9 +60,9 @@ fixtures.
 - `external_id` is optional in read models but required for creation.
 - The CLI must never create a contact without `external_id`; this is a permanent
   Contacts contract, not a deferred feature.
-- External IDs are encoded as `x-macos-data://external-id/<id>` in the URL field.
-- The reserved URL label is strictly `macos-data-cli`. Readers must not treat `Homepage` or other labels as an external ID.
-- The reserved URL value is `x-macos-data://external-id/<id>`.
+- External IDs are encoded as `mpia://ext-id/<id>` in the URL field.
+- The reserved URL label is strictly `mpia-cli`. Readers must not treat `Homepage` or other labels as an external ID.
+- The reserved URL value is `mpia://ext-id/<id>`.
 - `imageAvailable` is the Contacts.framework availability result; it is not a
   definitive statement about whether Contacts.app displays an iCloud avatar.
 - Avatar apply responses include `avatar.status`. `readback_confirmed` means
@@ -88,7 +88,7 @@ fixtures.
 - Version 0.1 permits only the iCloud container; if it is unavailable, writes must fail rather than fall back to local or another account.
 - Diagnostics retain `external_id` only as a correlation key. Email addresses,
   international phone numbers, absolute paths, and underlying exception text
-  are redacted before being written to `~/Library/Logs/macos-data-cli/diagnostics.log`.
+  are redacted before being written to `~/Library/Logs/mpia-cli/diagnostics.log`.
 - Diagnostics must not include names, organizations, postal addresses, avatar
   bytes, or full JSON contact payloads.
 
@@ -166,7 +166,7 @@ fixtures.
 The current deployment target is macOS 26.0+. Use the repository's Swift/Xcode toolchain and keep framework availability checks close to the adapter boundary.
 
 For compatibility verification, rebuild the Release configuration before
-testing the binary. A stale `.build/release/macos-data` may not contain the
+testing the binary. A stale `.build/release/mpia` may not contain the
 latest source changes.
 
 ## Metadata (0.1)

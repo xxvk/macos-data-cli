@@ -22,16 +22,16 @@ precompiled distribution status is documented separately.
 ## Commands
 
 ```text
-macos-data calendar permission
-macos-data calendar sources --format json
-macos-data calendar calendars --format json
-macos-data calendar query --start <iso8601> --end <iso8601> [--calendar <id|title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
-macos-data calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|title>] --format json
-macos-data calendar get --id <opaque-event-id> --format json
-macos-data calendar create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-macos-data calendar edit --id <id> --input <file>|--stdin --dry-run|--apply [--span this|future] --format json
-macos-data calendar delete --id <id> --dry-run [--span this|future] --format json
-macos-data calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+mpia calendar permission
+mpia calendar sources --format json
+mpia calendar calendars --format json
+mpia calendar query --start <iso8601> --end <iso8601> [--calendar <id|title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
+mpia calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|title>] --format json
+mpia calendar get --id <opaque-event-id> --format json
+mpia calendar create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
+mpia calendar edit --id <id> --input <file>|--stdin --dry-run|--apply [--span this|future] --format json
+mpia calendar delete --id <id> --dry-run [--span this|future] --format json
+mpia calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
 ```
 
 Timed Calendar dates are ISO 8601 and `timeZone` is an IANA identifier such as
@@ -49,7 +49,7 @@ applying the explicit JSON set.
 
 `create --idempotent` is opt-in. It first uses an immediate visible-event match,
 then writes a hashed, privacy-minimized receipt for 60 seconds under
-`~/Library/Application Support/macos-data-cli/idempotency/calendar`. The receipt
+`~/Library/Application Support/mpia-cli/idempotency/calendar`. The receipt
 contains only opaque event/calendar IDs and time; no title, notes, URL, location,
 or attendee data. A same-slot non-equivalent visible event fails closed.
 

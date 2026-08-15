@@ -66,9 +66,9 @@ public enum NotesError: Error, Equatable, CustomStringConvertible, Sendable {
     public var description: String {
         switch self {
         case .permissionRequired:
-            "Notes.app Automation permission requires consent. Run 'macos-data notes permission --request'."
+            "Notes.app Automation permission requires consent. Run 'mpia notes permission --request'."
         case .permissionDenied:
-            "Notes.app Automation permission was denied. Enable macos-data for Notes in System Settings > Privacy & Security > Automation."
+            "Notes.app Automation permission was denied. Enable mpia for Notes in System Settings > Privacy & Security > Automation."
         case .targetUnavailable:
             "Notes.app is unavailable on this Mac."
         case .targetNotRunning:

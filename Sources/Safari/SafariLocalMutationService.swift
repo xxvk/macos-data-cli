@@ -12,7 +12,7 @@ struct SafariLocalMutationService {
 
     init(
         source: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari/Bookmarks.plist"),
-        recoveryRoot: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/macos-data-cli/recovery/safari-local", isDirectory: true),
+        recoveryRoot: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/mpia-cli/recovery/safari-local", isDirectory: true),
         safetyGate: SafariPlistMutationSafetyGate = .init(),
         writer: SafariPlistAtomicMutationWriter = .init()
     ) {

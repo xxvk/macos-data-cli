@@ -36,12 +36,12 @@ burst、Live Photo；只有 `--include-location` 才返回精确位置。metadat
 hidden asset 默认排除。
 
 ```text
-macos-data photos permission [--request] --format json
-macos-data photos albums [--kind user|smart|all] [--limit N] [--cursor C] --format json
-macos-data photos query --start <ISO-8601> --end <ISO-8601> [--album-id ID]
+mpia photos permission [--request] --format json
+mpia photos albums [--kind user|smart|all] [--limit N] [--cursor C] --format json
+mpia photos query --start <ISO-8601> --end <ISO-8601> [--album-id ID]
   [--media image|video|audio|unknown] [--favorite true|false]
   [--include-hidden] [--include-location] [--limit N] [--cursor C] --format json
-macos-data photos get --id <opaque-asset-id> [--include-location] --format json
+mpia photos get --id <opaque-asset-id> [--include-location] --format json
 ```
 
 query 使用 creation date，start 必须早于 end，并设置跨度上限。默认 50、最大 200；按 creation
@@ -76,7 +76,7 @@ complete 和 truncated；权限不可读时必须在 fetch 前停止。
 
 当 agent shell 是 responsible process 时，macOS 可能把 PhotoKit 请求归因到 agent sandbox，
 而不是 CLI app。有效的本机 TCC gate 必须把当前 bundle 安装到稳定路径，并使用
-`MACOS_DATA_APP=/path/to/macos-data-debug.app` 运行 smoke。脚本通过 LaunchServices 和临时
+`MPIA_APP=/path/to/mpia-debug.app` 运行 smoke。脚本通过 LaunchServices 和临时
 stdout/stderr 文件保留 app 身份，且不会暴露 album title 或 identifier。沙箱内直接执行得到的
 denied 不能作为 app 本身被拒绝的证据。
 

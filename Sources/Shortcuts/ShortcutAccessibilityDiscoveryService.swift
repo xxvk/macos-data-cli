@@ -133,7 +133,7 @@ public struct ShortcutAccessibilityDiscoveryService: @unchecked Sendable {
         let nextAction: String
         switch status {
         case .permissionRequired:
-            nextAction = "Grant Accessibility to the stable macos-data app only if you intend to run the future disposable UI fixture gate. This command does not prompt."
+            nextAction = "Grant Accessibility to the stable mpia app only if you intend to run the future disposable UI fixture gate. This command does not prompt."
         case .targetNotRunning:
             nextAction = "Open Shortcuts.app manually with a disposable test shortcut before repeating read-only discovery."
         case .candidateFound:

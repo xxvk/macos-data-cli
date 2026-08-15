@@ -92,7 +92,7 @@ final class MailDoctorTests: XCTestCase {
 
     private func makeFixtureRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("macos-data-mail-tests-(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("mpia-mail-tests-(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         return root

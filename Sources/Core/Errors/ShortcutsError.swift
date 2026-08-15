@@ -98,9 +98,9 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
     public var description: String {
         switch self {
         case .permissionRequired:
-            "Shortcuts Automation permission requires consent. Run 'macos-data shortcuts permission --request'."
+            "Shortcuts Automation permission requires consent. Run 'mpia shortcuts permission --request'."
         case .permissionDenied:
-            "Shortcuts Automation permission was denied. Enable macos-data for Shortcuts Events in System Settings > Privacy & Security > Automation."
+            "Shortcuts Automation permission was denied. Enable mpia for Shortcuts Events in System Settings > Privacy & Security > Automation."
         case .targetUnavailable:
             "Shortcuts Events is unavailable on this Mac."
         case .targetNotRunning:
@@ -154,7 +154,7 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
         case .authorRegistryInvalid:
             "The private managed-Shortcuts registry is missing, corrupt, or contains invalid opaque metadata."
         case .authorManagedOnly:
-            "This operation is allowed only for a shortcut already tracked by the private macos-data registry."
+            "This operation is allowed only for a shortcut already tracked by the private mpia registry."
         case .authorSourceConflict:
             "The expected source SHA-256 does not match the managed registry. Refresh state and do not overwrite silently."
         case .authorNameConflict:

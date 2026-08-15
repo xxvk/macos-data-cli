@@ -44,7 +44,7 @@ public enum SafariError: Error, Equatable, CustomStringConvertible, Sendable {
     public var description: String {
         switch self {
         case .bookmarksUnavailable:
-            "Safari bookmarks are not readable. Grant Full Disk Access to the stable macos-data app or its Terminal host, then retry."
+            "Safari bookmarks are not readable. Grant Full Disk Access to the stable mpia app or its Terminal host, then retry."
         case .readFailed:
             "Safari bookmarks could not be read as one consistent property-list snapshot."
         case .fileTooLarge:
@@ -58,9 +58,9 @@ public enum SafariError: Error, Equatable, CustomStringConvertible, Sendable {
         case .notFound:
             "The selected Safari bookmark or Reading List item was not found."
         case .permissionRequired:
-            "Safari Automation requires consent. Open Safari, then run 'macos-data safari permission --request'."
+            "Safari Automation requires consent. Open Safari, then run 'mpia safari permission --request'."
         case .permissionDenied:
-            "Safari Automation was denied. Enable macos-data for Safari in System Settings > Privacy & Security > Automation."
+            "Safari Automation was denied. Enable mpia for Safari in System Settings > Privacy & Security > Automation."
         case .targetUnavailable:
             "Safari is unavailable or could not be reached."
         case .automationUnknown:

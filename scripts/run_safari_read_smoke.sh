@@ -2,12 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 command -v jq >/dev/null || { echo "Safari read smoke requires jq." >&2; exit 1; }
-[[ -x "$CLI" ]] || { echo "macos-data CLI is missing: $CLI" >&2; exit 1; }
+[[ -x "$CLI" ]] || { echo "mpia CLI is missing: $CLI" >&2; exit 1; }
 
 "$CLI" safari permission --format json >"$TMP_DIR/permission.json"
 jq -e '.ok == true and .data.bookmarksReadable == true' "$TMP_DIR/permission.json" >/dev/null

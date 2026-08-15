@@ -324,7 +324,7 @@ final class MailStoreTests: XCTestCase {
             """.replacingOccurrences(of: "\n", with: "\r\n").utf8)
         )
         let id = try XCTUnwrap(store.query(MailQuery(hasAttachment: true)).messages.first?.id)
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("macos-data-attachments-\(UUID().uuidString)")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("mpia-attachments-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let result = try store.exportAttachments(id: id, to: directory)
@@ -384,7 +384,7 @@ private final class MailSQLiteFixture {
 
     init() throws {
         rootURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("macos-data-mail-store-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("mpia-mail-store-\(UUID().uuidString)", isDirectory: true)
         mailStoreURL = rootURL.appendingPathComponent("V10", isDirectory: true)
         let mailDataURL = mailStoreURL.appendingPathComponent("MailData", isDirectory: true)
         try FileManager.default.createDirectory(at: mailDataURL, withIntermediateDirectories: true)

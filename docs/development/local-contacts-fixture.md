@@ -13,11 +13,11 @@ The fixture set contains two classification fixtures and one create smoke-test f
 ### Person
 
 ```text
-Name: macos-data Test Contact
-Organization: macos-data Test
+Name: mpia Test Contact
+Organization: mpia Test
 Phone: +1 555 010 0001
-Email: macos-data-test@example.invalid
-URL: x-macos-data://external-id/xvk-test-contacts-001
+Email: mpia-test@example.invalid
+URL: mpia://ext-id/xvk-test-contacts-001
 external_id: xvk-test-contacts-001
 ```
 
@@ -26,10 +26,10 @@ Expected `kind`: `person`
 ### Organization
 
 ```text
-Name: macos-data Test Organization
+Name: mpia Test Organization
 Phone: +1 555 010 0002
 Email: organization-test@example.invalid
-URL: x-macos-data://external-id/xvk-test-organizations-001
+URL: mpia://ext-id/xvk-test-organizations-001
 external_id: xvk-test-organizations-001
 ```
 
@@ -42,7 +42,7 @@ Expected `kind`: `organization`
 ```text
 Name: Apply Test Organization
 Email: apply-test@example.invalid
-URL: x-macos-data://external-id/org-create-apply-001
+URL: mpia://ext-id/org-create-apply-001
 external_id: org-create-apply-001
 ```
 
@@ -58,7 +58,7 @@ Do not create another copy if the record already exists.
 
 ## Container verification
 
-The local Contacts store currently exposes one container named `iCloud`. The create smoke test was written through the default container and verified by reading the record back through the CLI. All three fixture records use the reserved URL label `macos-data-cli`.
+The local Contacts store currently exposes one container named `iCloud`. The create smoke test was written through the default container and verified by reading the record back through the CLI. All three fixture records use the reserved URL label `mpia-cli`.
 
 Explicit `--container iCloud` selection is also verified locally. A future
 multi-account expansion must not weaken the current iCloud-only restriction.
@@ -80,11 +80,11 @@ They were written with the installed CLI using `contacts edit --image ... --appl
 Run the installed CLI:
 
 ```bash
-macos-data contacts permission
-macos-data contacts count
-macos-data contacts get --external-id xvk-test-contacts-001 --format json
-macos-data contacts get --external-id xvk-test-organizations-001 --format json
-macos-data contacts get --external-id org-create-apply-001 --format json
+mpia contacts permission
+mpia contacts count
+mpia contacts get --external-id xvk-test-contacts-001 --format json
+mpia contacts get --external-id xvk-test-organizations-001 --format json
+mpia contacts get --external-id org-create-apply-001 --format json
 ```
 
 The commands must return one JSON object each, with `kind` values of `person` and `organization` respectively.

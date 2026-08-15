@@ -4,34 +4,34 @@
 
 0.7.1 只管理以 `.cherri` 源码作为 SSOT 的 Shortcut，不接管或修改任意已有
 Shortcut，不读取 Shortcuts 私有数据库，也不把 GPL-2.0 的 Cherri 源码复制进
-本 MIT 仓库。Cherri 2.3.x 是可选外部 CLI；macos-data 固定使用
+本 MIT 仓库。Cherri 2.3.x 是可选外部 CLI；mpia 固定使用
 `--skip-sign --derive-uuids --no-ansi`，禁止 HubSign 和自定义远程签名服务，最终
 只调用系统 `/usr/bin/shortcuts sign`。
 
 ## 0.7.1 命令
 
 ```text
-macos-data shortcuts author validate --source <file.cherri> --format json
+mpia shortcuts author validate --source <file.cherri> --format json
 
-macos-data shortcuts author build --source <file.cherri> \
+mpia shortcuts author build --source <file.cherri> \
   --output <file.shortcut> \
   [--signing-mode people-who-know-me|anyone] --format json
 
-macos-data shortcuts create --source <file.cherri> [--idempotent] \
+mpia shortcuts create --source <file.cherri> [--idempotent] \
   [--dry-run] --format json
-macos-data shortcuts create --source <file.cherri> [--idempotent] \
+mpia shortcuts create --source <file.cherri> [--idempotent] \
   --apply --confirm "CREATE MANAGED SHORTCUT" --format json
 
-macos-data shortcuts update --id <managed-opaque-id> --source <file.cherri> \
+mpia shortcuts update --id <managed-opaque-id> --source <file.cherri> \
   --expected-source-sha256 <sha256> --strategy replace|retain-old \
   [--dry-run] --format json
-macos-data shortcuts update --id <managed-opaque-id> --source <file.cherri> \
+mpia shortcuts update --id <managed-opaque-id> --source <file.cherri> \
   --expected-source-sha256 <sha256> --strategy replace|retain-old \
   --apply --confirm "UPDATE MANAGED SHORTCUT" --format json
 
-macos-data shortcuts managed list --format json
-macos-data shortcuts managed forget --id <managed-opaque-id> [--dry-run] --format json
-macos-data shortcuts managed forget --id <managed-opaque-id> --apply \
+mpia shortcuts managed list --format json
+mpia shortcuts managed forget --id <managed-opaque-id> [--dry-run] --format json
+mpia shortcuts managed forget --id <managed-opaque-id> --apply \
   --confirm "FORGET MANAGED SHORTCUT" --format json
 ```
 
@@ -56,7 +56,7 @@ receipt 都不是自动重试信号。
 update 只接受 registry 中的 managed opaque ID，并用当前 source SHA-256 做乐观并发 token。
 `replace` 保持可见名称不变，但只有旧公开 count 与 registry 编译 count 一致且新 count 发生变化时
 才允许；count 不一致时无法安全证明替换结果，必须 fail closed。
-`retain-old` 会将候选包内部名称改为 ` (macos-data <source-hash-prefix>)` 后缀，但 registry
+`retain-old` 会将候选包内部名称改为 ` (mpia <source-hash-prefix>)` 后缀，但 registry
 仍记录原始 `.cherri` 的 source hash，而不是临时改名后的编译输入。旧 Shortcut 永远不会先删。
 `managed forget` 只清除私有 registry/receipt，不删除 Shortcuts.app 中的对象。
 
@@ -76,7 +76,7 @@ bash scripts/run_shortcuts_authoring_smoke.sh
 一次性可见生命周期 gate 必须获得当前任务明确授权，并使用准确的外层确认短语：
 
 ```text
-MACOS_DATA_CLI=.build/debug/macos-data.app/Contents/MacOS/macos-data \
+MPIA_CLI=.build/debug/mpia.app/Contents/MacOS/mpia \
   bash scripts/run_shortcuts_authoring_integration.sh \
   --apply --confirm "SHORTCUTS AUTHORING CRUD TEST"
 ```

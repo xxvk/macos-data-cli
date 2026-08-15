@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="${MACOS_DATA_CLI:-$ROOT_DIR/.build/debug/macos-data.app/Contents/MacOS/macos-data}"
+CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia.app/Contents/MacOS/mpia}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 chmod 700 "$TMP_DIR"
@@ -16,7 +16,7 @@ QUERY_START="$(date -u -v-30d '+%Y-%m-%dT%H:%M:%SZ')"
 QUERY_END="$(date -u -v+90d '+%Y-%m-%dT%H:%M:%SZ')"
 
 jq -n --arg start "$START" --arg end "$END" '{
-  title: "macos-data Calendar dry-run fixture",
+  title: "mpia Calendar dry-run fixture",
   startDate: $start,
   endDate: $end,
   timeZone: "Asia/Tokyo",
@@ -27,7 +27,7 @@ jq -n --arg start "$START" --arg end "$END" '{
 "$CLI" calendar create --input "$TMP_DIR/create.json" --dry-run --format json >"$TMP_DIR/create-preview.json"
 jq -e '.ok == true and .data.operation == "create_preview" and .data.dryRun == true and .data.event.timeZone == "Asia/Tokyo" and .data.event.alarms[0].relativeMinutes == -10 and .data.event.recurrenceRules[0].frequency == "weekly"' "$TMP_DIR/create-preview.json" >/dev/null
 
-printf '%s' '{"title":"macos-data all-day dry-run fixture","allDay":true,"startDate":"2026-11-01","endDate":"2026-11-02","timeZone":"America/Los_Angeles","alarms":[]}' >"$TMP_DIR/all-day.json"
+printf '%s' '{"title":"mpia all-day dry-run fixture","allDay":true,"startDate":"2026-11-01","endDate":"2026-11-02","timeZone":"America/Los_Angeles","alarms":[]}' >"$TMP_DIR/all-day.json"
 "$CLI" calendar create --input "$TMP_DIR/all-day.json" --dry-run --idempotent --format json >"$TMP_DIR/all-day-preview.json"
 jq -e '.ok == true and .data.event.allDay == true and .data.event.startDate == "2026-11-01" and .data.event.endDate == "2026-11-02"' "$TMP_DIR/all-day-preview.json" >/dev/null
 

@@ -48,7 +48,7 @@ gh auth login
 
 不要把 GitHub token 写入 Markdown、`.zshenv`、仓库文件或诊断日志。
 
-## macos-data 发布检查中的使用方式
+## mpia 发布检查中的使用方式
 
 ```bash
 bash scripts/check_public_release_prerequisites.sh
