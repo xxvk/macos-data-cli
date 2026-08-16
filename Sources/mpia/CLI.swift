@@ -9,6 +9,8 @@ import PhotosAdapter
 import NotesAdapter
 @_spi(ShortcutsFixtureGate) import ShortcutsAdapter
 import SafariAdapter
+import MessagesAdapter
+import PhoneAdapter
 
 @main
 struct MpiaCLI {
@@ -46,7 +48,7 @@ struct MpiaCLI {
             arguments.removeSubrange(index...(index + 1))
         }
 
-        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] || arguments == ["notes", "--help"] || arguments == ["shortcuts", "--help"] || arguments == ["safari", "--help"] {
+        if arguments.isEmpty || arguments == ["--help"] || arguments == ["contacts", "--help"] || arguments == ["mail", "--help"] || arguments == ["calendar", "--help"] || arguments == ["reminders", "--help"] || arguments == ["photos", "--help"] || arguments == ["notes", "--help"] || arguments == ["shortcuts", "--help"] || arguments == ["safari", "--help"] || arguments == ["messages", "--help"] || arguments == ["phone-calls", "--help"] {
             printHelp()
             return
         }
@@ -118,6 +120,20 @@ struct MpiaCLI {
             case let args where args.count >= 3 && args[0] == "safari" && args[1] == "reading-list" && args[2] == "add":
                 let request = try parseSafariReadingListAddArguments(Array(args.dropFirst(3)))
                 emitSafariJSONSuccess(try safariStore.addReadingList(SafariReadingListAddInput.decode(request.data), apply: request.apply))
+            case ["messages", "permission"]:
+                let reader = ChatDbReader(databaseURL: try MessagesStoreLocator().locate().databaseURL)
+                emitJSONSuccess(try reader.permission())
+            case let args where args.count >= 2 && args[0] == "messages" && args[1] == "recent":
+                let request = try parseMessagesRecentArguments(Array(args.dropFirst(2)))
+                let reader = ChatDbReader(databaseURL: try MessagesStoreLocator().locate().databaseURL)
+                emitJSONSuccess(try reader.recent(limit: request.limit, cursor: request.cursor, service: request.service))
+            case ["phone-calls", "permission"]:
+                let reader = CallHistoryReader(databaseURL: try PhoneStoreLocator().locate().databaseURL)
+                emitJSONSuccess(try reader.permission())
+            case let args where args.count >= 2 && args[0] == "phone-calls" && args[1] == "recent":
+                let request = try parsePhoneCallsRecentArguments(Array(args.dropFirst(2)))
+                let reader = CallHistoryReader(databaseURL: try PhoneStoreLocator().locate().databaseURL)
+                emitJSONSuccess(try reader.recent(limit: request.limit, cursor: request.cursor))
             case ["shortcuts", "permission"]:
                 emitJSONSuccess(shortcutsPermission.check(requestConsent: false))
             case ["shortcuts", "permission", "--request"]:
@@ -711,6 +727,12 @@ struct MpiaCLI {
         } catch let error as SafariError {
             report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.safariFailure.rawValue)
             Foundation.exit(CLIExitCode.safariFailure.rawValue)
+        } catch let error as MessagesError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.messagesFailure.rawValue)
+            Foundation.exit(CLIExitCode.messagesFailure.rawValue)
+        } catch let error as PhoneCallsError {
+            report(error: error.description, code: error.machineCode, arguments: rawArguments, exitCode: CLIExitCode.phoneCallsFailure.rawValue)
+            Foundation.exit(CLIExitCode.phoneCallsFailure.rawValue)
         } catch let error as PaginationError {
             if rawArguments.first == "reminders" {
                 report(error: error == .invalidLimit ? "Reminder limit must be between 1 and 200." : "Reminder cursor is invalid or stale.", code: CLIErrorCode.reminders.rawValue, arguments: rawArguments, exitCode: CLIExitCode.remindersFailure.rawValue)
@@ -1873,6 +1895,25 @@ struct MpiaCLI {
         }
         limitations.append("safari_bookmark_mutation_local_only_requires_safari_quit")
         limitations.append("safari_bookmark_mutation_does_not_sync_to_icloud")
+
+        do {
+            let reader = ChatDbReader(databaseURL: try MessagesStoreLocator().locate().databaseURL)
+            let status = try reader.permission()
+            resources.append(MessagesResourceMapper.map(status: status))
+            if !status.readable { limitations.append("messages_full_disk_access_required") }
+        } catch {
+            limitations.append("messages_resource_discovery_unavailable")
+        }
+
+        do {
+            let reader = CallHistoryReader(databaseURL: try PhoneStoreLocator().locate().databaseURL)
+            let status = try reader.permission()
+            resources.append(PhoneResourceMapper.map(status: status))
+            if !status.readable { limitations.append("phone_calls_full_disk_access_required") }
+        } catch {
+            limitations.append("phone_calls_resource_discovery_unavailable")
+        }
+
         return DataResourcesResult(resources: resources, limitations: limitations)
     }
 
@@ -2387,6 +2428,71 @@ struct MpiaCLI {
         return ShortcutMoveArguments(id: id, destinationFolderID: destinationFolderID, apply: apply)
     }
 
+    private struct MessagesRecentRequest {
+        let limit: Int
+        let cursor: String?
+        let service: String?
+    }
+
+    private static func parseMessagesRecentArguments(_ arguments: [String]) throws -> MessagesRecentRequest {
+        var limit = ChatDbReader.defaultLimit
+        var cursor: String?
+        var service: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--limit", "--cursor", "--service"].contains(option),
+                  seen.insert(option).inserted, index + 1 < arguments.count else {
+                throw MessagesError.invalidArgument("unexpected or repeated option \(option)")
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--limit":
+                guard let parsed = Int(value) else { throw MessagesError.invalidArgument("--limit requires an integer") }
+                limit = parsed
+            case "--cursor":
+                cursor = value
+            case "--service":
+                guard ["imessage", "sms"].contains(value.lowercased()) else { throw MessagesError.invalidArgument("--service must be imessage or sms") }
+                service = value
+            default: break
+            }
+            index += 2
+        }
+        return MessagesRecentRequest(limit: limit, cursor: cursor, service: service)
+    }
+
+    private struct PhoneCallsRecentRequest {
+        let limit: Int
+        let cursor: String?
+    }
+
+    private static func parsePhoneCallsRecentArguments(_ arguments: [String]) throws -> PhoneCallsRecentRequest {
+        var limit = CallHistoryReader.defaultLimit
+        var cursor: String?
+        var seen = Set<String>()
+        var index = 0
+        while index < arguments.count {
+            let option = arguments[index]
+            guard ["--limit", "--cursor"].contains(option),
+                  seen.insert(option).inserted, index + 1 < arguments.count else {
+                throw PhoneCallsError.invalidArgument("unexpected or repeated option \(option)")
+            }
+            let value = arguments[index + 1]
+            switch option {
+            case "--limit":
+                guard let parsed = Int(value) else { throw PhoneCallsError.invalidArgument("--limit requires an integer") }
+                limit = parsed
+            case "--cursor":
+                cursor = value
+            default: break
+            }
+            index += 2
+        }
+        return PhoneCallsRecentRequest(limit: limit, cursor: cursor)
+    }
+
     private static func parseSafariBookmarkPageArguments(_ arguments: [String]) throws -> SafariBookmarkPageArguments {
         var query = SafariBookmarkQuery()
         var limit = Pagination.defaultLimit
@@ -2555,7 +2661,7 @@ struct MpiaCLI {
           mpia safari <command> [options]
 
         Unified resources:
-          resources --format json                List Contacts, Mail, Calendar, Reminders, Photos, Notes, Shortcuts, and Safari resources
+          resources --format json                List Contacts, Mail, Calendar, Reminders, Photos, Notes, Shortcuts, Safari, Messages, and Call History resources
                                              with selection, permission, and limitations
 
         Safari 0.8 commands:
@@ -2912,12 +3018,27 @@ struct MpiaCLI {
           For create/edit JSON, use --stdin for one document from stdin, or
           --input <file> for a file.
 
+        Messages 0.9.1 commands:
+          permission --format json           Report chat.db readability and Full Disk Access
+          recent [--limit <1...200>] [--cursor <cursor>]
+            [--service imessage|sms] --format json
+                                             List recent messages (metadata + bounded text)
+          Reads ~/Library/Messages/chat.db read-only. Participant handles and
+          identifiers are never returned; body text is projected to 500 chars.
+
+        Phone calls 0.9.2 commands:
+          permission --format json           Report CallHistory.storedata readability and Full Disk Access
+          recent [--limit <1...200>] [--cursor <cursor>] --format json
+                                             List recent calls (direction/time/duration/missed)
+          Reads ~/Library/Application Support/CallHistoryDB/CallHistory.storedata
+          read-only. Counterparty numbers, names, and identifiers are never returned.
+
         JSON contract:
           Version: 0.1 (independent from the CLI release version)
           Exit codes: 0 success, 1 unexpected CLI error, 2 Contacts error,
             3 ambiguous/not-found query error, 4 Mail error, 5 Calendar error,
             6 Reminders error, 7 Photos error, 8 Notes error, 9 Shortcuts error,
-            10 Safari error,
+            10 Safari error, 11 Messages error, 12 Phone calls error,
             64 usage or invalid query
           Success: {"ok": true, "contractVersion": "0.1", "data": ...}
           Failure: {"ok": false, "contractVersion": "0.1", "error": {"code": ..., "message": ...}}

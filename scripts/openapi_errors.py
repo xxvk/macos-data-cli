@@ -19,6 +19,8 @@ ERROR_MESSAGES = {
     "NOTES_ERROR": "Notes Automation is not authorized. Grant access in System Settings → Privacy & Security → Automation.",
     "SHORTCUTS_ERROR": "Shortcuts adapter error. The shortcut could not be resolved, or the operation is unsupported.",
     "SAFARI_ERROR": "Safari adapter error. Safari must be fully exited for local bookmark writes, or the Bookmarks.plist is unavailable.",
+    "MESSAGES_ERROR": "Messages adapter error. Grant Full Disk Access to the responsible process and verify the chat.db schema is supported.",
+    "PHONE_CALLS_ERROR": "Phone calls adapter error. Grant Full Disk Access to the responsible process and verify the CallHistory.storedata schema is supported.",
     "INVALID_QUERY": "Invalid or malformed arguments. Run `mpia <command> --help` for usage.",
     "ERROR": "The command failed. See the exit code for the error category.",
 }

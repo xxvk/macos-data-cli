@@ -64,3 +64,10 @@ fastlane/test_output
 # mpia docs site (Node/pnpm)
 docs-site/node_modules/
 docs-site/dist/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+# Local browser-automation artifacts
+.playwright-cli/

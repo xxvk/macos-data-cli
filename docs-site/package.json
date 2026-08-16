@@ -1,14 +1,19 @@
 {
   "name": "mpia-docs-site",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.2",
   "description": "Customer-facing Scalar documentation site for the mpia macOS data CLI.",
+  "homepage": "https://mpia-cli-doc.vercel.app/",
+  "repository": "https://github.com/xxvk/mpia-cli",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "node scripts/build-docs.mjs"
+    "build": "node scripts/build-docs.mjs",
+    "test": "pnpm run test:localization && pnpm run test:contract",
+    "test:localization": "node scripts/test-localization.mjs",
+    "test:contract": "python3 ../scripts/test_openapi_json_contract.py && python3 ../scripts/test_openapi_navigation.py"
   },
   "devDependencies": {
     "@scalar/api-reference": "^1.64.1",

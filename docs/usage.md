@@ -7,7 +7,7 @@ integration.
 ## Unified resources
 
 List the currently discoverable Contacts, Mail, Calendar, Reminders, Photos,
-Notes, Shortcuts, and Safari resource scopes in one
+Notes, Shortcuts, Safari, Messages, and Call History resource scopes in one
 machine-readable response:
 
 ```text
@@ -33,6 +33,46 @@ Safari reports one `safariLibrary` scope. Readability means the responsible
 process can read `Bookmarks.plist`; writability covers guarded local-only plist
 mutation or the Automation-backed Reading List add path. It does not imply
 iCloud synchronization, and local bookmark writes require Safari fully quit.
+Messages reports one read-only `messagesLibrary` scope and Call History reports
+one read-only `phoneLibrary` scope; readability for both requires Full Disk
+Access and is never writable. Neither exposes counterparty identifiers.
+
+## Messages (0.9.1)
+
+Read-only recent messages from the local Messages SQLite store
+(`~/Library/Messages/chat.db`). Requires Full Disk Access for the responsible
+process; `messages permission` is a status-only probe and never prompts.
+
+```text
+mpia messages permission --format json
+mpia messages recent --limit 50 --format json
+mpia messages recent --limit 20 --service imessage --format json
+mpia messages recent --limit 20 --cursor <opaque-cursor> --format json
+```
+
+`messages recent` returns newest-first, cursor-paginated metadata (`id`,
+`service`, `isFromMe`, `sentAt`, `conversationId`) plus a bounded, redacted
+plain-text projection (`text`, truncated to 500 chars). Participant handles,
+raw local IDs, and account identifiers are never returned. Read-only only: no
+send/reply, mark-read, attachment export, or any write.
+
+## Phone calls (0.9.2)
+
+Read-only recent call history from the local Call History Core Data SQLite store
+(`~/Library/Application Support/CallHistoryDB/CallHistory.storedata`). Requires
+Full Disk Access for the responsible process; `phone-calls permission` is a
+status-only probe and never prompts.
+
+```text
+mpia phone-calls permission --format json
+mpia phone-calls recent --limit 50 --format json
+mpia phone-calls recent --limit 20 --cursor <opaque-cursor> --format json
+```
+
+`phone-calls recent` returns newest-first, cursor-paginated metadata (`id`,
+`direction`, `kind`, `answered`, `missed`, `durationSeconds`, `at`). Counterparty
+numbers, names, locations, carriers, and raw local IDs are never returned.
+Read-only only: no placing calls, deleting history, or any write.
 
 ## Safari (0.8.1)
 

@@ -912,7 +912,7 @@ binary must not call private Safari frameworks or sync daemons.
 
 ### 0.9.0: Phone and Messages CLI feasibility
 
-- [ ] Investigate whether macOS Phone/FaceTime and Messages can support safe,
+- [x] Investigate whether macOS Phone/FaceTime and Messages can support safe,
   local, read-only CLI adapters for recent call history and recent messages
   - Inventory the supported macOS versions and actual installed applications;
     do not assume `Phone.app` exists or owns call history on every supported Mac
@@ -924,21 +924,93 @@ binary must not call private Safari frameworks or sync daemons.
     fingerprints, immutable connections, bounded queries, and fail-closed
     compatibility. Do not implement or expose this fallback without a recorded
     architecture and privacy decision
-- [ ] Define a metadata-first candidate contract without committing to it:
+- [x] Define a metadata-first candidate contract without committing to it:
   `phone calls recent` for direction/time/duration/missed state and
   `messages recent` for service/direction/time/conversation and bounded text
   projection. Participant handles, message bodies, attachment paths, raw local
   IDs, and account identifiers require explicit projection and redaction rules
-- [ ] Map TCC and user-consent behavior for Full Disk Access, Automation,
+- [x] Map TCC and user-consent behavior for Full Disk Access, Automation,
   Contacts resolution, Messages data, and Phone/FaceTime data. Permission status
   must not prompt; only an explicit request path may initiate ordinary consent
-- [ ] Keep 0.9.0 research and any initial adapter read-only: no send/reply,
+- [x] Keep 0.9.0 research and any initial adapter read-only: no send/reply,
   call initiation, voicemail mutation, mark-read, reaction, attachment export,
   conversation deletion, or call-history deletion
-- [ ] Produce a separate go/no-go decision for Phone/call history and Messages.
+- [x] Produce a separate go/no-go decision for Phone/call history and Messages.
   Validate parsers only with synthetic fixtures; any live smoke must be
   privacy-minimized, bounded, separately authorized, and must not print personal
   handles or content
+
+**Go/no-go（2026-08-16 已记录）**：两者均无公开框架可读历史——Phone.app / FaceTime.app 无 AppleScript sdef 且 CallKit 仅 iOS；Messages.app 的 sdef 只暴露 `send`/`login`/`logout`（无 `message` 类），读不了历史。因此 0.9 全系走「只读本地库」回退，复用 Mail 的 SQLite fast-path 模式（Full Disk Access + 运行时 schema 指纹 + immutable + 有界查询 + fail-closed）。数据源：Messages = `~/Library/Messages/chat.db`（SQLite，schema 已确认，风险较低）；Phone = `~/Library/Application Support/CallHistoryDB/CallHistory.storedata`（Core Data SQLite，schema 需逆向，风险较高）。两者均为高敏感个人数据，投影 / redaction 必须先行。结论：go。
+
+### 0.9.1: Messages adapter (read-only recent)
+
+Architecture: [Messages adapter 0.9.1](docs/development/messages-adapter-architecture.md).
+
+- [ ] `messages permission` — status-only Full Disk Access + `chat.db` readability probe (no prompt)
+- [ ] `messages recent [--limit N] [--cursor C] [--service imessage|sms]` — read-only, newest-first, cursor paginated
+- [ ] Runtime `chat.db` schema fingerprint gate (fail-closed on mismatch), immutable read-only SQLite connection, bounded query + deadline
+- [ ] Metadata-first contract: opaque local ID, `service`, `isFromMe`, timestamp, opaque conversation ID, bounded text projection (default 500-char cap, `truncated` flag)
+- [ ] Redaction: never return raw handles/phone/email/`ROWID`/`guid`/`chat_identifier`/attachment paths; live smoke prints aggregate counts only
+- [ ] No send/reply, mark-read, reaction, attachment export, or any write in 0.9.1
+
+### 0.9.2: Phone adapter (read-only recent call history)
+
+Architecture: [Phone adapter 0.9.2](docs/development/phone-adapter-architecture.md).
+
+- [x] Reverse-engineer `~/Library/Application Support/CallHistoryDB/CallHistory.storedata` (Core Data SQLite) schema locally, record a runtime fingerprint
+  - Store is a Core Data SQLite store in WAL mode; `com.apple.callhistory.databaseInfo.plist` reports `DatabaseVersionPerm = 46`.
+  - Tables: `ZCALLRECORD` (call records), `ZHANDLE` (participant handles), `ZCALLDBPROPERTIES`, `ZEMERGENCYMEDIAITEM`, `ZSAINTDAVIDSCOUNTS`, `Z_2REMOTEPARTICIPANTHANDLES` (group-call join), plus Core Data bookkeeping `Z_METADATA`/`Z_MODELCACHE`/`Z_PRIMARYKEY`.
+  - `ZCALLRECORD` key columns: `Z_PK` (primary key), `ZDATE` (TIMESTAMP = Apple-epoch **seconds**, fractional; +978307200 → Unix), `ZDURATION` (FLOAT seconds), `ZORIGINATED` (0=incoming / 1=outgoing), `ZANSWERED` (incoming answered flag), `ZCALLTYPE` (1=audio, 8=video), `ZHANDLE_TYPE` (1=phone / 2=email), `ZUNIQUE_ID` (TEXT UUID), plus `ZADDRESS`/`ZNAME`/`ZLOCATION` (participant PII — never read).
+  - Missed semantics confirmed on 272 live rows: incoming + `ZANSWERED=0` ⇒ missed (all `ZDURATION=0`); outgoing `ZANSWERED` is unreliable, use `ZDURATION>0` as "connected".
+  - Runtime fingerprint = SHA-256 over `sqlite_master` rows (same gate as Messages/Mail).
+- [x] `phone-calls permission` — status-only probe (no prompt)
+- [x] `phone-calls recent [--limit N] [--cursor C]` — direction/time/duration/missed state, newest-first, cursor paginated
+- [x] Redaction: never return raw counterparty numbers or account identifiers
+- [x] Same fail-closed, bounded, immutable, deadline discipline as Messages/Mail
+
+### 1.0.0: Docs completeness, experience, clarity, and demo app
+
+The 1.0.0 milestone is the product-polish gate: the 8 existing adapters plus
+Messages (0.9.1) and Phone (0.9.2) are all shipped, and the deliverable becomes
+"complete, clear, and installable", not just "functional". This is the first
+non-adapter milestone in the roadmap.
+
+#### 1.0.0-a: Contract and clarity (foundation)
+
+- [x] Enhance all 90 command descriptions from one-liners to multi-sentence
+  (what it does, key params, read/write boundary, safety, return shape)
+- [x] Fill the 230 schema field descriptions and the missing scalar `example`
+  values (patch/enum fields keep no example on purpose)
+- [ ] Unify field naming across adapters; flag anything that needs a contract
+  rename decision before 1.0.0
+- [ ] Keep manifest as the single source of truth: descriptions + examples flow
+  into the docs, never hand-maintained in the docs layer
+- [x] Contacts + resources batch (15 commands) done end-to-end as the template
+
+#### 1.0.0-b: Docs completeness (generated from manifest)
+
+- [ ] Per-adapter data-flow diagrams as SVG (Scalar markdown does not render
+  Mermaid), stored in `docs-site/assets`, referenced from the intro/guides
+- [ ] Per-command detailed explanation rendered from the enhanced descriptions
+- [ ] Full request JSON samples (success + error) generated from schema `example`
+- [ ] A command-overview section: commands by adapter + HTTP method mapping +
+  read/write boundary + confirmation phrases
+
+#### 1.0.0-c: Experience optimization
+
+- [ ] Developer ID signing + notarization (prerequisite for a clean `brew install`;
+  gate on Apple Developer account availability)
+- [ ] Rewrite `INSTALL.md` as a clean `brew install mpia-cli` flow (or keep the
+  explicit unsigned-boundary wording if signing is not available at 1.0.0)
+- [ ] Screenshots: demo app + CLI real-run captures (bounded count, ~5–8), placed
+  in README/INSTALL and the docs guides
+
+#### 1.0.0-d: Demo native SwiftUI macOS app
+
+- [ ] Thin SwiftUI app reusing the mpia Core/Sources: read-only showcase of each
+  adapter's data + permission status + safe dry-run previews
+- [ ] Serves as the TCC-authorized carrier and the screenshot source
+- [ ] No write apply, no GUI-coordinate automation; explicitly not a CLI re-implementation
 
 ## Cross-cutting requirements for every release
 

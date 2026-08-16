@@ -10,6 +10,8 @@ public enum CLIExitCode: Int32 {
     case notesFailure = 8
     case shortcutsFailure = 9
     case safariFailure = 10
+    case messagesFailure = 11
+    case phoneCallsFailure = 12
     case usage = 64
 }
 
@@ -23,6 +25,8 @@ public enum CLIErrorCode: String {
     case notes = "NOTES_ERROR"
     case shortcuts = "SHORTCUTS_ERROR"
     case safari = "SAFARI_ERROR"
+    case messages = "MESSAGES_ERROR"
+    case phoneCalls = "PHONE_CALLS_ERROR"
     case invalidQuery = "INVALID_QUERY"
     case cli = "CLI_ERROR"
 }

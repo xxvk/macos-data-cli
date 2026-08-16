@@ -1,8 +1,8 @@
 (function () {
   var labels = {
-    'en-US': { version: 'Version', apiTest: 'Open API test tool', apiTestUnavailable: 'API test tool unavailable' },
-    'zh-CN': { version: '版本', apiTest: '打开 API 测试工具', apiTestUnavailable: 'API 测试工具不可用' },
-    'ja-JP': { version: 'バージョン', apiTest: 'API テストツールを開く', apiTestUnavailable: 'API テストツールを利用できません' },
+    'en-US': { version: 'Version', apiTest: 'Open API test tool', apiTestFile: 'Open the docs through a local HTTP server, not directly from the HTML file.', apiTestServer: 'The local documentation server is no longer running. Restart it, then refresh this page.', apiTestRender: 'The API test tool did not finish rendering. Refresh the page and try again.' },
+    'zh-CN': { version: '版本', apiTest: '打开 API 测试工具', apiTestFile: '请通过本机 HTTP 服务打开文档，不要直接打开 HTML 文件。', apiTestServer: '本机文档服务已经停止。请重新启动服务，然后刷新此页面。', apiTestRender: 'API 测试工具未能完成渲染。请刷新页面后重试。' },
+    'ja-JP': { version: 'バージョン', apiTest: 'API テストツールを開く', apiTestFile: 'HTML ファイルを直接開かず、ローカル HTTP サーバー経由で開いてください。', apiTestServer: 'ローカルドキュメントサーバーが停止しています。再起動してからページを更新してください。', apiTestRender: 'API テストツールの描画が完了しませんでした。ページを更新して再試行してください。' },
   };
 
   var svgNamespace = 'http://www.w3.org/2000/svg';
@@ -16,9 +16,13 @@
     'note': 'M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H156.69a15.86,15.86,0,0,0,11.31-4.69L212.69,174.69A15.86,15.86,0,0,0,216,163.31V48A16,16,0,0,0,208,32ZM48,48H208V152H160a8,8,0,0,0-8,8v48H48ZM196.69,168,168,196.69V168Z',
     'lightning': 'M215.79,118.17a8,8,0,0,0-5-5.66L153.18,90.9l14.66-73.33a8,8,0,0,0-13.69-7L22.27,132.26a8,8,0,0,0,3,13.13l58.36,21.87-14.66,73.33a8,8,0,0,0,13.69,7l131.87-121.66A8,8,0,0,0,215.79,118.17Z',
     'compass': 'M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm57.66-105.66-32,64a8,8,0,0,1-3.62,3.62l-64,32a8,8,0,0,1-10.66-10.66l32-64a8,8,0,0,1,3.62-3.62l64-32a8,8,0,0,1,10.66,10.66Z',
+    'chat': 'M216,48H40A16,16,0,0,0,24,64V192a16,16,0,0,0,16,16H82.75l31.59,27.64a20,20,0,0,0,27.32,0L173.25,208H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48Zm0,144H170.24a8,8,0,0,0-5.27,2l-33.84,29.61a4,4,0,0,1-5.26,0L92,194a8,8,0,0,0-5.27-2H40V64H216Z',
+    'phone': 'M222.37,158.46l-47.11-21.11a16,16,0,0,0-18.76,4.57l-20.89,25.08a127.91,127.91,0,0,1-46.6-46.6l25.1-20.89a16,16,0,0,0,4.57-18.76L97.54,33.64A16,16,0,0,0,79.39,24.42l-44,10.15A16,16,0,0,0,23,50.15C25.27,151.89,104.11,230.73,205.85,233A16,16,0,0,0,221.43,220l10.15-44A16,16,0,0,0,222.37,158.46Z',
+    'terminal': 'M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM32,64H224V192H32Zm32,96a8,8,0,0,1-5.66-13.66L76.69,128,58.34,109.66A8,8,0,0,1,69.66,98.34l24,24a8,8,0,0,1,0,11.32l-24,24A8,8,0,0,1,64,160Zm96,0H120a8,8,0,0,1,0-16h40a8,8,0,0,1,0,16Z',
   };
 
   var groupIcons = {
+    agent: 'terminal',
     resources: 'squares-four',
     contacts: 'user',
     mail: 'envelope',
@@ -28,6 +32,8 @@
     notes: 'note',
     shortcuts: 'lightning',
     safari: 'compass',
+    messages: 'chat',
+    'phone-calls': 'phone',
   };
 
   function lang() {
@@ -95,7 +101,7 @@
       if (!label) continue;
       // The label is "N. <english> <localized>" (e.g. "0. resources 资源"),
       // so strip the number and keep the leading English token for the lookup.
-      const base = label.textContent.trim().replace(/^\d+\.\s*/, '').split(/\s+/)[0];
+      const base = label.textContent.trim().replace(/^(?:\d+|[Aa])\.\s*/, '').split(/\s+/)[0];
       const iconName = groupIcons[base];
       if (!iconName) continue;
       label.insertAdjacentElement('beforebegin', createGroupIcon(iconName));
@@ -121,11 +127,27 @@
       var opButton = firstOperation ? firstOperation.querySelector('button') : null;
       if (opButton) opButton.click();
     }
-    if (attempt < 60) {
+    // Scalar mounts operation details lazily. Allow up to 15 seconds on a
+    // cold local load before reporting a genuine failure.
+    if (attempt < 300) {
       window.setTimeout(function () { openApiTestTool(attempt + 1); }, 50);
       return;
     }
-    window.alert(text('apiTestUnavailable'));
+    reportApiTestFailure();
+  }
+
+  function reportApiTestFailure() {
+    if (window.location.protocol === 'file:') {
+      window.alert(text('apiTestFile'));
+      return;
+    }
+    fetch(window.location.href.split('#')[0], { method: 'HEAD', cache: 'no-store' })
+      .then(function (response) {
+        window.alert(text(response.ok ? 'apiTestRender' : 'apiTestServer'));
+      })
+      .catch(function () {
+        window.alert(text('apiTestServer'));
+      });
   }
 
   function revealClientSidebar(attempt, root) {

@@ -15,6 +15,8 @@ import json
 import sys
 
 from openapi_errors import CONTRACT_VERSION, error_example
+from openapi_contracts import typed_success_schema
+from openapi_navigation import numbered_commands, tag_name
 
 _TYPE_MAP = {
     "string": "string",
@@ -67,7 +69,7 @@ def method_for(leaf):
     if "permission" in name or "doctor" in name or "verify" in name or name in ("resources", "containers", "sources"):
         return "options"
     # Scalar/selection metadata maps to HEAD ("just the summary, not the data").
-    if name in ("count", "container"):
+    if name in ("count", "container", "version"):
         return "head"
     # Actions that materialize an output artifact (export) or execute (run/reveal).
     if "export" in name or "run" in name or "reveal" in name:
@@ -95,6 +97,8 @@ _EXIT_TO_HTTP = {
     8: 500,   # NOTES_ERROR
     9: 500,   # SHORTCUTS_ERROR
     10: 500,  # SAFARI_ERROR
+    11: 500,  # MESSAGES_ERROR
+    12: 500,  # PHONE_CALLS_ERROR
     64: 400,  # INVALID_QUERY (usage)
 }
 
@@ -159,9 +163,12 @@ def leaf_operation(leaf, tag=None, command="", title="", group="", leaf_name="",
         op["tags"] = [tag]
     output = leaf.get("outputSchema")
     if output:
-        op["responses"]["200"]["content"]["application/json"]["schema"] = {
-            "$ref": "#/components/schemas/" + output
+        op["responses"]["200"]["content"]["application/json"]["schema"] = typed_success_schema(output)
+    if group == "agent" and leaf_name in ("help", "version"):
+        op["responses"]["200"]["content"] = {
+            "text/plain": {"schema": {"type": "string"}}
         }
+        op["x-output-format"] = "text/plain"
     inp = leaf.get("inputSchema")
     if inp:
         op["requestBody"] = {
@@ -173,36 +180,32 @@ def leaf_operation(leaf, tag=None, command="", title="", group="", leaf_name="",
     return {method: op}
 
 
-def _tag_name(cmd, index):
-    return f"{index}. {cmd.get('name', '')}"
-
-
 def build_paths(commands):
     paths = {}
-    for index, cmd in enumerate(commands, start=0):
-        tag = _tag_name(cmd, index)
+    for prefix, cmd in numbered_commands(commands):
+        tag = tag_name(cmd, prefix)
         name = cmd.get("name", "")
         if cmd.get("kind") == "leaf":
             command = f"mpia {name}"
-            number = f"{index}.1"
+            number = f"{prefix}.1"
             paths["/" + name] = leaf_operation(cmd, tag=tag, command=command, title=name, group=name, leaf_name=name, number=number)
         elif cmd.get("kind") == "group":
             for sub_index, leaf in enumerate(cmd.get("subcommands") or [], start=1):
                 if leaf.get("kind") != "leaf":
                     continue
                 leaf_name = leaf.get("name", "")
-                command = f"mpia {name} {leaf_name}"
+                command = leaf.get("usage", "") if name == "agent" else f"mpia {name} {leaf_name}"
                 title = f"{name} {leaf_name}"
-                number = f"{index}.{sub_index}"
-                path = "/" + name + "/" + leaf_name.replace(" ", "/")
+                number = f"{prefix}.{sub_index}"
+                path = "/" + leaf_name.replace(" ", "/") if name == "agent" else "/" + name + "/" + leaf_name.replace(" ", "/")
                 paths[path] = leaf_operation(leaf, tag=tag, command=command, title=title, group=name, leaf_name=leaf_name, number=number)
     return paths
 
 
 def build_tags(commands):
     return [
-        {"name": _tag_name(cmd, index), "description": cmd.get("description", "")}
-        for index, cmd in enumerate(commands, start=0)
+        {"name": tag_name(cmd, prefix), "description": cmd.get("description", "")}
+        for prefix, cmd in numbered_commands(commands)
     ]
 
 
@@ -213,10 +216,10 @@ def build_components(source_schemas):
         "description": "Success response envelope (ok=true, contractVersion, data).",
         "properties": {
             "ok": {"type": "boolean", "const": True},
-            "contractVersion": {"type": "string"},
+            "contractVersion": {"type": "string", "pattern": r"^0\.1$", "minLength": 3, "maxLength": 3},
             "data": {},
         },
-        "required": ["ok", "contractVersion"],
+        "required": ["ok", "contractVersion", "data"],
         "example": {
             "ok": True,
             "contractVersion": CONTRACT_VERSION,
@@ -228,17 +231,17 @@ def build_components(source_schemas):
         "description": "Error response envelope (ok=false, error.code, error.message).",
         "properties": {
             "ok": {"type": "boolean", "const": False},
-            "contractVersion": {"type": "string"},
+            "contractVersion": {"type": "string", "pattern": r"^0\.1$", "minLength": 3, "maxLength": 3},
             "error": {
                 "type": "object",
                 "properties": {
-                    "code": {"type": "string", "description": "Stable error code (e.g. CONTACTS_ERROR)."},
-                    "message": {"type": "string", "description": "Human-readable error message."},
+                    "code": {"type": "string", "pattern": r"^[A-Z][A-Z0-9_]*$", "minLength": 1, "maxLength": 128, "description": "Stable error code (e.g. CONTACTS_ERROR)."},
+                    "message": {"type": "string", "minLength": 1, "maxLength": 4096, "description": "Human-readable error message."},
                 },
-                "required": ["code"],
+                "required": ["code", "message"],
             },
         },
-        "required": ["ok", "error"],
+        "required": ["ok", "contractVersion", "error"],
         "example": error_example("ERROR"),
     }
     return schemas
@@ -258,15 +261,15 @@ def main():
                 "Paths mirror the CLI command tree (CLI-faithful) with slash-separated "
                 "subcommands; query parameters are CLI flags.\n\n"
                 "HTTP methods are a semantic mapping:\n"
-                "- OPTIONS for permission/discovery/verification\n"
-                "- HEAD for scalar metadata\n"
-                "- GET for reads\n"
-                "- POST for create/execute/export\n"
-                "- PUT for full replace\n"
-                "- PATCH for partial edit\n"
-                "- DELETE for removal\n\n"
-                "Write-safety (dry-run/apply/confirmation) and exit codes "
-                "are preserved as x-* extensions."
+                "| HTTP method | CLI semantics |\n"
+                "| --- | --- |\n"
+                "| `OPTIONS` | Permission, discovery, or verification |\n"
+                "| `HEAD` | Scalar metadata |\n"
+                "| `GET` | Read |\n"
+                "| `POST` | Create, execute, or export |\n"
+                "| `PUT` | Full replacement |\n"
+                "| `PATCH` | Partial edit |\n"
+                "| `DELETE` | Delete |"
             ),
         },
         "paths": build_paths(inner.get("commands", [])),

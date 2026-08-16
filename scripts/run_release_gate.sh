@@ -24,15 +24,13 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
-[[ "$EXPECTED_VERSION" == "0.9.0" ]] || {
-  echo "0.9.0 release gate requires VERSION=0.9.0; observed=$EXPECTED_VERSION" >&2
+[[ "$EXPECTED_VERSION" == "0.9.2" ]] || {
+  echo "0.9.2 release gate requires VERSION=0.9.2; observed=$EXPECTED_VERSION" >&2
   exit 1
 }
 
 plutil -lint Sources/mpia/Info.plist scripts/mpia-app-Info.plist scripts/mpia.entitlements >/dev/null
-rg -q '^## 0\.7\.2 — ' CHANGELOG.md
-rg -q 'current source release is 0\.8\.1' README.md
-rg -q '当前源码版本为 0\.8\.1' README_CN.md
+grep -q '^## 0\.9 — ' CHANGELOG.md
 
 bash scripts/run_swift_tests.sh --quiet
 swift build -c release

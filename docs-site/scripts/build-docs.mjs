@@ -2,6 +2,7 @@ import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path';
 import { dist, docsSiteRoot, languages, openApiPath } from './build-context.mjs';
 import { localizeOpenApiSpec } from './localize.mjs';
+import { addRoadmapSections } from './roadmap-sections.mjs';
 import { referencePage } from './scalar-page.mjs';
 
 rmSync(dist, { recursive: true, force: true });
@@ -20,14 +21,21 @@ if (sourceSpec.openapi !== '3.1.0') {
   throw new Error('docs/openapi.json is not OpenAPI 3.1.0. Run scripts/generate_openapi.py locally first.');
 }
 
+const semanticsHeadings = {
+  'en-US': 'OpenAPI semantic mapping',
+  'zh-CN': 'OpenAPI 语义映射',
+  'ja-JP': 'OpenAPI の意味マッピング',
+};
+
 // The overview is rendered by Scalar as the spec's `info.description`, exactly
 // like aim-robot-platform: no separate landing page.
 for (const { code } of languages) {
   const localized = localizeOpenApiSpec(sourceSpec, code);
+  addRoadmapSections(localized, code);
   const overviewMarkdown = readFileSync(resolve(docsSiteRoot, 'guides', code, 'overview.md'), 'utf8');
   localized.info.description = [
-    localized.info.description.trim(),
     overviewMarkdown.trim(),
+    `### ${semanticsHeadings[code]}\n\n${localized.info.description.trim()}`,
   ].join('\n\n');
 
   mkdirSync(resolve(dist, code), { recursive: true });

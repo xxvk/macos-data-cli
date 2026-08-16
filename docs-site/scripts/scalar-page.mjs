@@ -1,10 +1,24 @@
 import { languages } from './build-context.mjs';
 
 const brand = {
-  'en-US': { title: 'mpia', tagline: 'macOS personal intelligent access for AI agents' },
-  'zh-CN': { title: 'mpia', tagline: '面向 AI Agent 的 macOS 个人智能访问' },
-  'ja-JP': { title: 'mpia', tagline: 'AI エージェント向け macOS パーソナルインテリジェントアクセス' },
+  'en-US': {
+    title: 'mpia',
+    tagline: 'macOS personal intelligent access for AI agents',
+    description: 'Interactive command reference for the local-first mpia macOS data CLI.',
+  },
+  'zh-CN': {
+    title: 'mpia',
+    tagline: '面向 AI Agent 的 macOS 个人情资访问',
+    description: '面向 Agent 和开发者的 mpia 本机 macOS 数据 CLI 交互式命令参考。',
+  },
+  'ja-JP': {
+    title: 'mpia',
+    tagline: 'AI エージェント向け macOS パーソナルインテリジェントアクセス',
+    description: 'ローカルファーストの mpia macOS データ CLI 向けインタラクティブコマンドリファレンス。',
+  },
 };
+
+const siteOrigin = 'https://mpia-cli-doc.vercel.app';
 
 const shellUi = {
   'en-US': { search: 'Search commands' },
@@ -36,6 +50,7 @@ function serialize(value) {
 
 export function referencePage({ language, spec, assetPrefix = '../assets', rootPrefix = '../', languageHref }) {
   const b = brand[language];
+  const canonicalUrl = `${siteOrigin}/${language}/index.html`;
   const config = {
     content: spec,
     theme: 'alternate',
@@ -53,8 +68,17 @@ export function referencePage({ language, spec, assetPrefix = '../assets', rootP
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="${b.description}">
+  <meta name="robots" content="index,follow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="mpia">
+  <meta property="og:title" content="${b.title} · ${b.tagline}">
+  <meta property="og:description" content="${b.description}">
+  <meta property="og:url" content="${canonicalUrl}">
   <title>${b.title} · ${b.tagline}</title>
+  <link rel="canonical" href="${canonicalUrl}">
+  ${languages.map(({ code }) => `<link rel="alternate" hreflang="${code}" href="${siteOrigin}/${code}/index.html">`).join('\n  ')}
+  <link rel="alternate" hreflang="x-default" href="${siteOrigin}/en-US/index.html">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,700;1,700&display=swap" rel="stylesheet">

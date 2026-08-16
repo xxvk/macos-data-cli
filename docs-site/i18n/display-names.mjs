@@ -2,6 +2,7 @@
 // English is the source language; zh-CN / ja-JP provide the localized display names.
 
 export const resourceNames = {
+  agent: { 'en-US': 'Readable', 'zh-CN': '可读接口', 'ja-JP': '読み取り可能' },
   resources: { 'zh-CN': '资源', 'ja-JP': 'リソース' },
   contacts: { 'zh-CN': '通讯录', 'ja-JP': '連絡先' },
   mail: { 'zh-CN': '邮件', 'ja-JP': 'メール' },
@@ -10,10 +11,16 @@ export const resourceNames = {
   photos: { 'zh-CN': '照片', 'ja-JP': '写真' },
   notes: { 'zh-CN': '笔记', 'ja-JP': 'メモ' },
   shortcuts: { 'zh-CN': '快捷指令', 'ja-JP': 'ショートカット' },
-  safari: { 'zh-CN': 'Safari', 'ja-JP': 'Safari' },
+  safari: { 'zh-CN': '浏览器', 'ja-JP': 'Safari' },
+  messages: { 'zh-CN': '信息', 'ja-JP': 'メッセージ' },
+  'phone-calls': { 'zh-CN': '通话记录', 'ja-JP': '通話履歴' },
 };
 
 export const leafNames = {
+  'agent help': { 'en-US': 'CLI Help', 'zh-CN': 'CLI 帮助', 'ja-JP': 'CLI ヘルプ' },
+  'agent manifest': { 'en-US': 'Machine-readable Manifest', 'zh-CN': '机器可读清单', 'ja-JP': '機械可読マニフェスト' },
+  'agent version': { 'en-US': 'Version', 'zh-CN': '版本', 'ja-JP': 'バージョン' },
+  'agent resources': { 'en-US': 'Resource Discovery', 'zh-CN': '资源发现', 'ja-JP': 'リソース検出' },
   permission: { 'zh-CN': '系统授权', 'ja-JP': 'システム認可' },
   count: { 'zh-CN': '计数', 'ja-JP': '件数' },
   containers: { 'zh-CN': '容器列表', 'ja-JP': 'コンテナ一覧' },
@@ -37,6 +44,10 @@ export const leafNames = {
   lists: { 'zh-CN': '列表', 'ja-JP': 'リスト一覧' },
   complete: { 'zh-CN': '完成', 'ja-JP': '完了' },
   reopen: { 'zh-CN': '重新打开', 'ja-JP': '再開' },
+  recent: { 'zh-CN': '最近记录', 'ja-JP': '最近の履歴' },
+  'messages permission': { 'zh-CN': '信息权限', 'ja-JP': 'メッセージ権限' },
+  'messages recent': { 'zh-CN': '最近信息', 'ja-JP': '最近のメッセージ' },
+  'phone-calls recent': { 'zh-CN': '最近通话', 'ja-JP': '最近の通話' },
   albums: { 'zh-CN': '相册列表', 'ja-JP': 'アルバム一覧' },
   folders: { 'zh-CN': '文件夹列表', 'ja-JP': 'フォルダ一覧' },
   rename: { 'zh-CN': '重命名', 'ja-JP': '名称変更' },
@@ -50,6 +61,8 @@ export const leafNames = {
   'attachments export': { 'zh-CN': '附件导出', 'ja-JP': '添付書き出し' },
   'folder create': { 'zh-CN': '文件夹创建', 'ja-JP': 'フォルダ作成' },
   'folder rename': { 'zh-CN': '文件夹重命名', 'ja-JP': 'フォルダ名称変更' },
+  'folder move': { 'zh-CN': '文件夹移动', 'ja-JP': 'フォルダ移動' },
+  'folder delete': { 'zh-CN': '文件夹删除', 'ja-JP': 'フォルダ削除' },
   'write-account status': { 'zh-CN': '写入账户状态', 'ja-JP': '書き込みアカウント状態' },
   'write-account bind': { 'zh-CN': '写入账户绑定', 'ja-JP': '書き込みアカウントバインド' },
   'write-account clear': { 'zh-CN': '写入账户清除', 'ja-JP': '書き込みアカウント解除' },
@@ -66,8 +79,14 @@ export const leafNames = {
   'bookmarks get': { 'zh-CN': '书签获取', 'ja-JP': 'ブックマーク取得' },
   'bookmarks create': { 'zh-CN': '书签创建', 'ja-JP': 'ブックマーク作成' },
   'bookmarks edit': { 'zh-CN': '书签编辑', 'ja-JP': 'ブックマーク編集' },
+  'bookmarks move': { 'zh-CN': '书签移动', 'ja-JP': 'ブックマーク移動' },
   'bookmarks delete': { 'zh-CN': '书签删除', 'ja-JP': 'ブックマーク削除' },
+  'folders create': { 'zh-CN': '文件夹创建', 'ja-JP': 'フォルダ作成' },
+  'folders rename': { 'zh-CN': '文件夹重命名', 'ja-JP': 'フォルダ名称変更' },
+  'folders move': { 'zh-CN': '文件夹移动', 'ja-JP': 'フォルダ移動' },
+  'folders delete': { 'zh-CN': '文件夹删除', 'ja-JP': 'フォルダ削除' },
   'reading-list list': { 'zh-CN': '阅读列表', 'ja-JP': 'リーディングリスト一覧' },
+  'reading-list query': { 'zh-CN': '阅读列表查询', 'ja-JP': 'リーディングリスト検索' },
   'reading-list get': { 'zh-CN': '阅读列表获取', 'ja-JP': 'リーディングリスト取得' },
   'reading-list add': { 'zh-CN': '阅读列表添加', 'ja-JP': 'リーディングリスト追加' },
 };

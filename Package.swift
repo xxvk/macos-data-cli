@@ -44,6 +44,14 @@ let package = Package(
             name: "SafariAdapter",
             targets: ["SafariAdapter"]
         ),
+        .library(
+            name: "MessagesAdapter",
+            targets: ["MessagesAdapter"]
+        ),
+        .library(
+            name: "PhoneAdapter",
+            targets: ["PhoneAdapter"]
+        ),
         .executable(
             name: "mpia",
             targets: ["mpia"]
@@ -123,9 +131,31 @@ let package = Package(
                 .swiftLanguageMode(.v6)
             ]
         ),
+        .target(
+            name: "MessagesAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Messages",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3")
+            ]
+        ),
+        .target(
+            name: "PhoneAdapter",
+            dependencies: ["Core"],
+            path: "Sources/Phone",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3")
+            ]
+        ),
         .executableTarget(
             name: "mpia",
-            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter", "ShortcutsAdapter", "SafariAdapter"],
+            dependencies: ["Core", "ContactsAdapter", "MailAdapter", "CalendarAdapter", "RemindersAdapter", "PhotosAdapter", "NotesAdapter", "ShortcutsAdapter", "SafariAdapter", "MessagesAdapter", "PhoneAdapter"],
             exclude: ["Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -204,6 +234,26 @@ let package = Package(
             dependencies: ["SafariAdapter", "Core"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "MessagesTests",
+            dependencies: ["MessagesAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3")
+            ]
+        ),
+        .testTarget(
+            name: "PhoneTests",
+            dependencies: ["PhoneAdapter"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3")
             ]
         ),
         .testTarget(

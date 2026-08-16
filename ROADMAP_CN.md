@@ -703,7 +703,7 @@ iCloud 同步，正式二进制也不得调用 Safari 私有 Framework 或同步
 
 ### 0.9.0：Phone 与 Messages CLI 可行性调研
 
-- [ ] 调研 macOS Phone/FaceTime 与 Messages 能否形成安全、本机、只读的 CLI adapter，目标是
+- [x] 调研 macOS Phone/FaceTime 与 Messages 能否形成安全、本机、只读的 CLI adapter，目标是
   获取最近通话记录与最近消息
   - 先盘点受支持 macOS 版本和实际安装 app；不得假定每台受支持 Mac 都存在 `Phone.app`，
     也不得假定它一定是通话记录的 owner
@@ -712,16 +712,82 @@ iCloud 同步，正式二进制也不得调用 Safari 私有 Framework 或同步
   - 如果公共接口不足，另行评估严格只读的本地 database/index：要求 Full Disk Access、运行时
     schema fingerprint、immutable connection、有界 query 和版本不兼容时 fail closed；没有形成
     单独架构与隐私决策前，不实现或公开该 fallback
-- [ ] 先设计但不承诺 metadata-first 候选 contract：`phone calls recent` 返回方向、时间、时长、
+- [x] 先设计但不承诺 metadata-first 候选 contract：`phone calls recent` 返回方向、时间、时长、
   missed 状态；`messages recent` 返回 service、方向、时间、conversation 和有界正文 projection。
   联系方式、正文、attachment path、raw local ID 与 account identifier 必须另行定义显式 projection
   和脱敏规则
-- [ ] 明确 Full Disk Access、Automation、Contacts 名称解析、Messages 数据和 Phone/FaceTime
+- [x] 明确 Full Disk Access、Automation、Contacts 名称解析、Messages 数据和 Phone/FaceTime
   数据对应的 TCC/用户授权行为。permission status 不得弹窗；只有显式 request 路径可发起普通授权
-- [ ] 0.9.0 调研及可能的初始 adapter 保持只读：不发送/回复消息、不发起通话、不修改 voicemail、
+- [x] 0.9.0 调研及可能的初始 adapter 保持只读：不发送/回复消息、不发起通话、不修改 voicemail、
   不 mark-read、不 reaction、不导出 attachment、不删除 conversation 或通话记录
-- [ ] Phone/通话记录与 Messages 分别给出 go/no-go 决策。parser 只使用 synthetic fixture；任何
+- [x] Phone/通话记录与 Messages 分别给出 go/no-go 决策。parser 只使用 synthetic fixture；任何
   真实 smoke 都必须隐私最小化、有界、另行明确授权，且不得打印个人联系方式或正文
+
+**Go/no-go（2026-08-16 已记录）**：两者均无公开框架可读历史——Phone.app / FaceTime.app 无
+AppleScript sdef 且 CallKit 仅 iOS；Messages.app 的 sdef 只暴露 `send`/`login`/`logout`（无
+`message` 类），读不了历史。因此 0.9 全系走「只读本地库」回退，复用 Mail 的 SQLite fast-path
+模式（Full Disk Access + 运行时 schema 指纹 + immutable + 有界查询 + fail-closed）。数据源：
+Messages = `~/Library/Messages/chat.db`（SQLite，schema 已确认，风险较低）；Phone =
+`~/Library/Application Support/CallHistoryDB/CallHistory.storedata`（Core Data SQLite，schema 需
+逆向，风险较高）。两者均为高敏感个人数据，投影/redaction 必须先行。结论：go。
+
+### 0.9.1：Messages adapter（只读 recent）
+
+架构：[Messages adapter 0.9.1](docs/development/messages-adapter-architecture.md)。
+
+- [x] `messages permission` — 状态查询：Full Disk Access + `chat.db` 可读性探测（不弹窗）
+- [x] `messages recent [--limit N] [--cursor C] [--service imessage|sms]` — 只读、最新在前、游标分页
+- [x] 运行时 `chat.db` schema 指纹门禁（不匹配即 fail-closed）、immutable 只读 SQLite、有界 query + deadline
+- [x] metadata-first 契约：opaque local ID、`service`、`isFromMe`、时间戳、opaque conversation ID、有界正文投影（默认 500 字符截断 + `truncated` 标记）
+- [x] 脱敏：绝不返回 raw handle/电话/邮箱/`ROWID`/`guid`/`chat_identifier`/attachment path；live smoke 只打印聚合计数
+- [x] 0.9.1 不发消息/回复、mark-read、reaction、附件导出或任何写入
+
+### 0.9.2：Phone adapter（只读最近通话记录）
+
+架构：[Phone adapter 0.9.2](docs/development/phone-adapter-architecture.md)。
+
+- [x] 逆向 `~/Library/Application Support/CallHistoryDB/CallHistory.storedata`（Core Data SQLite）schema，记录运行时指纹
+  - 存储为 WAL 模式的 Core Data SQLite；`com.apple.callhistory.databaseInfo.plist` 报告 `DatabaseVersionPerm = 46`。
+  - 表：`ZCALLRECORD`（通话记录）、`ZHANDLE`（参与者句柄）、`ZCALLDBPROPERTIES`、`ZEMERGENCYMEDIAITEM`、`ZSAINTDAVIDSCOUNTS`、`Z_2REMOTEPARTICIPANTHANDLES`（群呼关联），以及 Core Data 记账 `Z_METADATA`/`Z_MODELCACHE`/`Z_PRIMARYKEY`。
+  - `ZCALLRECORD` 关键列：`Z_PK`（主键）、`ZDATE`（TIMESTAMP = Apple 纪元**秒**，带小数；+978307200 → Unix）、`ZDURATION`（FLOAT 秒）、`ZORIGINATED`（0=呼入 / 1=呼出）、`ZANSWERED`（呼入已接听标记）、`ZCALLTYPE`（1=音频、8=视频）、`ZHANDLE_TYPE`（1=电话 / 2=邮箱）、`ZUNIQUE_ID`（TEXT UUID），另有 `ZADDRESS`/`ZNAME`/`ZLOCATION`（参与者 PII——永不读取）。
+  - 未接语义在 272 行真实数据上确认：呼入 + `ZANSWERED=0` ⇒ 未接（`ZDURATION` 全为 0）；呼出 `ZANSWERED` 不可靠，以 `ZDURATION>0` 判定「已接通」。
+  - 运行时指纹 = 对 `sqlite_master` 行做 SHA-256（与 Messages/Mail 同门）。
+- [x] `phone-calls permission` — 状态查询（不弹窗）
+- [x] `phone-calls recent [--limit N] [--cursor C]` — 方向/时间/时长/未接状态，最新在前，游标分页
+- [x] 脱敏：绝不返回对方号码原文或账号标识
+- [x] 与 Messages/Mail 相同的 fail-closed、有界、immutable、deadline 纪律
+
+### 1.0.0：文档完备、体验、清晰度与 demo app
+
+1.0.0 是产品打磨门：8 个既有 adapter + Messages（0.9.1）+ Phone（0.9.2）全部交付后，
+交付物从「可用」升级为「完备、清晰、可安装」。这是路线图里第一个非 adapter 里程碑。
+
+#### 1.0.0-a：契约与清晰度（地基）
+
+- [x] 把 90 个命令的描述从单句扩成多句（做什么、关键参数、读写边界、安全、返回结构）
+- [x] 补齐 230 个字段描述和缺失的标量 `example`（patch/enum 字段按设计不设 example）
+- [ ] 统一各 adapter 字段命名；需要改契约的项在 1.0.0 前单独决策
+- [ ] manifest 保持单一事实源：描述 + example 流入文档，绝不在文档层手写维护
+- [x] contacts + resources 批（15 个命令）已端到端完成，作为模板
+
+#### 1.0.0-b：文档完备（从 manifest 生成）
+
+- [ ] per-adapter 数据流图（SVG；Scalar markdown 不渲染 Mermaid），放 `docs-site/assets`
+- [ ] 从增强后的描述渲染每命令详细说明
+- [ ] 从 schema `example` 生成完整请求 JSON sample（成功 + 错误）
+- [ ] 命令总览章节：按 adapter 列命令 + HTTP 方法映射 + 读写边界 + 确认短语
+
+#### 1.0.0-c：体验优化
+
+- [ ] Developer ID 签名 + 公证（清爽 `brew install` 的前提；取决于 Apple Developer 账号）
+- [ ] 重写 `INSTALL.md` 为清爽的 `brew install mpia-cli` 流程（若 1.0.0 时签名未就绪则保留明确的 unsigned 边界说明）
+- [ ] 截图：demo app + CLI 真实运行截图（有界数量，约 5–8 张），放 README/INSTALL 与 docs guide
+
+#### 1.0.0-d：Demo 原生 SwiftUI macOS app
+
+- [ ] 薄 SwiftUI app，复用 mpia Core/Sources：只读展示各 adapter 数据 + 权限状态 + 安全 dry-run 预览
+- [ ] 兼作 TCC 授权承载进程与截图来源
+- [ ] 不做写 apply、不做 GUI 坐标自动化；明确不是 CLI 重实现
 
 ## 每个版本的横向完成条件
 

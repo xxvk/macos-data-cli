@@ -3,6 +3,8 @@
 This repository is a CLI, not an Agent Skill. Agents and Skills that invoke
 `mpia` should read these files before using it:
 
+0. `https://mpia-cli-doc.vercel.app/` for the hosted, searchable command
+   reference; repository Markdown remains the auditable source of truth
 1. `README.md` or `README_CN.md` for the supported command surface
 2. `docs/usage.md` or `docs/usage_CN.md` for command details and examples
 3. `docs/development/rules.md` or `docs/development/rules_CN.md` for safety rules
@@ -47,6 +49,11 @@ For Shortcuts 0.7.1 authoring, also read:
 14. `docs/development/safari-adapter-architecture.md` or the Chinese version
     before reading Safari data, adding a Reading List item, or investigating
     direct bookmark mutation
+15. `docs/development/messages-adapter-architecture.md` or the Chinese version
+    before reading Messages data or changing the `messages` read-only boundary
+16. `docs/development/phone-adapter-architecture.md` or the Chinese version
+    before reading Call History data or changing the `phone-calls` read-only
+    boundary
 
 Shortcuts authoring rules:
 
@@ -467,6 +474,51 @@ not assume a Homebrew or Release binary while development is in progress.
   authorization and zero-residue cleanup. Existing personal Safari data is
   never a mutation fixture.
 
+## Non-negotiable Messages rules
+
+- Messages 0.9.1 is read-only. It reads `~/Library/Messages/chat.db` through a
+  fail-closed SQLite fast path; never write the database, WAL/SHM sidecars, or
+  Messages account configuration.
+- `messages permission` is status-only and must not prompt. There is no
+  `--request` path. Reading requires Full Disk Access for the responsible process.
+- Run a runtime schema fingerprint and a bounded structural gate before any
+  query; an unknown schema is fail-closed and must not be guessed.
+- `messages recent` is newest-first, cursor-paginated, default 50 / max 200,
+  with a query deadline. `--service` accepts `imessage` or `sms`.
+- Never return or log raw `ROWID`, `guid`, `chat_identifier`, participant
+  handles, phone numbers, emails, or attachment paths. Only opaque `msg_` /
+  `chat_` / `cur_` tokens cross the contract.
+- Body text is a projection truncated to a hard 500-char cap; the response marks
+  `truncated` when the cap is hit.
+- No send/reply, mark-read, reaction, attachment export, or any write in 0.9.1.
+- Live smoke output is aggregate-only (counts, truncation, completeness); it
+  must never print bodies, handles, or identifiers. Use
+  `scripts/run_messages_read_smoke.sh`, which stops before any query when Full
+  Disk Access is unavailable.
+
+## Non-negotiable Phone rules
+
+- Phone 0.9.2 is read-only. It reads
+  `~/Library/Application Support/CallHistoryDB/CallHistory.storedata` (a Core
+  Data SQLite store in WAL mode) through a fail-closed SQLite fast path; never
+  write the store or its WAL/SHM sidecars.
+- `phone-calls permission` is status-only and must not prompt. There is no
+  `--request` path. Reading requires Full Disk Access for the responsible process.
+- Run a runtime schema fingerprint and a bounded structural gate (required
+  `ZCALLRECORD` columns) before any query; an unknown schema is fail-closed.
+- `phone-calls recent` is newest-first, cursor-paginated, default 50 / max 200,
+  with a query deadline. `ZDATE` is Apple-epoch **seconds** (not nanoseconds);
+  `ZORIGINATED` is direction (0=incoming, 1=outgoing); incoming +
+  `ZANSWERED=0` is missed; outgoing "connected" is derived from `ZDURATION>0`.
+- Never return or log counterparty numbers, emails, names, locations, carriers,
+  `ZADDRESS`, `ZNAME`, `ZUNIQUE_ID`, or `ZHANDLE.ZVALUE`/`ZNORMALIZEDVALUE`.
+  Only opaque `call_` / `cur_` tokens cross the contract.
+- No placing calls, deleting history, marking read, voicemail, or any write.
+- Live smoke output is aggregate-only (counts, truncation, completeness); it
+  must never print counterparty identifiers. Use
+  `scripts/run_phone_calls_read_smoke.sh`, which stops before any query when
+  Full Disk Access is unavailable.
+
 ## Local verification
 
 These checks are local-only and do not require CI:
@@ -494,6 +546,8 @@ bash scripts/run_notes_folder_integration.sh
 bash scripts/run_shortcuts_authoring_smoke.sh
 bash scripts/run_safari_read_smoke.sh
 bash scripts/run_safari_dry_run_smoke.sh
+bash scripts/run_messages_read_smoke.sh
+bash scripts/run_phone_calls_read_smoke.sh
 # Add --apply only for an explicitly authorized disposable signed-app gate.
 bash scripts/run_local_calendar_integration.sh
 bash scripts/run_installed_release_smoke.sh

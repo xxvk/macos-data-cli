@@ -5,7 +5,7 @@ Automation 接口访问 macOS 数据，Agent 不需要专用集成即可调用�
 
 ## 统一资源查询
 
-使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos、Notes、Shortcuts 和 Safari 资源作用域：
+使用一个机器可读响应查看当前可发现的 Contacts、Mail、Calendar、Reminders、Photos、Notes、Shortcuts、Safari、Messages 和 Call History 资源作用域：
 
 ```text
 mpia resources --format json
@@ -24,6 +24,41 @@ Automation 状态，不代表可以访问 Notes 私有数据库。
 Safari 报告一个 `safariLibrary` scope。readable 表示负责执行进程可读取
 `Bookmarks.plist`；writable 表示能够进行受保护的 local-only plist mutation，或 Safari
 Automation 当前允许 Reading List add。它不表示 iCloud 同步可用。
+Messages 报告一个只读 `messagesLibrary` scope，Call History 报告一个只读 `phoneLibrary`
+scope；两者 readable 都要求 Full Disk Access，且永不 writable，也绝不暴露对方标识。
+
+## Messages（0.9.1）
+
+只读读取本机 Messages SQLite 库（`~/Library/Messages/chat.db`）的近期消息。要求负责
+执行进程具备 Full Disk Access；`messages permission` 是状态查询，绝不弹窗。
+
+```text
+mpia messages permission --format json
+mpia messages recent --limit 50 --format json
+mpia messages recent --limit 20 --service imessage --format json
+mpia messages recent --limit 20 --cursor <opaque-cursor> --format json
+```
+
+`messages recent` 返回最新在前、游标分页的 metadata（`id`、`service`、`isFromMe`、
+`sentAt`、`conversationId`）+ 有界脱敏的纯文本投影（`text`，截断到 500 字符）。参与者
+handle、原始本地 ID 与账号标识绝不返回。只读：不做发消息/回复、已读回执、附件导出或
+任何写入。
+
+## Phone calls（0.9.2）
+
+只读读取本机通话历史 Core Data SQLite 库（
+`~/Library/Application Support/CallHistoryDB/CallHistory.storedata`）的近期通话。要求负责
+执行进程具备 Full Disk Access；`phone-calls permission` 是状态查询，绝不弹窗。
+
+```text
+mpia phone-calls permission --format json
+mpia phone-calls recent --limit 50 --format json
+mpia phone-calls recent --limit 20 --cursor <opaque-cursor> --format json
+```
+
+`phone-calls recent` 返回最新在前、游标分页的 metadata（`id`、`direction`、`kind`、
+`answered`、`missed`、`durationSeconds`、`at`）。对方号码、姓名、位置、运营商与原始
+本地 ID 绝不返回。只读：不发起通话、不删历史、不做任何写入。
 
 ## Safari（0.8.1）
 
