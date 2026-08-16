@@ -5,8 +5,7 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist",
   "redirects": [
-    { "source": "/", "destination": "/en-US/index.html", "permanent": false },
-    { "source": "/reference", "destination": "/reference/en-US/index.html", "permanent": false }
+    { "source": "/", "destination": "/en-US/index.html", "permanent": false }
   ],
   "headers": [
     {

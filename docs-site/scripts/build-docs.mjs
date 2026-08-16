@@ -1,9 +1,8 @@
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { marked } from 'marked';
 import { dist, docsSiteRoot, languages, openApiPath } from './build-context.mjs';
 import { localizeOpenApiSpec } from './localize.mjs';
-import { landingPage, referencePage } from './scalar-page.mjs';
+import { referencePage } from './scalar-page.mjs';
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(resolve(dist, 'assets'), { recursive: true });
@@ -21,28 +20,22 @@ if (sourceSpec.openapi !== '3.1.0') {
   throw new Error('docs/openapi.json is not OpenAPI 3.1.0. Run scripts/generate_openapi.py locally first.');
 }
 
+// The overview is rendered by Scalar as the spec's `info.description`, exactly
+// like aim-robot-platform: no separate landing page.
 for (const { code } of languages) {
   const localized = localizeOpenApiSpec(sourceSpec, code);
   const overviewMarkdown = readFileSync(resolve(docsSiteRoot, 'guides', code, 'overview.md'), 'utf8');
-  const bodyHtml = marked.parse(overviewMarkdown);
+  localized.info.description = [
+    localized.info.description.trim(),
+    overviewMarkdown.trim(),
+  ].join('\n\n');
 
   mkdirSync(resolve(dist, code), { recursive: true });
-  writeFileSync(resolve(dist, code, 'index.html'), landingPage({
-    language: code,
-    bodyHtml,
-    assetPrefix: '../assets',
-    rootPrefix: '../',
-    referenceHref: `../reference/${code}/index.html`,
-    languageHref: (target) => `../${target}/index.html`,
-  }));
-
-  mkdirSync(resolve(dist, 'reference', code), { recursive: true });
-  writeFileSync(resolve(dist, 'reference', code, 'index.html'), referencePage({
+  writeFileSync(resolve(dist, code, 'index.html'), referencePage({
     language: code,
     spec: localized,
-    assetPrefix: '../../assets',
-    rootPrefix: '../../',
-    overviewHref: `../../${code}/index.html`,
+    assetPrefix: '../assets',
+    rootPrefix: '../',
     languageHref: (target) => `../${target}/index.html`,
   }));
 }

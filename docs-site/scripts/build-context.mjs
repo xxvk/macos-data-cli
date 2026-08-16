@@ -10,7 +10,7 @@ export const dist = process.env.MPIA_DOCS_DIST
 
 export const languages = [
   { code: 'en-US', label: 'English', scalarLocale: 'en' },
-  { code: 'zh-CN', label: '简体中文', scalarLocale: 'zh-CN' },
+  { code: 'zh-CN', label: '简中', scalarLocale: 'zh-CN' },
   { code: 'ja-JP', label: '日本語', scalarLocale: 'ja-JP' },
 ];
 

@@ -15,6 +15,7 @@ public struct JSONSchema: Codable, Sendable {
     public let enumValues: [String]?
     public let format: String?
     public let additionalProperties: Bool?
+    public let example: JSONValue?
 
     public init(
         type: JSONType? = nil,
@@ -26,7 +27,8 @@ public struct JSONSchema: Codable, Sendable {
         ref: String? = nil,
         enumValues: [String]? = nil,
         format: String? = nil,
-        additionalProperties: Bool? = nil
+        additionalProperties: Bool? = nil,
+        example: JSONValue? = nil
     ) {
         self.type = type
         self.title = title
@@ -38,10 +40,11 @@ public struct JSONSchema: Codable, Sendable {
         self.enumValues = enumValues
         self.format = format
         self.additionalProperties = additionalProperties
+        self.example = example
     }
 
     enum CodingKeys: String, CodingKey {
-        case type, title, description, properties, required, items, format, additionalProperties
+        case type, title, description, properties, required, items, format, additionalProperties, example
         case ref = "$ref"
         case enumValues = "enum"
     }
@@ -81,16 +84,20 @@ extension JSONSchema {
         JSONSchema(type: .array, items: JSONSchemaBox(items))
     }
 
-    public static func string(_ description: String? = nil, format: String? = nil) -> JSONSchema {
-        JSONSchema(type: .string, description: description, format: format)
+    public static func string(_ description: String? = nil, format: String? = nil, example: JSONValue? = nil) -> JSONSchema {
+        JSONSchema(type: .string, description: description, format: format, example: example)
     }
 
-    public static func integer(_ description: String? = nil) -> JSONSchema {
-        JSONSchema(type: .integer, description: description)
+    public static func integer(_ description: String? = nil, example: JSONValue? = nil) -> JSONSchema {
+        JSONSchema(type: .integer, description: description, example: example)
     }
 
-    public static func boolean(_ description: String? = nil) -> JSONSchema {
-        JSONSchema(type: .boolean, description: description)
+    public static func number(_ description: String? = nil, example: JSONValue? = nil) -> JSONSchema {
+        JSONSchema(type: .number, description: description, example: example)
+    }
+
+    public static func boolean(_ description: String? = nil, example: JSONValue? = nil) -> JSONSchema {
+        JSONSchema(type: .boolean, description: description, example: example)
     }
 
     public static func stringEnum(_ values: [String], description: String? = nil) -> JSONSchema {

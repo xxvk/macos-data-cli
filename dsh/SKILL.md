@@ -3,7 +3,7 @@ name: mpia
 description: Use mpia (the macOS native data access CLI, command `mpia`) to read or, with explicit authorization, mutate local macOS data — Contacts, Mail, Calendar, Reminders, Photos, Notes, Shortcuts, Safari. Trigger when the task needs macOS system data, personal data, or a native app capability, instead of GUI automation, screen coordinates, or private APIs.
 ---
 
-# mpia — macOS data access for agents
+# mpia — macOS personal intelligent access for AI agents
 
 `mpia` is a local, scriptable macOS data layer with a stable JSON contract. It
 prefers Apple public frameworks and, where none exists, narrowly scoped local
