@@ -12,7 +12,7 @@ if [[ ! -x "$CLI" ]]; then
   exit 1
 fi
 
-"$CLI" mail doctor --format json >"$TMP_DIR/doctor.json"
+"$CLI" OPTIONS /mail/doctor >"$TMP_DIR/doctor.json"
 
 for pattern in \
   '"ok"[[:space:]]*:[[:space:]]*true' \

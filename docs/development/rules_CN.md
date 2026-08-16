@@ -90,13 +90,13 @@ bash scripts/run_local_contacts_integration.sh --with-writes
 - `calevent_` ID 绑定 calendar item 与 occurrence start，确保周期事件不会误定位到第一个 occurrence。
 - create/edit/delete 必须显式选择 `--dry-run` 或 `--apply`；delete apply 额外要求
   `--confirm "DELETE EVENT"`。
-- 周期事件 edit/delete 必须显式选择 `--span this` 或 `--span future`。
+- 周期事件 edit/delete 必须在 params 中显式选择 `"span":"this"` 或 `"span":"future"`。
 - 参与者字段只读。0.3 不发送邀请，也不接受非空 attendees 写入。
 - 普通事件日期使用 ISO 8601；全天事件使用 date-only `YYYY-MM-DD`，且 endDate 不包含在
   事件内。timeZone 使用有效 IANA identifier。
 - 每个 alarm 只能有一个相对或绝对触发条件；`alarms: []` 清空提醒，create 必须先移除
   目标日历继承的默认 alarm，再应用 JSON。
-- Calendar `create --idempotent` 使用 60 秒、opaque、隐私最小化的 receipt 处理紧邻进程
+- Calendar `POST /calendar/create` 的 `"idempotent":true` 参数使用 60 秒、opaque、隐私最小化的 receipt 处理紧邻进程
   重试；receipt 不得保存事件文本。
 - 冲突扫描最多处理 200 个事件；仅边界相接不算冲突。
 - dry-run 临时数据必须位于权限 700 的自动删除目录，不在日志或测试输出中打印事件标题、

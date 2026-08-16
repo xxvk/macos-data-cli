@@ -44,9 +44,9 @@ Mail's `V10` gate.
 
 ## Command surface (0.9.1)
 
-- `mpia messages permission` — status-only authorization/readability probe.
+- `mpia OPTIONS "/messages/permission"` — status-only authorization/readability probe.
   Reports Full Disk Access and `chat.db` accessibility without prompting.
-- `mpia messages recent [--limit N] [--cursor C] [--service imessage|sms]`
+- `mpia GET "/messages/recent" --params '{"limit":20,"cursor":"<opaque-cursor>","service":"imessage"}'`
   — read-only recent messages, newest first, cursor paginated.
   Returns per message: opaque local ID, `service`, `isFromMe`, timestamp,
   conversation ID, and a bounded redacted text projection.
@@ -96,8 +96,8 @@ Projection and redaction rules (non-negotiable):
 - Reading `chat.db` requires Full Disk Access for the responsible process. The
   signed app bundle (`.build/debug/mpia.app` during development, the released
   bundle in distribution) must be granted Full Disk Access.
-- `messages permission` is status-only and must not prompt. There is no
-  `--request` path in 0.9.1.
+- `OPTIONS /messages/permission` is status-only and must not prompt. It accepts
+  no consent-request parameter.
 
 ## Component design
 

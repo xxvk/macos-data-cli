@@ -9,7 +9,7 @@ Calendar.app GUI 或 AppleScript。本文定义 0.3.0 源码版本 contract；�
 - 读取事件必须具有 EventKit `fullAccess`。`writeOnly` 不得被解释为可读。
 - `calendar permission` 调用 `requestFullAccessToEvents()`。
 - 默认 source 必须是唯一可验证的 `iCloud` CalDAV source。
-- 可以显式使用 `--source iCloud` 或 source identifier，但非 iCloud source 会被拒绝。
+- `source` 参数可以显式使用 `iCloud` 或准确 source identifier，但非 iCloud source 会被拒绝。
 - 找不到或匹配到多个 iCloud source 时 fail closed，不回退到 Local、Exchange、Google
   或其他账户。
 - query 默认读取所选 iCloud source 下的全部事件日历；`--calendar` 可以指定 identifier
@@ -19,18 +19,11 @@ Calendar.app GUI 或 AppleScript。本文定义 0.3.0 源码版本 contract；�
 
 ## 命令
 
-```text
-mpia calendar permission
-mpia calendar sources --format json
-mpia calendar calendars --format json
-mpia calendar query --start <iso8601> --end <iso8601> [--calendar <id|title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
-mpia calendar conflicts --start <iso8601> --end <iso8601> [--calendar <id|title>] --format json
-mpia calendar get --id <opaque-event-id> --format json
-mpia calendar create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-mpia calendar edit --id <id> --input <file>|--stdin --dry-run|--apply [--span this|future] --format json
-mpia calendar delete --id <id> --dry-run [--span this|future] --format json
-mpia calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|future] --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 所有日期输入和 Calendar JSON 输出使用 ISO 8601。`timeZone` 使用 IANA identifier，
 例如 `Asia/Tokyo`。
@@ -53,7 +46,8 @@ mpia calendar delete --id <id> --apply --confirm "DELETE EVENT" [--span this|fut
 时区偏移的 ISO 8601 timestamp。Alarm 每项只允许 `relativeMinutes` 或 `absoluteDate`；
 `[]` 清空提醒。创建时必须先删除 EventKit 继承的目标日历默认 alarm。
 
-幂等创建不能假设两个独立 EventKit 进程立即一致。`--idempotent` 因此使用 60 秒、mode 700
+幂等创建不能假设两个独立 EventKit 进程立即一致。`POST /calendar/create` 的
+`"idempotent":true` 参数因此使用 60 秒、mode 700
 目录/mode 600 文件的本机 receipt；receipt 不保存事件正文，只保存请求 SHA-256、opaque ID
 和时间戳。冲突检测硬上限为 200 个事件，并只返回冲突事件 ID 与重叠区间。
 
@@ -68,7 +62,8 @@ recurrence rule 显式表示：
 - `daysOfMonth`、`monthsOfYear`、`weeksOfYear`、`daysOfYear`、`setPositions`
 - `end.endDate` 或 `end.occurrenceCount`，两者不能同时出现
 
-周期事件 edit/delete 必须显式提供 `--span this` 或 `--span future`。CLI 不提供隐式
+周期事件 edit/delete 必须在 params 中显式提供 `"span":"this"` 或
+`"span":"future"`。CLI 不提供隐式
 “整个系列”操作，也不会猜测调用方意图。
 
 ## opaque event ID

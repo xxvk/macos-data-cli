@@ -5,14 +5,11 @@
 0.7.2 当前公开能力包含只读采集/能力分类、语义编辑计划、Accessibility discovery，以及一个受保护的
 copy-first mutation：
 
-```text
-mpia shortcuts edit inspect --input <local.cherri|local.shortcut> --format json
-mpia shortcuts edit plan --input <local.shortcut> --patch <plan.json>|--stdin --format json
-mpia shortcuts edit copy --input <local.shortcut> --patch <plan.json>|--stdin \
-  --expected-editor-name-sha256 <sha256> --dry-run|--apply \
-  [--confirm "EDIT SHORTCUT COPY"] --format json
-mpia shortcuts edit ui-inspect --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 inspect、plan、UI inspection 和 edit-copy dry-run 都不会修改对象。plan 只读取 artifact 一次，核对
 准确 input hash，并在内存 shadow graph 上执行操作。edit-copy apply 仅允许已证明的 replace-text、末尾
@@ -115,7 +112,7 @@ apply 授权或兼容性承诺。
 
 ### 公开 `edit copy` contract
 
-- `--patch`/`--stdin` 必须二选一，`--dry-run`/`--apply` 也必须二选一。
+- 必须提供一个严格的 `--body` JSON object，且 `--dry-run`/`--apply` 必须二选一。
 - 必须提供准确可见 editor 名称的 SHA-256。hash 输入为无换行 UTF-8 bytes；名称不得进入 JSON 或日志。
 - dry-run 验证 private execution plan 后返回脱敏 preview，不构造具体 system AX bridge。
 - apply 必须先匹配 `--confirm "EDIT SHORTCUT COPY"`，然后才能构造 bridge。

@@ -1,6 +1,6 @@
 ## What is mpia
 
-`mpia` is a local, scriptable macOS data access layer for agents and developers. It prefers Apple public frameworks and, where none exists, narrowly scoped local adapters with fail-closed read/write boundaries. It runs locally and never uploads Contacts, Mail, Photos, or Notes.
+`mpia` is, at its core, a local macOS data access CLI for agents and developers. It lets agents use one discoverable, machine-readable command contract without depending on a particular agent vendor or client. Under the hood, it prefers Apple public frameworks and, where none exists, narrowly scoped local adapters with fail-closed read/write boundaries. It runs locally and never uploads Contacts, Mail, Photos, or Notes.
 
 ## Install and TCC
 
@@ -38,5 +38,5 @@ Every command returns JSON:
 Get the command registry with:
 
 ```bash
-mpia manifest --format json
+mpia GET "/agent/manifest"
 ```

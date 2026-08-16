@@ -74,7 +74,8 @@
       themeRow.classList.add('mpia-theme-row');
       var label = document.createElement('span');
       label.className = 'mpia-version-label';
-      label.textContent = text('version') + ' 0.9.0';
+      var version = document.body.dataset.mpiaVersion;
+      label.textContent = text('version') + (version ? ' ' + version : '');
       themeRow.insertAdjacentElement('afterbegin', label);
     }
 

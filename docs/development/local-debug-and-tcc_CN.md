@@ -56,7 +56,7 @@ MPIA_APP="$HOME/Applications/mpia-debug.app" \
 第一次使用时启动权限请求：
 
 ```bash
-open -W .build/debug/mpia.app --args contacts permission
+open -W .build/debug/mpia.app --args OPTIONS /contacts/permission
 ```
 
 然后在“系统设置 → 隐私与安全性 → 通讯录”中确认
@@ -65,20 +65,22 @@ open -W .build/debug/mpia.app --args contacts permission
 ## 读取验证
 
 `open` 不会把 app 的 stdout 转发回当前 Terminal。需要读取 JSON 时，使用
-支持 `--output` 的 export 命令：
+支持 `output` 参数的 export route：
 
 ```bash
 open -W .build/debug/mpia.app --args \
-  contacts export --format json --output /tmp/mpia-contacts.json
+  POST /contacts/export --params '{"output":"/tmp/mpia-contacts.json"}'
 ```
 
 确认读取成功后应删除临时快照；联系人 JSON 可能包含个人敏感信息。
 
 不要用裸 Debug 二进制验证授权：
 
-```text
-.build/debug/mpia contacts count --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 它可能与已授权的 `mpia.app` 被 macOS TCC 视为不同身份，并返回
 `Access Denied` 或 permission-not-granted。真实 Contacts 写入仍须遵循
@@ -133,11 +135,12 @@ Debug app 已包含 `NSAppleEventsUsageDescription`。先通过 UI 启动 Mail.a
 
 ```bash
 bash scripts/build_debug_app.sh
-open -W .build/debug/mpia.app --args mail reveal --id <opaque-id> --format json
+open -W .build/debug/mpia.app --args POST /mail/reveal \
+  --params '{"id":"<opaque-id>"}'
 ```
 
 `reveal` 会在 Mail.app 中可见地定位消息；确认该行为可接受后再授权。普通
-`mail get --content text` fallback 不会为了读取而自动启动 Mail.app。
+`GET /mail/get` 使用 `"content":"text"` 参数时，fallback 不会为了读取而自动启动 Mail.app。
 
 Codex 或其他 agent host 的 shell 可能不在当前 loginwindow GUI bootstrap namespace：
 这时直接运行 doctor 会把已打开的 Mail 误报为 `target_not_running`。使用登录用户会话
@@ -157,8 +160,10 @@ Debug app 的两个 Info.plist 都必须包含 `NSCalendarsFullAccessUsageDescri
 后，用 app bundle 内的 executable 请求 full access：
 
 ```bash
-.build/debug/mpia.app/Contents/MacOS/mpia calendar permission --format json
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 返回 `fullAccess` 后，使用隐私安全 smoke；不要直接打印真实事件 JSON：
 

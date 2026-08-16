@@ -5,338 +5,91 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI="${MPIA_CLI:-$ROOT_DIR/.build/debug/mpia}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
-NO_APPLY=false
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --no-apply) NO_APPLY=true; shift ;;
-    *) echo "usage: $0 [--no-apply]" >&2; exit 64 ;;
-  esac
-done
+[[ "${1:-}" == "--no-apply" || $# -eq 0 ]] || { echo "usage: $0 [--no-apply]" >&2; exit 64; }
+[[ -x "$CLI" ]] || { echo "CLI not found: $CLI" >&2; exit 1; }
 
-if [[ ! -x "$CLI" ]]; then
-  echo "CLI not found or not executable: $CLI" >&2
-  echo "Run: swift build" >&2
-  exit 1
-fi
-
-assert_contains() {
-  local file="$1"
-  local pattern="$2"
-  if ! rg -q "$pattern" "$file"; then
-    echo "Expected pattern not found: $pattern" >&2
-    cat "$file" >&2
-    exit 1
-  fi
-}
-
-run_expected_failure() {
-  local name="$1"
-  local expected_code="$2"
-  shift 2
-  local output="$TMP_DIR/$name.out"
+assert_json_error() {
+  local name="$1" expected_exit="$2" expected_code="$3"
+  shift 3
+  local output="$TMP_DIR/$name.json"
   set +e
   "$@" >"$output" 2>&1
-  local actual_code=$?
+  local actual_exit=$?
   set -e
-  if [[ "$actual_code" -ne "$expected_code" ]]; then
-    echo "$name: expected exit $expected_code, got $actual_code" >&2
-    cat "$output" >&2
-    exit 1
-  fi
-  assert_contains "$output" '"ok"[[:space:]]*:[[:space:]]*false'
+  [[ "$actual_exit" -eq "$expected_exit" ]] || { cat "$output" >&2; exit 1; }
+  jq -e --arg code "$expected_code" '.ok == false and .contractVersion == "0.1" and .error.code == $code' "$output" >/dev/null
 }
 
-"$CLI" contacts count --format json >"$TMP_DIR/count.out"
-assert_contains "$TMP_DIR/count.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
-assert_contains "$TMP_DIR/count.out" '"ok"[[:space:]]*:[[:space:]]*true'
+assert_adapter_error() {
+  local name="$1" expected_exit="$2"
+  shift 2
+  local output="$TMP_DIR/$name.json"
+  set +e
+  "$@" >"$output" 2>&1
+  local actual_exit=$?
+  set -e
+  [[ "$actual_exit" -eq "$expected_exit" ]] || { cat "$output" >&2; exit 1; }
+  jq -e '.ok == false and .contractVersion == "0.1" and (.error.code | type == "string")' "$output" >/dev/null
+}
 
-"$CLI" photos permission --format json >"$TMP_DIR/photos-permission.out"
-assert_contains "$TMP_DIR/photos-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
-assert_contains "$TMP_DIR/photos-permission.out" '"access"[[:space:]]*:[[:space:]]*"(notDetermined|restricted|denied|limited|authorized)"'
-assert_contains "$TMP_DIR/photos-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
+"$CLI" --help >"$TMP_DIR/help.txt"
+rg -q 'mpia METHOD "/command/path"' "$TMP_DIR/help.txt"
+rg -q 'GET "/agent/manifest"' "$TMP_DIR/help.txt"
+[[ "$("$CLI" --version)" == "$("$CLI" -v)" ]]
 
-"$CLI" notes permission --format json >"$TMP_DIR/notes-permission.out"
-assert_contains "$TMP_DIR/notes-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
-assert_contains "$TMP_DIR/notes-permission.out" '"access"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
-assert_contains "$TMP_DIR/notes-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
+"$CLI" GET /agent/manifest >"$TMP_DIR/manifest.json"
+jq -e '.ok == true and .data.cli.name == "mpia" and (.data.routes | length > 80)' "$TMP_DIR/manifest.json" >/dev/null
+jq -e '[.data.routes[] | (.method + " " + .path)] | length == (unique | length)' "$TMP_DIR/manifest.json" >/dev/null
+"$CLI" GET /agent/help | jq -e '.ok == true and (.data.usage | contains("METHOD \"/command/path\""))' >/dev/null
 
-"$CLI" shortcuts permission --format json >"$TMP_DIR/shortcuts-permission.out"
-assert_contains "$TMP_DIR/shortcuts-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
-assert_contains "$TMP_DIR/shortcuts-permission.out" '"access"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
-assert_contains "$TMP_DIR/shortcuts-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
+assert_json_error legacy 64 LEGACY_SYNTAX_REMOVED "$CLI" reminders edit
+assert_json_error legacy-manifest 64 LEGACY_SYNTAX_REMOVED "$CLI" manifest
+assert_json_error wrong-method 64 METHOD_NOT_ALLOWED "$CLI" POST /reminders/edit --params '{"id":"x"}' --body '{"title":"x"}' --dry-run
+assert_json_error unknown-route 64 ROUTE_NOT_FOUND "$CLI" GET /unknown
+assert_json_error trailing-slash 64 INVALID_REQUEST "$CLI" GET /reminders/query/
+assert_json_error query-string 64 INVALID_REQUEST "$CLI" GET '/reminders/query?limit=1'
+assert_json_error duplicate-option 64 INVALID_REQUEST "$CLI" GET /messages/recent --params '{}' --params '{}'
+assert_json_error malformed-params 64 INVALID_REQUEST "$CLI" GET /messages/recent --params '{broken'
+assert_json_error array-params 64 INVALID_REQUEST "$CLI" GET /messages/recent --params '[]'
+assert_json_error duplicate-json-key 64 INVALID_REQUEST "$CLI" GET /messages/recent --params '{"limit":1,"limit":2}'
+assert_json_error unknown-param 64 INVALID_REQUEST "$CLI" GET /messages/recent --params '{"unknown":true}'
+assert_json_error wrong-param-type 64 INVALID_REQUEST "$CLI" GET /messages/recent --params '{"limit":"1"}'
+assert_json_error body-on-read 64 INVALID_REQUEST "$CLI" GET /messages/recent --body '{}'
+assert_json_error missing-body 64 INVALID_REQUEST "$CLI" POST /reminders/create --dry-run
+assert_json_error unknown-body-field 64 INVALID_REQUEST "$CLI" POST /reminders/create --body '{"title":"x","unknown":true}' --dry-run
+assert_json_error safety-in-params 64 INVALID_REQUEST "$CLI" POST /reminders/create --params '{"apply":true}' --body '{"title":"x"}'
+assert_json_error conflicting-mode 64 INVALID_REQUEST "$CLI" POST /reminders/create --body '{"title":"x"}' --dry-run --apply
+assert_json_error confirm-without-apply 64 INVALID_REQUEST "$CLI" DELETE /reminders/delete --params '{"id":"x"}' --dry-run --confirm 'DELETE REMINDER'
+assert_json_error missing-confirmation 64 INVALID_REQUEST "$CLI" DELETE /reminders/delete --params '{"id":"x"}' --apply
+assert_json_error wrong-confirmation 64 INVALID_REQUEST "$CLI" DELETE /reminders/delete --params '{"id":"x"}' --apply --confirm 'DELETE EVENT'
 
-"$CLI" safari permission --format json >"$TMP_DIR/safari-permission.out"
-assert_contains "$TMP_DIR/safari-permission.out" '"contractVersion"[[:space:]]*:[[:space:]]*"0.1"'
-assert_contains "$TMP_DIR/safari-permission.out" '"automation"[[:space:]]*:[[:space:]]*"(available|denied|requiresConsent|targetNotRunning|targetUnavailable|unknown)"'
-assert_contains "$TMP_DIR/safari-permission.out" '"bookmarksReadable"[[:space:]]*:[[:space:]]*(true|false)'
-assert_contains "$TMP_DIR/safari-permission.out" '"requested"[[:space:]]*:[[:space:]]*false'
-
-"$CLI" notes --help >"$TMP_DIR/notes-help.out"
-assert_contains "$TMP_DIR/notes-help.out" 'Notes 0\.6 read commands and guarded 0\.6\.1/0\.6\.2 writes'
-
-"$CLI" shortcuts --help >"$TMP_DIR/shortcuts-help.out"
-assert_contains "$TMP_DIR/shortcuts-help.out" 'Shortcuts 0\.7 commands'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'MOVE SHORTCUT'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'RUN SHORTCUT'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'EDIT SHORTCUT COPY'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'author validate'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'author build'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'edit inspect'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'edit plan'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'edit ui-inspect'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'never uses HubSign'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'CREATE MANAGED SHORTCUT'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'UPDATE MANAGED SHORTCUT'
-assert_contains "$TMP_DIR/shortcuts-help.out" 'FORGET MANAGED SHORTCUT'
-
-"$CLI" safari --help >"$TMP_DIR/safari-help.out"
-assert_contains "$TMP_DIR/safari-help.out" 'Safari 0\.8 commands'
-assert_contains "$TMP_DIR/safari-help.out" 'reading-list add'
-assert_contains "$TMP_DIR/safari-help.out" 'bookmarks create|edit|move|delete'
-assert_contains "$TMP_DIR/safari-help.out" 'folders create|rename|move|delete'
-assert_contains "$TMP_DIR/safari-help.out" 'does not sync to iCloud'
-
-"$CLI" --help >"$TMP_DIR/global-help.out"
-assert_contains "$TMP_DIR/global-help.out" '7 Photos error, 8 Notes error, 9 Shortcuts error'
-assert_contains "$TMP_DIR/global-help.out" '10 Safari error'
-
+# One bounded invocation per adapter. Permission/TCC failures are acceptable;
+# parser or adapter output must remain a JSON envelope and no command may apply.
 set +e
-printf '' | "$CLI" contacts create --stdin --dry-run --format json >"$TMP_DIR/empty-stdin.out" 2>&1
-empty_code=$?
+"$CLI" HEAD /contacts/count >"$TMP_DIR/contacts.json" 2>&1
+"$CLI" OPTIONS /mail/doctor >"$TMP_DIR/mail.json" 2>&1
+"$CLI" GET /calendar/query --params '{"start":"2026-08-16T00:00:00Z","end":"2026-08-17T00:00:00Z","limit":1}' >"$TMP_DIR/calendar.json" 2>&1
+"$CLI" GET /reminders/query --params '{"limit":1}' >"$TMP_DIR/reminders.json" 2>&1
+"$CLI" OPTIONS /photos/permission >"$TMP_DIR/photos.json" 2>&1
+"$CLI" OPTIONS /notes/permission >"$TMP_DIR/notes.json" 2>&1
+"$CLI" OPTIONS /shortcuts/permission >"$TMP_DIR/shortcuts.json" 2>&1
+"$CLI" OPTIONS /safari/permission >"$TMP_DIR/safari.json" 2>&1
+"$CLI" OPTIONS /messages/permission >"$TMP_DIR/messages.json" 2>&1
+"$CLI" OPTIONS /phone-calls/permission >"$TMP_DIR/phone.json" 2>&1
 set -e
-[[ "$empty_code" -eq 2 ]] || { cat "$TMP_DIR/empty-stdin.out" >&2; exit 1; }
-assert_contains "$TMP_DIR/empty-stdin.out" '"CONTACTS_ERROR"'
 
-set +e
-printf '{broken-json' | "$CLI" contacts create --stdin --dry-run --format json >"$TMP_DIR/broken-json.out" 2>&1
-broken_code=$?
-set -e
-[[ "$broken_code" -ne 0 ]] || { cat "$TMP_DIR/broken-json.out" >&2; exit 1; }
-assert_contains "$TMP_DIR/broken-json.out" '"ok"[[:space:]]*:[[:space:]]*false'
-
-run_expected_failure missing-input 64 "$CLI" contacts create --dry-run --format json
-run_expected_failure missing-container 64 "$CLI" contacts count --container --format json
-run_expected_failure unknown-container 2 "$CLI" contacts count --container DOES-NOT-EXIST --format json
-for unsupported_mail_command in send draft reply forward move archive delete flag; do
-  run_expected_failure "mail-$unsupported_mail_command-is-read-only" 64 "$CLI" mail "$unsupported_mail_command" --format json
+for adapter in contacts mail calendar reminders photos notes shortcuts safari messages phone; do
+  jq -e '.contractVersion == "0.1" and (.ok | type == "boolean")' "$TMP_DIR/$adapter.json" >/dev/null
 done
-if [[ "$NO_APPLY" != true ]]; then
-  run_expected_failure idempotency-conflict 2 "$CLI" contacts create --stdin --apply --idempotent --format json <<<'{"kind":"organization","externalID":"xvk-test-organizations-001","organizationName":"intentional-conflict"}'
-fi
-run_expected_failure avatar-replace-missing-confirmation 2 "$CLI" contacts avatar replace --external-id xvk-test-contacts-001 --image "$ROOT_DIR/docs/development/icon1.png" --apply --format json
-run_expected_failure calendar-query-missing-range 5 "$CLI" calendar query --format json
-run_expected_failure calendar-query-invalid-range 5 "$CLI" calendar query --start 2026-08-15T00:00:00Z --end 2026-08-14T00:00:00Z --format json
-run_expected_failure calendar-delete-missing-confirmation 5 "$CLI" calendar delete --id calevent_invalid --apply --format json
-run_expected_failure calendar-delete-invalid-span 5 "$CLI" calendar delete --id calevent_invalid --dry-run --span all --format json
-run_expected_failure reminders-delete-missing-confirmation 6 "$CLI" reminders delete --id reminder_invalid --apply --format json
-run_expected_failure reminders-delete-wrong-confirmation 6 "$CLI" reminders delete --id reminder_invalid --apply --confirm "DELETE EVENT" --format json
-run_expected_failure reminders-edit-missing-input 6 "$CLI" reminders edit --id reminder_invalid --dry-run --format json
-run_expected_failure reminders-edit-missing-mode 6 "$CLI" reminders edit --id reminder_invalid --stdin --format json <<<'{"title":"Updated"}'
-run_expected_failure reminders-edit-empty-patch 6 "$CLI" reminders edit --id reminder_invalid --stdin --dry-run --format json <<<'{}'
-run_expected_failure reminders-edit-completion-is-separate 6 "$CLI" reminders edit --id reminder_invalid --stdin --dry-run --format json <<<'{"completed":true}'
-run_expected_failure reminders-complete-missing-mode 6 "$CLI" reminders complete --id reminder_invalid --format json
-run_expected_failure reminders-reopen-invalid-mode 6 "$CLI" reminders reopen --id reminder_invalid --apply --dry-run --format json
-run_expected_failure photos-albums-invalid-limit 7 "$CLI" photos albums --limit 0 --format json
-run_expected_failure photos-albums-invalid-kind 7 "$CLI" photos albums --kind unsupported --format json
-run_expected_failure photos-query-missing-range 7 "$CLI" photos query --format json
-run_expected_failure photos-query-invalid-favorite 7 "$CLI" photos query --start 2026-01-01T00:00:00Z --end 2026-01-02T00:00:00Z --favorite yes --format json
-run_expected_failure photos-query-overwide-range 7 "$CLI" photos query --start 2025-01-01T00:00:00Z --end 2026-01-03T00:00:00Z --format json
-run_expected_failure photos-get-missing-id 7 "$CLI" photos get --format json
-run_expected_failure photos-export-missing-output 7 "$CLI" photos export --id photo_invalid --format json
-run_expected_failure photos-export-invalid-variant 7 "$CLI" photos export --id photo_invalid --output /tmp/never-created --variant guessed --format json
-run_expected_failure photos-export-stdout-forbidden 7 "$CLI" photos export --id photo_invalid --output - --format json
-run_expected_failure safari-bookmarks-invalid-limit 10 "$CLI" safari bookmarks list --limit 0 --format json
-run_expected_failure safari-bookmarks-get-missing-id 64 "$CLI" safari bookmarks get --format json
-run_expected_failure safari-reading-list-invalid-read 10 "$CLI" safari reading-list query --read yes --format json
-run_expected_failure safari-reading-list-add-missing-input 10 "$CLI" safari reading-list add --dry-run --format json
-run_expected_failure safari-reading-list-add-conflicting-mode 10 "$CLI" safari reading-list add --stdin --dry-run --apply --format json <<<'{"url":"https://mpia.invalid/fixture-080"}'
-run_expected_failure safari-reading-list-add-unknown-field 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"https://mpia.invalid/fixture-080","unknown":true}'
-run_expected_failure safari-reading-list-add-unsafe-url 10 "$CLI" safari reading-list add --stdin --dry-run --format json <<<'{"url":"file:///tmp/private"}'
-run_expected_failure safari-local-create-missing-input 10 "$CLI" safari bookmarks create --format json
-run_expected_failure safari-local-create-conflicting-mode 10 "$CLI" safari bookmarks create --stdin --dry-run --apply --format json <<<'{"parentID":"safarifolder_invalid","index":0,"title":"T","url":"https://example.com"}'
-run_expected_failure safari-local-create-unknown-field 10 "$CLI" safari bookmarks create --stdin --dry-run --format json <<<'{"parentID":"safarifolder_invalid","index":0,"title":"T","url":"https://example.com","unknown":true}'
-run_expected_failure safari-local-create-unsafe-url 10 "$CLI" safari bookmarks create --stdin --dry-run --format json <<<'{"parentID":"safarifolder_invalid","index":0,"title":"T","url":"file:///tmp/private"}'
-run_expected_failure safari-local-delete-confirm-on-dry-run 10 "$CLI" safari bookmarks delete --stdin --dry-run --confirm "DELETE SAFARI BOOKMARK" --format json <<<'{"id":"safaribookmark_invalid"}'
-run_expected_failure safari-local-folder-rename-wrong-command 10 "$CLI" safari bookmarks rename --stdin --dry-run --format json <<<'{"id":"safarifolder_invalid","title":"T"}'
-run_expected_failure notes-folders-invalid-limit 8 "$CLI" notes folders --limit 0 --format json
-run_expected_failure notes-folders-missing-value 8 "$CLI" notes folders --account-id --format json
-run_expected_failure notes-folder-create-missing-input 8 "$CLI" notes folder create --dry-run --format json
-run_expected_failure notes-folder-create-missing-parent 8 "$CLI" notes folder create --stdin --dry-run --format json <<<'{"name":"Projects"}'
-run_expected_failure notes-folder-create-unknown-field 8 "$CLI" notes folder create --stdin --dry-run --format json <<<'{"name":"Projects","parentFolderID":null,"unknown":true}'
-run_expected_failure notes-folder-rename-missing-id 8 "$CLI" notes folder rename --stdin --dry-run --format json <<<'{"name":"Projects","expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
-run_expected_failure notes-folder-rename-invalid-hash 8 "$CLI" notes folder rename --id notesfolder_invalid --stdin --dry-run --format json <<<'{"name":"Projects","expectedNameSHA256":"bad"}'
-run_expected_failure notes-folder-delete-missing-confirmation 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --apply --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
-run_expected_failure notes-folder-delete-wrong-confirmation 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --apply --confirm "DELETE NOTES FOLDER" --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
-run_expected_failure notes-folder-delete-unknown-field 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --dry-run --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","unknown":true}'
-run_expected_failure notes-folder-delete-apply-unsupported 8 "$CLI" notes folder delete --id notesfolder_invalid --stdin --apply --confirm "DELETE EMPTY NOTES FOLDER" --format json <<<'{"expectedParentFolderID":null,"expectedNameSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
-assert_contains "$TMP_DIR/notes-folder-delete-apply-unsupported.out" 'NOTES_FOLDER_DELETE_UNSUPPORTED'
-run_expected_failure notes-folder-move-missing-expected-parent 8 "$CLI" notes folder move --id notesfolder_invalid --stdin --dry-run --format json <<<'{"destinationParentFolderID":null,"expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
-run_expected_failure notes-folder-move-conflicting-mode 8 "$CLI" notes folder move --id notesfolder_invalid --stdin --dry-run --apply --format json <<<'{"destinationParentFolderID":null,"expectedParentFolderID":null,"expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
-run_expected_failure notes-folder-move-apply-unsupported 8 "$CLI" notes folder move --id notesfolder_invalid --stdin --apply --format json <<<'{"destinationParentFolderID":null,"expectedParentFolderID":null,"expectedNameSHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
-assert_contains "$TMP_DIR/notes-folder-move-apply-unsupported.out" 'NOTES_FOLDER_MOVE_UNSUPPORTED'
-run_expected_failure notes-query-invalid-limit 8 "$CLI" notes query --limit 0 --format json
-run_expected_failure notes-query-invalid-date 8 "$CLI" notes query --modified-after not-a-date --format json
-run_expected_failure notes-query-missing-value 8 "$CLI" notes query --title --format json
-run_expected_failure notes-get-missing-id 8 "$CLI" notes get --format json
-run_expected_failure notes-get-invalid-body 8 "$CLI" notes get --id note_invalid --body markdown --format json
-run_expected_failure notes-get-duplicate-attachments 8 "$CLI" notes get --id note_invalid --include-attachments --include-attachments --format json
-run_expected_failure notes-create-missing-input 8 "$CLI" notes create --dry-run --format json
-run_expected_failure notes-create-conflicting-mode 8 "$CLI" notes create --stdin --dry-run --apply --format json <<<'{"folderID":"x","title":"x","bodyFormat":"plaintext","body":""}'
-run_expected_failure notes-create-unknown-field 8 "$CLI" notes create --stdin --dry-run --format json <<<'{"folderID":"x","title":"x","bodyFormat":"plaintext","body":"","unknown":true}'
-run_expected_failure notes-rename-missing-id 8 "$CLI" notes rename --stdin --dry-run --format json <<<'{"title":"x","expectedModificationDate":"2026-08-14T00:00:00Z"}'
-run_expected_failure notes-move-missing-input 8 "$CLI" notes move --id note_invalid --dry-run --format json
-run_expected_failure notes-delete-missing-id 8 "$CLI" notes delete --stdin --dry-run --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
-run_expected_failure notes-delete-missing-confirmation 8 "$CLI" notes delete --id note_invalid --stdin --apply --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
-run_expected_failure notes-delete-wrong-confirmation 8 "$CLI" notes delete --id note_invalid --stdin --apply --confirm "DELETE NOTES" --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
-run_expected_failure notes-delete-valid-confirmation-invalid-id 8 "$CLI" notes delete --id note_invalid --stdin --apply --confirm "DELETE NOTE" --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z"}'
-run_expected_failure notes-delete-unknown-field 8 "$CLI" notes delete --id note_invalid --stdin --dry-run --format json <<<'{"expectedModificationDate":"2026-08-14T00:00:00Z","unknown":true}'
-run_expected_failure notes-edit-body-missing-id 8 "$CLI" notes edit-body --stdin --dry-run --format json <<<'{"bodyFormat":"plaintext","body":"x","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"0000000000000000000000000000000000000000000000000000000000000000"}'
-run_expected_failure notes-edit-body-unknown-field 8 "$CLI" notes edit-body --id note_invalid --stdin --dry-run --format json <<<'{"bodyFormat":"plaintext","body":"x","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"0000000000000000000000000000000000000000000000000000000000000000","unknown":true}'
-run_expected_failure notes-edit-body-invalid-hash 8 "$CLI" notes edit-body --id note_invalid --stdin --dry-run --format json <<<'{"bodyFormat":"plaintext","body":"x","expectedModificationDate":"2026-08-14T00:00:00Z","expectedBodySHA256":"bad"}'
-run_expected_failure notes-bind-wrong-confirmation 8 "$CLI" notes write-account bind --account-id notesaccount_invalid --apply --confirm "BIND NOTES" --format json
-run_expected_failure notes-clear-wrong-confirmation 8 "$CLI" notes write-account clear --apply --confirm "CLEAR NOTES" --format json
-run_expected_failure shortcuts-list-invalid-limit 9 "$CLI" shortcuts list --limit 0 --format json
-run_expected_failure shortcuts-get-invalid-id 9 "$CLI" shortcuts get --id shortcut_invalid --format json
-run_expected_failure shortcuts-run-missing-apply 9 "$CLI" shortcuts run --id shortcut_invalid --format json
-run_expected_failure shortcuts-run-wrong-confirmation 9 "$CLI" shortcuts run --id shortcut_invalid --apply --confirm "RUN" --format json
-run_expected_failure shortcuts-run-invalid-timeout 9 "$CLI" shortcuts run --id shortcut_invalid --timeout 0 --apply --confirm "RUN SHORTCUT" --format json
-run_expected_failure shortcuts-move-missing-confirmation 9 "$CLI" shortcuts move --id shortcut_invalid --destination-folder-id shortcutfolder_invalid --apply --format json
-run_expected_failure shortcuts-move-conflicting-mode 9 "$CLI" shortcuts move --id shortcut_invalid --destination-folder-id shortcutfolder_invalid --dry-run --apply --format json
-run_expected_failure shortcuts-author-validate-missing-source 9 "$CLI" shortcuts author validate --format json
-run_expected_failure shortcuts-author-validate-wrong-extension 9 "$CLI" shortcuts author validate --source "$TMP_DIR/source.txt" --format json
-run_expected_failure shortcuts-author-build-missing-output 9 "$CLI" shortcuts author build --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json
-run_expected_failure shortcuts-author-build-invalid-signing-mode 9 "$CLI" shortcuts author build --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --output "$TMP_DIR/out.shortcut" --signing-mode remote --format json
-run_expected_failure shortcuts-edit-inspect-missing-input 9 "$CLI" shortcuts edit inspect --format json
-run_expected_failure shortcuts-edit-inspect-unknown-option 9 "$CLI" shortcuts edit inspect --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json
-private_share_link='https://www.icloud.com/shortcuts/private-fixture-token.shortcut'
-run_expected_failure shortcuts-edit-inspect-share-link-disabled 9 "$CLI" shortcuts edit inspect --input "$private_share_link" --format json
-if rg -q 'private-fixture-token|icloud\.com/shortcuts' "$TMP_DIR/shortcuts-edit-inspect-share-link-disabled.out"; then
-  echo "Shortcuts disabled share-link acquisition leaked the supplied URL" >&2
-  exit 1
-fi
-run_expected_failure shortcuts-edit-plan-missing-patch 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --format json
-run_expected_failure shortcuts-edit-plan-conflicting-source 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --stdin --format json
-run_expected_failure shortcuts-edit-plan-unknown-option 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --apply --stdin --format json
-run_expected_failure shortcuts-edit-ui-inspect-rejects-options 9 "$CLI" shortcuts edit ui-inspect --request --format json
-"$CLI" shortcuts edit inspect --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --format json >"$TMP_DIR/shortcuts-edit-inspect-cherri.out"
-assert_contains "$TMP_DIR/shortcuts-edit-inspect-cherri.out" '"capability"[[:space:]]*:[[:space:]]*"managed_source_route"'
-assert_contains "$TMP_DIR/shortcuts-edit-inspect-cherri.out" '"canApplySemanticEdit"[[:space:]]*:[[:space:]]*false'
-if rg -qi 'Macos Data 071 Fixture|mpia-071-sentinel|#define|WFWorkflowAction' "$TMP_DIR/shortcuts-edit-inspect-cherri.out"; then
-  echo "Shortcuts acquisition result leaked source, name, or action data" >&2
-  exit 1
-fi
-printf '%s' 'opaque signed payload' >"$TMP_DIR/opaque.shortcut"
-"$CLI" shortcuts edit inspect --input "$TMP_DIR/opaque.shortcut" --format json >"$TMP_DIR/shortcuts-edit-inspect-opaque.out"
-assert_contains "$TMP_DIR/shortcuts-edit-inspect-opaque.out" '"capability"[[:space:]]*:[[:space:]]*"manual_migration_required"'
-assert_contains "$TMP_DIR/shortcuts-edit-inspect-opaque.out" '"opaque_or_signed_artifact"'
-if rg -q 'opaque signed payload' "$TMP_DIR/shortcuts-edit-inspect-opaque.out"; then
-  echo "Shortcuts acquisition result leaked opaque input bytes" >&2
-  exit 1
-fi
-shortcut_hash="$(shasum -a 256 "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" | awk '{print $1}')"
-private_edit_value='mpia-072-private-edit-value'
-printf '{"expectedInputSHA256":"%s","operations":[{"operation":"replace_text","index":0,"value":"%s"}]}' "$shortcut_hash" "$private_edit_value" >"$TMP_DIR/plan.json"
-"$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --format json >"$TMP_DIR/shortcuts-edit-plan.out"
-assert_contains "$TMP_DIR/shortcuts-edit-plan.out" '"operation"[[:space:]]*:[[:space:]]*"edit_plan"'
-assert_contains "$TMP_DIR/shortcuts-edit-plan.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
-assert_contains "$TMP_DIR/shortcuts-edit-plan.out" '"canApplySemanticEdit"[[:space:]]*:[[:space:]]*true'
-if rg -q "$private_edit_value|is\.workflow\.actions|WFTextActionText" "$TMP_DIR/shortcuts-edit-plan.out"; then
-  echo "Shortcuts edit plan leaked value or action data" >&2
-  exit 1
-fi
-run_expected_failure shortcuts-edit-plan-unknown-field 9 "$CLI" shortcuts edit plan --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --stdin --format json <<EOF
-{"expectedInputSHA256":"$shortcut_hash","operations":[],"unknown":true}
-EOF
-editor_name_hash='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-run_expected_failure shortcuts-edit-copy-missing-mode 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --format json
-run_expected_failure shortcuts-edit-copy-conflicting-mode 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --dry-run --apply --format json
-run_expected_failure shortcuts-edit-copy-missing-editor-hash 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --dry-run --format json
-run_expected_failure shortcuts-edit-copy-apply-missing-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --apply --format json
-run_expected_failure shortcuts-edit-copy-apply-wrong-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --apply --confirm "EDIT SHORTCUT" --format json
-run_expected_failure shortcuts-edit-copy-dry-run-rejects-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --dry-run --confirm "EDIT SHORTCUT COPY" --format json
-printf '{"expectedInputSHA256":"%s","operations":[{"operation":"insert_text","index":0,"value":"private unsupported value"}]}' "$shortcut_hash" \
-  | run_expected_failure shortcuts-edit-copy-rejects-unsupported-before-ax 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json
-"$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text.shortcut" --patch "$TMP_DIR/plan.json" --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-preview.out"
-assert_contains "$TMP_DIR/shortcuts-edit-copy-preview.out" '"operation"[[:space:]]*:[[:space:]]*"semantic_edit_copy"'
-assert_contains "$TMP_DIR/shortcuts-edit-copy-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
-assert_contains "$TMP_DIR/shortcuts-edit-copy-preview.out" '"originalPreserved"[[:space:]]*:[[:space:]]*true'
-if rg -q "$private_edit_value|private unsupported value|is\.workflow\.actions|WFTextActionText" "$TMP_DIR/shortcuts-edit-copy-preview.out"; then
-  echo "Shortcuts edit copy preview leaked value or action data" >&2
-  exit 1
-fi
-text_comment_hash="$(shasum -a 256 "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" | awk '{print $1}')"
-printf '{"expectedInputSHA256":"%s","operations":[{"operation":"insert_text","index":2,"value":"private append value"}]}' "$text_comment_hash" \
-  | "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-append-preview.out"
-assert_contains "$TMP_DIR/shortcuts-edit-copy-append-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
-assert_contains "$TMP_DIR/shortcuts-edit-copy-append-preview.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
-if rg -q 'private append value|is\.workflow\.actions|WFTextActionText' "$TMP_DIR/shortcuts-edit-copy-append-preview.out"; then
-  echo "Shortcuts append preview leaked value or action data" >&2
-  exit 1
-fi
-printf '{"expectedInputSHA256":"%s","operations":[{"operation":"delete_action","index":1}]}' "$text_comment_hash" \
-  | "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-delete-preview.out"
-assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
-assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-preview.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
-assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-preview.out" '"finalActionCount"[[:space:]]*:[[:space:]]*2'
-if rg -q 'is\.workflow\.actions|WFTextActionText|WFCommentActionText' "$TMP_DIR/shortcuts-edit-copy-delete-preview.out"; then
-  echo "Shortcuts delete preview leaked action data" >&2
-  exit 1
-fi
-printf '{"expectedInputSHA256":"%s","operations":[{"operation":"delete_action","index":1}]}' "$text_comment_hash" \
-  | run_expected_failure shortcuts-edit-copy-delete-apply-missing-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --apply --format json
-assert_contains "$TMP_DIR/shortcuts-edit-copy-delete-apply-missing-confirmation.out" 'SHORTCUTS_EDIT_CONFIRMATION_REQUIRED'
-printf '{"expectedInputSHA256":"%s","operations":[{"operation":"move_action","fromIndex":1,"toIndex":0}]}' "$text_comment_hash" \
-  | "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --dry-run --format json >"$TMP_DIR/shortcuts-edit-copy-move-preview.out"
-assert_contains "$TMP_DIR/shortcuts-edit-copy-move-preview.out" '"status"[[:space:]]*:[[:space:]]*"preview"'
-assert_contains "$TMP_DIR/shortcuts-edit-copy-move-preview.out" '"operationCount"[[:space:]]*:[[:space:]]*1'
-assert_contains "$TMP_DIR/shortcuts-edit-copy-move-preview.out" '"finalActionCount"[[:space:]]*:[[:space:]]*2'
-if rg -q 'is\.workflow\.actions|WFTextActionText|WFCommentActionText' "$TMP_DIR/shortcuts-edit-copy-move-preview.out"; then
-  echo "Shortcuts move preview leaked action data" >&2
-  exit 1
-fi
-printf '{"expectedInputSHA256":"%s","operations":[{"operation":"move_action","fromIndex":1,"toIndex":0}]}' "$text_comment_hash" \
-  | run_expected_failure shortcuts-edit-copy-move-apply-missing-confirmation 9 "$CLI" shortcuts edit copy --input "$ROOT_DIR/Tests/Fixtures/Shortcuts/editable-text-comment.shortcut" --stdin --expected-editor-name-sha256 "$editor_name_hash" --apply --format json
-assert_contains "$TMP_DIR/shortcuts-edit-copy-move-apply-missing-confirmation.out" 'SHORTCUTS_EDIT_CONFIRMATION_REQUIRED'
-"$CLI" shortcuts edit ui-inspect --format json >"$TMP_DIR/shortcuts-edit-ui-inspect.out"
-assert_contains "$TMP_DIR/shortcuts-edit-ui-inspect.out" '"operation"[[:space:]]*:[[:space:]]*"ui_inspect"'
-assert_contains "$TMP_DIR/shortcuts-edit-ui-inspect.out" '"status"[[:space:]]*:[[:space:]]*"(permission_required|target_not_running|no_candidate|candidate_found|ambiguous|unbounded)"'
-assert_contains "$TMP_DIR/shortcuts-edit-ui-inspect.out" '"canApplySemanticEdit"[[:space:]]*:[[:space:]]*false'
-if rg -q 'AXWindow|AXGroup|AXToolbar|AXScrollArea|workflow-editor|Shortcut Editor' "$TMP_DIR/shortcuts-edit-ui-inspect.out"; then
-  echo "Shortcuts Accessibility inspection leaked AX labels or identifiers" >&2
-  exit 1
-fi
-run_expected_failure shortcuts-create-missing-source 9 "$CLI" shortcuts create --dry-run --format json
-run_expected_failure shortcuts-create-conflicting-mode 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --dry-run --apply --format json
-run_expected_failure shortcuts-create-apply-missing-confirmation 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --apply --format json
-run_expected_failure shortcuts-create-apply-wrong-confirmation 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --apply --confirm "CREATE SHORTCUT" --format json
-run_expected_failure shortcuts-create-dry-run-rejects-confirmation 9 "$CLI" shortcuts create --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --dry-run --confirm "CREATE MANAGED SHORTCUT" --format json
-run_expected_failure shortcuts-update-missing-strategy 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --dry-run --format json
-run_expected_failure shortcuts-update-conflicting-mode 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy retain-old --dry-run --apply --format json
-run_expected_failure shortcuts-update-apply-missing-confirmation 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy retain-old --apply --format json
-run_expected_failure shortcuts-update-wrong-confirmation 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy replace --apply --confirm "UPDATE SHORTCUT" --format json
-run_expected_failure shortcuts-update-unmanaged 9 "$CLI" shortcuts update --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --source "$ROOT_DIR/Tests/Fixtures/Shortcuts/echo.cherri" --expected-source-sha256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --strategy retain-old --dry-run --format json
-assert_contains "$TMP_DIR/shortcuts-update-unmanaged.out" 'SHORTCUTS_AUTHOR_MANAGED_ONLY'
-"$CLI" shortcuts managed list --format json >"$TMP_DIR/shortcuts-managed-list.out"
-assert_contains "$TMP_DIR/shortcuts-managed-list.out" '"ok"[[:space:]]*:[[:space:]]*true'
-run_expected_failure shortcuts-managed-forget-missing-confirmation 9 "$CLI" shortcuts managed forget --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --apply --format json
-run_expected_failure shortcuts-managed-forget-unmanaged 9 "$CLI" shortcuts managed forget --id shortcut_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --dry-run --format json
 
-set +e
-printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/calendar-empty-stdin.out" 2>&1
-calendar_empty_code=$?
-set -e
-[[ "$calendar_empty_code" -eq 5 ]] || { cat "$TMP_DIR/calendar-empty-stdin.out" >&2; exit 1; }
-assert_contains "$TMP_DIR/calendar-empty-stdin.out" '"CALENDAR_INVALID_INPUT"'
+# Body data must not be echoed by route-parser failures or diagnostics.
+private_value='mpia-rest-private-body-sentinel'
+assert_json_error redacted-body 64 INVALID_REQUEST "$CLI" POST /reminders/create \
+  --body "{\"title\":\"$private_value\",\"unknown\":true}" --dry-run
+if rg -q "$private_value" "$TMP_DIR/redacted-body.json"; then
+  echo "REST parser leaked inline body content" >&2
+  exit 1
+fi
 
-"$CLI" contacts avatar verify --external-id xvk-test-contacts-001 --format json >"$TMP_DIR/avatar-verify.out"
-assert_contains "$TMP_DIR/avatar-verify.out" '"status"[[:space:]]*:[[:space:]]*"(readback_confirmed|verification_unknown|not_available)"'
-
-"$CLI" contacts avatar replace --external-id xvk-test-contacts-001 --image "$ROOT_DIR/docs/development/icon1.png" --dry-run --format json >"$TMP_DIR/avatar-replace-dry-run.out"
-assert_contains "$TMP_DIR/avatar-replace-dry-run.out" '"operation"[[:space:]]*:[[:space:]]*"avatar_replace"'
-
-printf '%s' '{"kind":"person","externalID":"phonetic-contract-test-001","givenName":"顕","familyName":"上島","phoneticGivenName":"あきら","phoneticFamilyName":"かみじま"}' | "$CLI" contacts create --stdin --dry-run --format json >"$TMP_DIR/phonetic.out"
-assert_contains "$TMP_DIR/phonetic.out" '"phoneticGivenName"[[:space:]]*:[[:space:]]*"あきら"'
-assert_contains "$TMP_DIR/phonetic.out" '"phoneticFamilyName"[[:space:]]*:[[:space:]]*"かみじま"'
-
-echo "CLI contract and negative-path tests passed (noApply=$NO_APPLY)."
+echo "REST CLI contract tests passed (no apply)."

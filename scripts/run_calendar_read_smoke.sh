@@ -13,9 +13,10 @@ command -v jq >/dev/null || { echo "jq is required for privacy-safe aggregate va
 START="$(date -u -v-30d '+%Y-%m-%dT%H:%M:%SZ')"
 END="$(date -u -v+90d '+%Y-%m-%dT%H:%M:%SZ')"
 
-"$CLI" calendar sources --format json >"$TMP_DIR/sources.json"
-"$CLI" calendar calendars --format json >"$TMP_DIR/calendars.json"
-"$CLI" calendar query --start "$START" --end "$END" --limit 50 --format json >"$TMP_DIR/events.json"
+"$CLI" OPTIONS /calendar/sources >"$TMP_DIR/sources.json"
+"$CLI" GET /calendar/calendars >"$TMP_DIR/calendars.json"
+params="$(jq -cn --arg start "$START" --arg end "$END" '{start:$start,end:$end,limit:50}')"
+"$CLI" GET /calendar/query --params "$params" >"$TMP_DIR/events.json"
 
 jq -e '.ok == true and .contractVersion == "0.1"' "$TMP_DIR/sources.json" >/dev/null
 jq -e '.data as $d | [$d.sources[] | select(.identifier == $d.selectedSourceID and .isICloud == true)] | length == 1' "$TMP_DIR/sources.json" >/dev/null

@@ -2,11 +2,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { openApiPath } from './build-context.mjs';
 import { inferSchemaRoles, localizeOpenApiSpec } from './localize.mjs';
+import { referencePage } from './scalar-page.mjs';
 
 const source = JSON.parse(readFileSync(openApiPath, 'utf8'));
 const zh = localizeOpenApiSpec(source, 'zh-CN');
 const en = localizeOpenApiSpec(source, 'en-US');
 const ja = localizeOpenApiSpec(source, 'ja-JP');
+
+const versionedPage = referencePage({
+  language: 'zh-CN',
+  spec: zh,
+  languageHref: (language) => `../${language}/index.html`,
+});
+assert.match(versionedPage, /data-mpia-version="0\.9\.3"/u);
 
 assert.equal(zh.components.schemas.CalendarEventInput.title, '日历 新建事件请求');
 assert.equal(zh.components.schemas.CalendarEventPayload.title, '日历 事件详情响应');

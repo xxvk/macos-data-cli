@@ -11,8 +11,10 @@ chmod 700 "$TMP_DIR"
 [[ -x "$CLI" ]] || { echo "CLI not found: $CLI" >&2; exit 1; }
 [[ -f "$SOURCE" ]] || { echo "Fixture not found" >&2; exit 1; }
 
-"$CLI" shortcuts author validate --source "$SOURCE" --format json >"$TMP_DIR/validate.json"
-"$CLI" shortcuts author build --source "$SOURCE" --output "$TMP_DIR/fixture.shortcut" --format json >"$TMP_DIR/build.json"
+validate_params="$(jq -cn --arg source "$SOURCE" '{source:$source}')"
+build_params="$(jq -cn --arg source "$SOURCE" --arg output "$TMP_DIR/fixture.shortcut" '{source:$source,output:$output}')"
+"$CLI" POST /shortcuts/author/validate --params "$validate_params" >"$TMP_DIR/validate.json"
+"$CLI" POST /shortcuts/author/build --params "$build_params" >"$TMP_DIR/build.json"
 
 rg -q '"ok"[[:space:]]*:[[:space:]]*true' "$TMP_DIR/validate.json"
 rg -q '"actionCount"[[:space:]]*:[[:space:]]*1' "$TMP_DIR/validate.json"

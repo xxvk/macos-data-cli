@@ -127,7 +127,7 @@ checking required tables, columns, indexes, timestamp range, and WAL readability
 This satisfies a macOS 26 machine whose Mail store is `V10`, while failing safely
 instead of treating `V10` as guaranteed on every macOS 26 installation.
 
-`mail doctor --format json` should expose at least `osVersion`, `sdkBaseline`,
+`OPTIONS /mail/doctor` should expose at least `osVersion`, `sdkBaseline`,
 `mailStoreVersion`, `schemaFingerprint`, `fullDiskAccess`, `automation`, and
 `fastPathAvailable` so support can be verified on a real macOS 26 host.
 
@@ -235,16 +235,11 @@ require a signed host app plus user-enabled Mail extension. That is a possible
 
 The first release is intentionally read-only:
 
-```text
-mpia mail doctor --format json
-mpia mail accounts --format json
-mpia mail mailboxes [--account-id <id>] --format json
-mpia mail query [filters] [--limit <n>] [--cursor <cursor>] --format json
-mpia mail get --id <opaque-local-id> [--content metadata|text] --format json
-mpia mail get --id <opaque-local-id> --content raw --output <file|->
-mpia mail reveal --id <opaque-local-id> [--format json]
-mpia mail attachments verify --id <opaque-local-id> --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+Discover executable 0.9.3 routes from the manifest; see `docs/usage.md` for examples.
 
 Initial query filters should cover account, mailbox, sender, recipient,
 subject, received-after/before, unread, flagged, and has-attachment. Results
@@ -274,16 +269,17 @@ paths, content IDs, or payload bytes; partial EMLX can never produce `matched`.
 
 ## CLI grammar and design philosophy
 
-The command grammar is:
+Mail uses the shared REST-style local CLI grammar:
 
 ```text
-mpia <domain> <operation> [selector] [projection] [rendering]
+mpia METHOD "/mail/path" --params '<JSON object>'
 ```
 
-For Mail, `mail` is the domain; query filters and `--id` select data;
-`--content` controls how much of the selected message is projected; and
-`--format` controls only serialization. This separation prevents a storage or
-output decision from changing the semantic meaning of a query.
+Selection and projection fields live in the strict `--params` object. For
+example, `id` selects one opaque message, `content` selects
+`metadata|text|raw`, and `output` supplies a filesystem destination. Output is
+always a versioned JSON envelope; raw bytes are written only to an explicit
+file path.
 
 The design follows these rules:
 
@@ -306,26 +302,25 @@ The design follows these rules:
 
 | Command | Cardinality / effect | Reason for the shape |
 | --- | --- | --- |
-| `mail doctor` | One capability report | Mail access is a combination of store discovery, schema, FDA, Automation, cache, and fast-path status, not one permission bit |
-| `mail accounts` | Zero-to-many collection | Establishes stable account scope before mailbox/message operations; `accounts` is the read-only collection endpoint, so a redundant `list` is omitted in 0.2.0 |
-| `mail mailboxes` | Zero-to-many collection | Separates hierarchy discovery and counts from message search; accepts `--account-id` to resolve multi-account ambiguity efficiently |
-| `mail query` | Zero-to-many envelopes | A bounded, cursor-paginated candidate search; it does not fetch message bodies |
-| `mail get` | Exactly one message | Separates unique lookup from collection search and makes content projection explicit |
-| `mail reveal` | One visible Mail.app action | Keeps Apple Events/UI activation outside pure reads; "reveal" means locate in the source app, not read or export content |
+| `OPTIONS /mail/doctor` | One capability report | Mail access is a combination of store discovery, schema, FDA, Automation, cache, and fast-path status, not one permission bit |
+| `GET /mail/accounts` | Zero-to-many collection | Establishes stable account scope before mailbox/message operations |
+| `GET /mail/mailboxes` | Zero-to-many collection | Separates hierarchy discovery and counts from message search; accepts `account-id` in params |
+| `GET /mail/query` | Zero-to-many envelopes | A bounded, cursor-paginated candidate search; it does not fetch message bodies |
+| `GET /mail/get` | Exactly one message | Separates unique lookup from collection search and makes content projection explicit |
+| `POST /mail/reveal` | One visible Mail.app action | Keeps Apple Events/UI activation outside pure reads; "reveal" means locate in the source app, not read or export content |
 
-`mail doctor` is non-interactive and side-effect free by default. It must not
-launch Mail.app, prompt for Automation, or open System Settings. A helper such
-as `--open-settings` must be explicit.
+`OPTIONS /mail/doctor` is non-interactive and side-effect free. It must not
+launch Mail.app, prompt for Automation, or open System Settings.
 
 `accounts` and `mailboxes` return stable adapter IDs for scoping. Display names
 are not selectors because they can be duplicated, localized, or renamed.
-`query` combines typed filters with AND semantics, defaults to `--limit 50`,
+`GET /mail/query` combines typed params with AND semantics, defaults to limit 50,
 caps at 200, and uses a cursor rather than a drifting page number. It never
 accepts arbitrary SQL.
 
 ### IDs and content projection
 
-The public `--id` is an opaque adapter ID returned by `query`/`get`, not a raw
+The public `id` param is an opaque adapter ID returned by query/get, not a raw
 SQLite ROWID. A response exposes its local scope and the RFC 822 Message-ID
 separately:
 
@@ -342,7 +337,7 @@ preserving the CLI contract. It is still local and may become stale after Mail
 reindexes or moves data; stale resolution returns `STALE_LOCAL_ID` instead of
 silently selecting a different message.
 
-`--content` is a projection, not a format:
+The `content` param is a projection:
 
 - `metadata`: headers, addresses, dates, flags, mailbox, size, and attachment
   metadata; this is the default.
@@ -350,15 +345,8 @@ silently selecting a different message.
 - `raw`: exact RFC 822 bytes.
 
 Raw RFC 822 is byte-oriented and may be non-UTF-8 or very large, so it must not
-be embedded directly in the JSON envelope. `--content raw` requires
-`--output <file>` or `--output -`. With a file, stdout contains a small JSON or
-human confirmation; with `--output -`, stdout is raw bytes and `--format json`
-is invalid.
-
-`--format json` changes only rendering. Human-readable output remains useful at
-the terminal; agents request JSON explicitly. `reveal` also accepts
-`--format json` so an agent can receive structured confirmation even though the
-operation is user-visible.
+be embedded directly in the JSON envelope. `"content":"raw"` requires an
+explicit file `output` param; stdout remains a small JSON confirmation.
 
 ## Agent and MCP boundary
 

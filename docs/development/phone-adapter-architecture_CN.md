@@ -57,9 +57,9 @@ SQLite 视图，返回方向、时间、时长与未接状态——绝不返回�
 
 ## 命令面（0.9.2）
 
-- `mpia phone-calls permission` — 状态只读探测：报告 Full Disk Access 与库可读性，
+- `mpia OPTIONS "/phone-calls/permission"` — 状态只读探测：报告 Full Disk Access 与库可读性，
   不弹窗。
-- `mpia phone-calls recent [--limit N] [--cursor C]` — 只读「近期通话」，最新在前，
+- `mpia GET "/phone-calls/recent" --params '{"limit":20,"cursor":"<opaque-cursor>"}'` — 只读「近期通话」，最新在前，
   游标分页。每条返回：不透明本地 ID、方向、类型、已接听、未接、时长、时间。
 - 仅只读：不发起通话、不删历史、不标已读、不做任何写入。
 
@@ -105,7 +105,7 @@ SQLite 视图，返回方向、时间、时长与未接状态——绝不返回�
 - 读 `CallHistory.storedata` 要求 responsible process 具备 Full Disk Access。
   开发期用签名 app bundle（`.build/debug/mpia.app`），发布期用发布 bundle，均需
   授权 Full Disk Access。
-- `phone-calls permission` 是状态查询，不弹窗；0.9.2 没有 `--request` 路径。
+- `OPTIONS /phone-calls/permission` 是状态查询，不弹窗，也不接受主动请求授权的参数。
 
 ## 组件设计
 

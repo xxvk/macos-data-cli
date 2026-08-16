@@ -31,17 +31,11 @@ delete remain deferred until their separate destructive/rich-content gates pass.
 
 ## Proposed 0.6 MVP
 
-```text
-mpia notes permission [--request] --format json
-mpia notes accounts --format json
-mpia notes folders [--account-id ID] [--parent-id ID]
-  [--limit N] [--cursor C] --format json
-mpia notes query [--account-id ID] [--folder-id ID]
-  [--title TEXT] [--modified-after ISO-8601]
-  [--limit N] [--cursor C] --format json
-mpia notes get --id <opaque-note-id>
-  [--body none|plaintext|html] [--include-attachments] --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+Discover executable 0.9.3 routes from the manifest; see `docs/usage.md` for examples.
 
 The default query is metadata-only. Body access is explicit because note bodies
 can contain sensitive information and can be much larger than list metadata.
@@ -84,8 +78,8 @@ claim that parsing those links reconstructs Notes' internal rich-text model.
 
 The responsible signed app requires `NSAppleEventsUsageDescription` and the
 `com.apple.security.automation.apple-events` entitlement already used by the
-Mail adapter. `notes permission --request` should trigger only the ordinary
-macOS Automation prompt. Query commands fail with a stable authorization error
+Mail adapter. `OPTIONS /notes/permission` is status-only and accepts no
+consent-request parameter. Query routes fail with a stable authorization error
 instead of opening Settings or retrying silently.
 
 Every Apple Event call needs a deadline and bounded object count. The adapter

@@ -3,28 +3,52 @@ import XCTest
 
 final class CommandManifestTests: XCTestCase {
     func testStandardManifestDescribesCLIAndCoreCommands() {
-        let manifest = CommandRegistry.standard(version: "0.9.2")
+        let manifest = CommandRegistry.standard(version: "0.9.3")
 
         XCTAssertEqual(manifest.cli.name, "mpia")
-        XCTAssertEqual(manifest.cli.version, "0.9.2")
+        XCTAssertEqual(manifest.cli.version, "0.9.3")
 
         let topLevel = Set(manifest.commands.map(\.name))
         XCTAssertTrue(topLevel.contains("agent"))
         XCTAssertTrue(topLevel.contains("resources"))
         XCTAssertTrue(topLevel.contains("contacts"))
         XCTAssertTrue(topLevel.contains("mail"))
+        XCTAssertFalse(manifest.routes.isEmpty)
     }
 
     func testAgentGroupDescribesEveryGlobalDiscoveryEntryPoint() throws {
-        let manifest = CommandRegistry.standard(version: "0.9.2")
+        let manifest = CommandRegistry.standard(version: "0.9.3")
         let agent = try XCTUnwrap(manifest.commands.first(where: { $0.name == "agent" }))
-        XCTAssertFalse(agent.usage.contains("mpia agent"))
         XCTAssertEqual(agent.subcommands?.map(\.name), ["help", "manifest", "version"])
         XCTAssertTrue(agent.subcommands?.first(where: { $0.name == "manifest" })?.description.contains("schemas") == true)
     }
 
+    func testRoutesAreUniqueAndExposeCanonicalMethods() throws {
+        let routes = CommandRegistry.standard(version: "0.9.3").routes
+        let identities = routes.map { "\($0.method.rawValue) \($0.path)" }
+        XCTAssertEqual(Set(identities).count, identities.count)
+
+        let byPath = Dictionary(uniqueKeysWithValues: routes.map { ($0.path, $0) })
+        XCTAssertEqual(byPath["/agent/manifest"]?.method, .get)
+        XCTAssertEqual(byPath["/resources"]?.method, .options)
+        XCTAssertEqual(byPath["/reminders/edit"]?.method, .patch)
+        XCTAssertEqual(byPath["/notes/edit-body"]?.method, .put)
+        XCTAssertEqual(byPath["/photos/export"]?.method, .post)
+        XCTAssertEqual(byPath["/shortcuts/author/build"]?.method, .post)
+    }
+
+    func testPublicManifestEncodingContainsRoutesButNotLegacyCommands() throws {
+        let data = try JSONEncoder().encode(CommandRegistry.standard(version: "0.9.3"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertNotNil(object["cli"])
+        XCTAssertNotNil(object["routes"])
+        XCTAssertNotNil(object["schemas"])
+        XCTAssertNil(object["commands"])
+    }
+
     func testNotesAndSafariManifestCoverEveryPublicCommand() throws {
-        let manifest = CommandRegistry.standard(version: "0.9.2")
+        let manifest = CommandRegistry.standard(version: "0.9.3")
         let notes = try XCTUnwrap(manifest.commands.first(where: { $0.name == "notes" })?.subcommands)
         let safari = try XCTUnwrap(manifest.commands.first(where: { $0.name == "safari" })?.subcommands)
 
@@ -36,7 +60,7 @@ final class CommandManifestTests: XCTestCase {
     }
 
     func testContactsGroupExposesGuardedWriteSafety() {
-        let manifest = CommandRegistry.standard(version: "0.9.2")
+        let manifest = CommandRegistry.standard(version: "0.9.3")
         guard let contacts = manifest.commands.first(where: { $0.name == "contacts" }),
               let subcommands = contacts.subcommands else {
             return XCTFail("contacts group missing")
@@ -57,7 +81,7 @@ final class CommandManifestTests: XCTestCase {
     }
 
     func testSchemasIncludeContactPayloadReferences() {
-        let manifest = CommandRegistry.standard(version: "0.9.2")
+        let manifest = CommandRegistry.standard(version: "0.9.3")
 
         let payload = try? XCTUnwrap(manifest.schemas["ContactPayload"])
         XCTAssertEqual(payload?.type, .object)
@@ -70,7 +94,7 @@ final class CommandManifestTests: XCTestCase {
     }
 
     func testPageSchemaDeclaresStableRequiredFieldsAndBounds() throws {
-        let page = try XCTUnwrap(CommandRegistry.standard(version: "0.9.2").schemas["Page"])
+        let page = try XCTUnwrap(CommandRegistry.standard(version: "0.9.3").schemas["Page"])
         XCTAssertEqual(Set(page.required ?? []), ["items", "limit", "truncated", "complete"])
 
         let limit = try XCTUnwrap(page.properties?["limit"])
@@ -88,7 +112,7 @@ final class CommandManifestTests: XCTestCase {
     }
 
     func testEverySchemaHasAuditedValidRequiredProperties() {
-        for (name, schema) in CommandRegistry.standard(version: "0.9.2").schemas {
+        for (name, schema) in CommandRegistry.standard(version: "0.9.3").schemas {
             guard let required = schema.required else {
                 return XCTFail("\(name) has not been audited for required properties")
             }
@@ -98,7 +122,7 @@ final class CommandManifestTests: XCTestCase {
     }
 
     func testKnownInputConstraintsMatchRuntimePolicies() throws {
-        let schemas = CommandRegistry.standard(version: "0.9.2").schemas
+        let schemas = CommandRegistry.standard(version: "0.9.3").schemas
         let notesCreate = try XCTUnwrap(schemas["NotesCreateInput"])
         XCTAssertEqual(notesCreate.required, ["folderID", "title", "bodyFormat", "body"])
         XCTAssertEqual(notesCreate.properties?["title"]?.minLength, 1)
@@ -119,7 +143,7 @@ final class CommandManifestTests: XCTestCase {
     }
 
     func testNotesStructuredInputsMatchRuntimeParser() throws {
-        let manifest = CommandRegistry.standard(version: "0.9.2")
+        let manifest = CommandRegistry.standard(version: "0.9.3")
         let notes = try XCTUnwrap(manifest.commands.first(where: { $0.name == "notes" })?.subcommands)
         let byName = Dictionary(uniqueKeysWithValues: notes.map { ($0.name, $0) })
 

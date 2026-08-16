@@ -39,19 +39,13 @@ if ! head -n 1 "$TEMP_DIR/help.txt" | rg -q '^mpia '; then
   echo "installed binary help header is invalid" >&2
   exit 1
 fi
-if ! rg -q '^Calendar commands:' "$TEMP_DIR/help.txt" || ! rg -q 'conflicts --start <iso8601>' "$TEMP_DIR/help.txt"; then
-  echo "installed binary help does not expose the Calendar 0.3 command surface" >&2
-  exit 1
-fi
-if ! rg -q '^Shortcuts 0\.7 commands:' "$TEMP_DIR/help.txt" \
-  || ! rg -q 'RUN SHORTCUT' "$TEMP_DIR/help.txt" \
-  || ! rg -q 'MOVE SHORTCUT' "$TEMP_DIR/help.txt"; then
-  echo "installed binary help does not expose the Shortcuts 0.7 command surface" >&2
+if ! rg -q 'mpia METHOD "/path"' "$TEMP_DIR/help.txt" || ! rg -q 'GET "/agent/manifest"' "$TEMP_DIR/help.txt"; then
+  echo "installed binary help does not expose the REST-style command surface" >&2
   exit 1
 fi
 
 set +e
-"$CLI" calendar query --format json >"$TEMP_DIR/calendar-invalid.stdout" 2>"$TEMP_DIR/calendar-invalid.stderr"
+"$CLI" GET /calendar/query >"$TEMP_DIR/calendar-invalid.stdout" 2>"$TEMP_DIR/calendar-invalid.stderr"
 calendar_status=$?
 set -e
 if [[ "$calendar_status" -ne 5 ]] || ! /usr/bin/jq -e '.error.code == "CALENDAR_INVALID_INPUT"' "$TEMP_DIR/calendar-invalid.stderr" >/dev/null; then
@@ -60,7 +54,7 @@ if [[ "$calendar_status" -ne 5 ]] || ! /usr/bin/jq -e '.error.code == "CALENDAR_
 fi
 
 set +e
-"$CLI" shortcuts list --limit 0 --format json >"$TEMP_DIR/shortcuts-invalid.stdout" 2>"$TEMP_DIR/shortcuts-invalid.stderr"
+"$CLI" GET /shortcuts/list --params '{"limit":0}' >"$TEMP_DIR/shortcuts-invalid.stdout" 2>"$TEMP_DIR/shortcuts-invalid.stderr"
 shortcuts_status=$?
 set -e
 if [[ "$shortcuts_status" -ne 9 ]] || ! /usr/bin/jq -e '.error.code == "SHORTCUTS_INVALID_LIMIT"' "$TEMP_DIR/shortcuts-invalid.stderr" >/dev/null; then
@@ -68,19 +62,19 @@ if [[ "$shortcuts_status" -ne 9 ]] || ! /usr/bin/jq -e '.error.code == "SHORTCUT
   exit 1
 fi
 
-run_json "$TEMP_DIR/shortcuts-permission.json" shortcuts permission --format json
+run_json "$TEMP_DIR/shortcuts-permission.json" OPTIONS /shortcuts/permission
 if ! /usr/bin/jq -e '.ok == true and .data.requested == false' "$TEMP_DIR/shortcuts-permission.json" >/dev/null; then
   echo "installed binary Shortcuts permission contract is invalid" >&2
   exit 1
 fi
 
-run_json "$TEMP_DIR/doctor.json" mail doctor --format json
+run_json "$TEMP_DIR/doctor.json" OPTIONS /mail/doctor
 if ! /usr/bin/jq -e '.ok == true and .data.fastPathAvailable == true' "$TEMP_DIR/doctor.json" >/dev/null; then
   echo "installed binary Mail V10 fast path is unavailable" >&2
   exit 1
 fi
 
-run_json "$TEMP_DIR/query.json" mail query --limit 1 --format json
+run_json "$TEMP_DIR/query.json" GET /mail/query --params '{"limit":1}'
 if ! /usr/bin/jq -e '.ok == true and .data.backend == "sqlite"' "$TEMP_DIR/query.json" >/dev/null; then
   echo "installed binary Mail query did not use the SQLite backend" >&2
   exit 1

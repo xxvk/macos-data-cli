@@ -58,14 +58,11 @@ Query/get never call `PHImageManager` or `PHAssetResourceManager` and never
 trigger iCloud downloads. Hidden assets are excluded unless `--include-hidden`
 is explicit.
 
-```text
-mpia photos permission [--request] --format json
-mpia photos albums [--kind user|smart|all] [--limit N] [--cursor C] --format json
-mpia photos query --start <ISO-8601> --end <ISO-8601> [--album-id ID]
-  [--media image|video|audio|unknown] [--favorite true|false]
-  [--include-hidden] [--include-location] [--limit N] [--cursor C] --format json
-mpia photos get --id <opaque-asset-id> [--include-location] --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+Discover executable 0.9.3 routes from the manifest; see `docs/usage.md` for examples.
 
 Query uses creation date, requires start before end, and has a bounded range.
 Default limit is 50 and maximum is 200. Ordering is creation date descending,

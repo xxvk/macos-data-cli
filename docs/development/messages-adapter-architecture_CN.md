@@ -38,9 +38,9 @@
 
 ## 命令面（0.9.1）
 
-- `mpia messages permission` — 状态只读探测：报告 Full Disk Access 与 `chat.db`
+- `mpia OPTIONS "/messages/permission"` — 状态只读探测：报告 Full Disk Access 与 `chat.db`
   可读性，不弹窗。
-- `mpia messages recent [--limit N] [--cursor C] [--service imessage|sms]`
+- `mpia GET "/messages/recent" --params '{"limit":20,"cursor":"<opaque-cursor>","service":"imessage"}'`
   — 只读「近期消息」，最新在前，游标分页。每条返回：不透明本地 ID、`service`、
   `isFromMe`、时间、会话 ID、以及有界脱敏后的正文投影。
 - 仅只读：不做发消息/回复、已读回执、反应、附件导出、会话删除或任何写入。
@@ -84,7 +84,7 @@
 - 读 `chat.db` 要求 responsible process 具备 Full Disk Access。开发期用签名 app
   bundle（`.build/debug/mpia.app`），发布期用发布 bundle，均需授权 Full Disk
   Access。
-- `messages permission` 是状态查询，不弹窗；0.9.1 没有 `--request` 路径。
+- `OPTIONS /messages/permission` 是状态查询，不弹窗，也不接受主动请求授权的参数。
 
 ## 组件设计
 

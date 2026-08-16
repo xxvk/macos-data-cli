@@ -40,8 +40,8 @@ Calendar 成功响应沿用 contract `0.1` envelope。普通事件 Date 使用 I
 start/end 使用 `YYYY-MM-DD`。
 Calendar query 返回统一 `items`、`limit`、`nextCursor`、`truncated`、`complete`。
 `calevent_`、source、calendar 和 cursor 都是本机 opaque 值；调用方不得解析。
-移动事件后返回的新 `calevent_` ID取代旧 ID。周期事件 edit/delete 必须显式提供
-`--span this` 或 `--span future`。
+移动事件后返回的新 `calevent_` ID取代旧 ID。周期事件 edit/delete 必须在 params 中
+显式提供 `"span":"this"` 或 `"span":"future"`。
 
 Safari bookmark 与 Reading List ID 都是本机 opaque 值。query cursor 绑定完整
 `Bookmarks.plist` fingerprint；snapshot 发生任何变化后必须返回 stale cursor 错误。

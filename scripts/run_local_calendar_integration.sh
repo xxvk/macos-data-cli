@@ -31,7 +31,7 @@ TMP_DIR="$(mktemp -d)"
 EVENT_ID=""
 trap '
   if [[ -n "$EVENT_ID" ]]; then
-    "$CLI" calendar delete --id "$EVENT_ID" --apply --confirm "DELETE EVENT" --format json >/dev/null 2>&1 || true
+    "$CLI" DELETE /calendar/delete --params "$(jq -cn --arg id "$EVENT_ID" '{id:$id}')" --apply --confirm "DELETE EVENT" >/dev/null 2>&1 || true
   fi
   rm -rf "$TMP_DIR"
 ' EXIT
@@ -49,26 +49,26 @@ jq -n --arg start "$START" --arg end "$END" --arg suffix "$SUFFIX" '{
   notes: "Disposable mpia integration fixture; safe to delete."
 }' >"$TMP_DIR/create.json"
 
-"$CLI" calendar create --input "$TMP_DIR/create.json" --apply --format json >"$TMP_DIR/created.json"
+"$CLI" POST /calendar/create --body "$(jq -c . "$TMP_DIR/create.json")" --apply >"$TMP_DIR/created.json"
 jq -e '.ok == true and .data.operation == "created" and (.data.event.id | startswith("calevent_"))' "$TMP_DIR/created.json" >/dev/null
 EVENT_ID="$(jq -r '.data.event.id' "$TMP_DIR/created.json")"
 
-"$CLI" calendar get --id "$EVENT_ID" --format json >"$TMP_DIR/read-created.json"
+"$CLI" GET /calendar/get --params "$(jq -cn --arg id "$EVENT_ID" '{id:$id}')" >"$TMP_DIR/read-created.json"
 jq -e --arg id "$EVENT_ID" '.ok == true and .data.id == $id' "$TMP_DIR/read-created.json" >/dev/null
 
 jq -n --arg suffix "$SUFFIX" '{title: ("mpia disposable Calendar integration updated " + $suffix)}' >"$TMP_DIR/patch.json"
-"$CLI" calendar edit --id "$EVENT_ID" --input "$TMP_DIR/patch.json" --apply --format json >"$TMP_DIR/updated.json"
+"$CLI" PATCH /calendar/edit --params "$(jq -cn --arg id "$EVENT_ID" '{id:$id}')" --body "$(jq -c . "$TMP_DIR/patch.json")" --apply >"$TMP_DIR/updated.json"
 jq -e '.ok == true and .data.operation == "updated"' "$TMP_DIR/updated.json" >/dev/null
 EVENT_ID="$(jq -r '.data.event.id' "$TMP_DIR/updated.json")"
 
-"$CLI" calendar get --id "$EVENT_ID" --format json >"$TMP_DIR/read-updated.json"
+"$CLI" GET /calendar/get --params "$(jq -cn --arg id "$EVENT_ID" '{id:$id}')" >"$TMP_DIR/read-updated.json"
 jq -e --arg suffix "$SUFFIX" '.ok == true and .data.title == ("mpia disposable Calendar integration updated " + $suffix)' "$TMP_DIR/read-updated.json" >/dev/null
 
-"$CLI" calendar delete --id "$EVENT_ID" --apply --confirm "DELETE EVENT" --format json >"$TMP_DIR/deleted.json"
+"$CLI" DELETE /calendar/delete --params "$(jq -cn --arg id "$EVENT_ID" '{id:$id}')" --apply --confirm "DELETE EVENT" >"$TMP_DIR/deleted.json"
 jq -e '.ok == true and .data.operation == "deleted"' "$TMP_DIR/deleted.json" >/dev/null
 
 set +e
-"$CLI" calendar get --id "$EVENT_ID" --format json >"$TMP_DIR/absent.json" 2>&1
+"$CLI" GET /calendar/get --params "$(jq -cn --arg id "$EVENT_ID" '{id:$id}')" >"$TMP_DIR/absent.json" 2>&1
 absent_code=$?
 set -e
 [[ "$absent_code" -eq 5 ]] || { echo "Deleted Calendar event remained readable." >&2; exit 1; }

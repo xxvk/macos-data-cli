@@ -151,7 +151,15 @@ export function localizeOpenApiSpec(spec, language) {
       }
 
       for (const param of operation.parameters ?? []) {
-        if (param.description) param.description = translate(param.description, table);
+        if (param.description) {
+          const original = param.description;
+          param.description = translate(param.description, table);
+          if (language !== 'en-US' && param.description === original) {
+            param.description = language === 'ja-JP'
+              ? `パラメータ ${param.name}。`
+              : `参数 ${param.name}。`;
+          }
+        }
       }
       for (const response of Object.values(operation.responses ?? {})) {
         if (response?.description) response.description = translate(response.description, table);
@@ -188,7 +196,13 @@ export function localizeOpenApiSpec(spec, language) {
   );
 
   if (clone.info?.description) {
+    const original = clone.info.description;
     clone.info.description = translate(clone.info.description, table);
+    if (language === 'zh-CN' && clone.info.description === original) {
+      clone.info.description = '本页是本地 mpia macOS 数据 CLI 的可执行 REST 风格契约。使用 `mpia METHOD /path` 调用；它不是网络 HTTP 服务。参数通过 `--params` 严格内联 JSON object 传递，结构化请求正文通过 `--body` 传递。';
+    } else if (language === 'ja-JP' && clone.info.description === original) {
+      clone.info.description = 'このページはローカル mpia macOS データ CLI の実行可能な REST 形式契約です。`mpia METHOD /path` で呼び出し、ネットワーク HTTP サービスではありません。パラメータは `--params` の厳密なインライン JSON object、構造化本文は `--body` で渡します。';
+    }
   }
   return clone;
 }

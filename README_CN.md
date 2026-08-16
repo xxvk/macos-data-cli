@@ -13,7 +13,7 @@ Agent 操作 macOS 原生数据时，通常只能依赖脆弱的 GUI 自动化�
 
 ## Adapter
 
-`mpia` 提供十个 adapter，每个都是独立的命令组，并拥有各自的权限模型：
+`mpia` 提供十个 adapter，每个领域拥有独立 REST 风格 route 与权限模型：
 
 | Adapter | 命令 | 数据源 / Framework | 访问方式 |
 | --- | --- | --- | --- |
@@ -39,7 +39,7 @@ git clone https://github.com/xxvk/mpia-cli.git
 cd mpia-cli
 export DEVELOPER_DIR="$(xcode-select -p)"
 swift build
-.build/debug/mpia resources --format json
+.build/debug/mpia OPTIONS "/resources"
 ```
 
 环境要求：macOS 26 或更新版本、Apple Silicon，以及支持 Swift 6.2 的 Xcode。
@@ -62,10 +62,10 @@ brew install --cask mpia
 建议从 capability 与权限检查开始——这些命令不会修改数据：
 
 ```bash
-mpia resources --format json
-mpia contacts permission
-mpia mail doctor --format json
-mpia phone-calls recent --limit 5 --format json
+mpia OPTIONS "/resources"
+mpia OPTIONS "/contacts/permission"
+mpia OPTIONS "/mail/doctor"
+mpia GET "/phone-calls/recent" --params '{"limit":5}'
 ```
 
 每个命令都返回统一的 JSON envelope：
@@ -77,8 +77,11 @@ mpia phone-calls recent --limit 5 --format json
 获取完整的机器可读命令注册表：
 
 ```bash
-mpia manifest --format json
+mpia GET "/agent/manifest"
 ```
+
+业务命令统一使用 `mpia METHOD "/path" [--params JSON] [--body JSON]`。内联 JSON
+可能进入 shell history 或进程参数；不得用于 API key、密码或其他秘密信息。
 
 ## 安全模型
 

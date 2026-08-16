@@ -757,6 +757,29 @@ Messages = `~/Library/Messages/chat.db`（SQLite，schema 已确认，风险较�
 - [x] 脱敏：绝不返回对方号码原文或账号标识
 - [x] 与 Messages/Mail 相同的 fail-closed、有界、immutable、deadline 纪律
 
+### 0.9.3：REST 风格 CLI 破坏性重构
+
+0.9.3 不提供旧 adapter/subcommand 兼容层。除 `--help`、`--version` 和 `-v`
+外，统一入口为 `mpia METHOD "/path"`，manifest 是运行时路由、参数、body schema、
+安全约束和输出 schema 的单一事实源。它是本机 CLI contract，不是网络 HTTP 服务。
+
+- [x] 增加严格 METHOD/path parser、dispatcher，以及稳定的未知路径、方法不匹配和
+  `LEGACY_SYNTAX_REMOVED` 错误
+- [x] 增加严格内联 JSON object：`--params` 32 KiB、`--body` 384 KiB；拒绝重复键、
+  未知字段、类型错误、缺少必填字段和不允许的 body
+- [x] 将 `--dry-run`、`--apply`、`--confirm` 保留为 JSON 外的独立安全 flags，
+  写入 route fail-closed
+- [x] manifest 公开输出只保留 `cli`、`routes`、`schemas`，OpenAPI 直接描述可执行 route
+- [x] 将 README、usage、开发文档和本机测试脚本迁移到 METHOD/path 形式
+- [x] 拆分 2,617 行的 `CLI.swift`；REST 入口和各 adapter handler/parser 均低于 300 行
+- [x] 完成全仓旧语法扫描、Swift tests、CLI contracts、文档生成、Release build、
+  `git diff --check` 和版本一致性门禁
+- [x] 门禁全部通过后，统一把 VERSION、Info.plist、CLI version、CHANGELOG 更新为 0.9.3
+- [ ] 清理全仓历史代码行数债务：当前仍有 24 个手写 Swift source/test 文件超过
+  主库 300 行硬上限；0.9.3 新增的 CLI/route 文件已经全部低于 300 行，但在这些
+  旧文件拆分前不能宣称“全仓行数门禁通过”
+- [ ] commit、tag、push 和 Release 等待单独授权
+
 ### 1.0.0：文档完备、体验、清晰度与 demo app
 
 1.0.0 是产品打磨门：8 个既有 adapter + Messages（0.9.1）+ Phone（0.9.2）全部交付后，

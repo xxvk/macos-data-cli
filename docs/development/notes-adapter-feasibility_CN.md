@@ -26,17 +26,11 @@ Automation，不能称为原生 Notes Framework。禁止读取 Notes 数据库�
 
 ## 建议的 0.6 MVP
 
-```text
-mpia notes permission [--request] --format json
-mpia notes accounts --format json
-mpia notes folders [--account-id ID] [--parent-id ID]
-  [--limit N] [--cursor C] --format json
-mpia notes query [--account-id ID] [--folder-id ID]
-  [--title TEXT] [--modified-after ISO-8601]
-  [--limit N] [--cursor C] --format json
-mpia notes get --id <opaque-note-id>
-  [--body none|plaintext|html] [--include-attachments] --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 query 默认只返回 metadata。body 可能高度敏感且远大于列表字段，因此必须显式 opt-in。
 `get` 应限制返回 byte，并在锁定或不可访问 note 上 fail closed。分页使用 adapter 自有 opaque
@@ -70,8 +64,8 @@ HTML body 内的 link 可以作为 HTML 保留，但解析 link 不代表恢复�
 ## 权限与执行
 
 负责执行的签名 App 需要 `NSAppleEventsUsageDescription` 和 Mail adapter 已使用的
-`com.apple.security.automation.apple-events` entitlement。`notes permission --request` 只触发
-普通 macOS Automation prompt；查询命令在未授权时返回稳定错误，不自动打开设置或静默重试。
+`com.apple.security.automation.apple-events` entitlement。`OPTIONS /notes/permission`
+仅查询状态，不接受主动请求授权的参数；查询 route 在未授权时返回稳定错误，不自动打开设置或静默重试。
 
 每次 Apple Event 都必须有 deadline 和对象数量上限。禁止无界读取 `every note` 的 body。
 metadata 枚举和 body get 分离；timeout 后启动 circuit breaker。

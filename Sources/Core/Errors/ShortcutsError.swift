@@ -98,7 +98,7 @@ public enum ShortcutsError: Error, Equatable, CustomStringConvertible, Sendable 
     public var description: String {
         switch self {
         case .permissionRequired:
-            "Shortcuts Automation permission requires consent. Run 'mpia shortcuts permission --request'."
+            "Shortcuts Automation permission requires consent. Run: mpia OPTIONS /shortcuts/permission --params '{\"request\":true}'."
         case .permissionDenied:
             "Shortcuts Automation permission was denied. Enable mpia for Shortcuts Events in System Settings > Privacy & Security > Automation."
         case .targetUnavailable:

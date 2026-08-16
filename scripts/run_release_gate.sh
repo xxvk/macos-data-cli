@@ -24,8 +24,8 @@ export SWIFT_MODULECACHE_PATH="$BUILD_CACHE_DIR/clang-module-cache"
 mkdir -p "$SWIFTPM_CONFIG_DIR" "$XDG_CACHE_HOME" "$CLANG_MODULE_CACHE_PATH"
 
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
-[[ "$EXPECTED_VERSION" == "0.9.2" ]] || {
-  echo "0.9.2 release gate requires VERSION=0.9.2; observed=$EXPECTED_VERSION" >&2
+[[ "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "release gate requires a semantic VERSION; observed=$EXPECTED_VERSION" >&2
   exit 1
 }
 
@@ -80,7 +80,7 @@ MPIA_CLI="$DEBUG_CLI" bash scripts/run_shortcuts_authoring_smoke.sh
 MPIA_CLI="$DEBUG_CLI" bash scripts/run_calendar_contract_tests.sh
 CALENDAR_PREFLIGHT="$DEBUG_APP_TEMP_ROOT/calendar-sources.json"
 set +e
-"$DEBUG_CLI" calendar sources --format json >"$CALENDAR_PREFLIGHT" 2>&1
+"$DEBUG_CLI" OPTIONS /calendar/sources >"$CALENDAR_PREFLIGHT" 2>&1
 CALENDAR_PREFLIGHT_EXIT=$?
 set -e
 if [[ "$CALENDAR_PREFLIGHT_EXIT" -eq 0 ]]; then

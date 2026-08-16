@@ -51,23 +51,15 @@ Apple 官方参考：
 - 默认读取选中 source 下所有 lists；`--list` 可以缩小范围。
 - 系统默认 list 只有属于选中 iCloud source 且可写时才能自动用于创建；否则如果只有一个
   可写 iCloud list 就选它；存在多个时必须显式提供 `listID` 并 fail closed。
-- `mpia resources` 应报告 Reminders 能力，但不得暴露 Apple ID 或账户地址。
+- `mpia OPTIONS "/resources"` 应报告 Reminders 能力，但不得暴露 Apple ID 或账户地址。
 
 ## 建议命令
 
-```text
-mpia reminders permission --format json
-mpia reminders sources --format json
-mpia reminders lists --format json
-mpia reminders query [--status incomplete|completed|all] [--due-start <value>] [--due-end <value>] [--list <id|unique-title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
-mpia reminders get --id <opaque-reminder-id> --format json
-mpia reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-mpia reminders edit --id <id> --input <file>|--stdin --dry-run|--apply --format json
-mpia reminders complete --id <id> --dry-run|--apply --format json
-mpia reminders reopen --id <id> --dry-run|--apply --format json
-mpia reminders delete --id <id> --dry-run --format json
-mpia reminders delete --id <id> --apply --confirm "DELETE REMINDER" --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 只有 permission 命令可以触发授权请求。
 

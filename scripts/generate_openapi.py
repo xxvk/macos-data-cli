@@ -1,31 +1,22 @@
 #!/usr/bin/env python3
-"""Generate an OpenAPI 3.1 document from the mpia command manifest.
+"""Generate the executable REST-style mpia CLI contract as OpenAPI 3.1.
 
-This is a documentation-only mapping: a CLI subcommand becomes a path, and
-flags become query parameters. It is NOT a real HTTP API and must not be used
-to drive HTTP requests. Feed the manifest JSON on stdin (from
-`mpia manifest --format json`) and write the OpenAPI document to
+The paths and methods are executable by the local CLI; this is not a network
+HTTP service. Feed the manifest JSON on stdin (from
+`mpia GET "/agent/manifest"`) and write the OpenAPI document to
 `docs/openapi.json` (or stdout when no path is given).
 
 Usage:
-  mpia manifest --format json | python3 scripts/generate_openapi.py docs/openapi.json
+  mpia GET "/agent/manifest" | python3 scripts/generate_openapi.py docs/openapi.json
 """
 
 import json
 import sys
 
 from openapi_errors import CONTRACT_VERSION, error_example
-from openapi_contracts import typed_success_schema
-from openapi_navigation import numbered_commands, tag_name
-
-_TYPE_MAP = {
-    "string": "string",
-    "int": "integer",
-    "bool": "boolean",
-    "file": "string",
-    "json": "object",
-}
-
+from openapi_contracts import param_to_openapi, typed_success_schema
+from openapi_examples import REQUEST_BODY_EXAMPLES
+from openapi_navigation import tag_name
 
 def rewrite_refs(node):
     """Rewrite local `$ref` values ("Name") to component references."""
@@ -40,49 +31,6 @@ def rewrite_refs(node):
     if isinstance(node, list):
         return [rewrite_refs(item) for item in node]
     return node
-
-
-def param_to_openapi(param):
-    schema_type = _TYPE_MAP.get(param.get("type", "string"), "string")
-    spec = {
-        "name": param.get("name", ""),
-        "in": "query",
-        "description": param.get("description", ""),
-        "schema": {"type": schema_type},
-    }
-    if param.get("required"):
-        spec["required"] = True
-    return spec
-
-
-def method_for(leaf):
-    """Map a CLI command to the closest HTTP method (documentation-only).
-
-    Read-only commands are GET, except action verbs (run/reveal) that execute
-    or activate but do not mutate macOS data — those are POST. Mutating
-    commands follow their verb: delete/forget -> DELETE, full replace
-    (edit-body/replace) -> PUT, partial edit (edit/rename/move) -> PATCH, and
-    everything else (create/add/complete/reopen/migrate/bind/clear) -> POST.
-    """
-    name = (leaf.get("name") or "").lower()
-    # Capability/discovery/verification checks map to OPTIONS.
-    if "permission" in name or "doctor" in name or "verify" in name or name in ("resources", "containers", "sources"):
-        return "options"
-    # Scalar/selection metadata maps to HEAD ("just the summary, not the data").
-    if name in ("count", "container", "version"):
-        return "head"
-    # Actions that materialize an output artifact (export) or execute (run/reveal).
-    if "export" in name or "run" in name or "reveal" in name:
-        return "post"
-    if not leaf.get("mutates"):
-        return "get"
-    if "delete" in name or "forget" in name:
-        return "delete"
-    if "edit-body" in name or "replace" in name:
-        return "put"
-    if "edit" in name or "rename" in name or "move" in name:
-        return "patch"
-    return "post"
 
 
 _EXIT_TO_HTTP = {
@@ -108,7 +56,6 @@ _HTTP_REASONS = {
     500: "Internal Server Error",
 }
 
-
 def cli_example(command, leaf):
     """Append representative safety flags so the CLI example shows real usage.
 
@@ -116,6 +63,10 @@ def cli_example(command, leaf):
     value); other write commands show `--apply`; read-only commands keep the
     bare command. This drives the colorized `CLI example:` line in the docs.
     """
+    if leaf.get("params"):
+        command += " --params '<JSON object>'"
+    if leaf.get("inputSchema"):
+        command += " --body '<JSON object>'"
     safety = leaf.get("safety") or {}
     confirmation = safety.get("confirmation")
     if confirmation:
@@ -125,9 +76,9 @@ def cli_example(command, leaf):
     return command
 
 
-def leaf_operation(leaf, tag=None, command="", title="", group="", leaf_name="", number=None):
+def leaf_operation(leaf, tag=None, command="", title="", group="", leaf_name="", number=None, path=""):
     command = cli_example(command, leaf)
-    method = method_for(leaf)
+    method = leaf["method"].lower()
     summary = f"{number} {title}" if number else title
     op = {
         "summary": summary,
@@ -164,48 +115,84 @@ def leaf_operation(leaf, tag=None, command="", title="", group="", leaf_name="",
     output = leaf.get("outputSchema")
     if output:
         op["responses"]["200"]["content"]["application/json"]["schema"] = typed_success_schema(output)
-    if group == "agent" and leaf_name in ("help", "version"):
-        op["responses"]["200"]["content"] = {
-            "text/plain": {"schema": {"type": "string"}}
-        }
-        op["x-output-format"] = "text/plain"
     inp = leaf.get("inputSchema")
     if inp:
+        media = {"schema": {"$ref": "#/components/schemas/" + inp}}
+        example = REQUEST_BODY_EXAMPLES.get((leaf["method"], path))
+        if example is not None:
+            media["example"] = example
         op["requestBody"] = {
             "required": True,
-            "content": {
-                "application/json": {"schema": {"$ref": "#/components/schemas/" + inp}}
-            },
+            "content": {"application/json": media},
         }
     return {method: op}
 
 
-def build_paths(commands):
+_GROUP_ORDER = [
+    "agent", "resources", "contacts", "calendar", "reminders", "notes",
+    "mail", "messages", "phone-calls", "photos", "safari", "shortcuts",
+]
+
+_GROUP_DESCRIPTIONS = {
+    "agent": "Global discovery commands for people, scripts, and agents.",
+    "contacts": "Query and manage contacts.",
+    "calendar": "Query and manage calendar events in the uniquely verified iCloud CalDAV source.",
+    "reminders": "Query and manage reminders in the uniquely verified iCloud CalDAV source.",
+    "notes": "Bounded Notes.app Automation access through the public scripting dictionary.",
+    "mail": "Read-only Mail access over the local SQLite store with a bounded Apple Events fallback.",
+    "messages": "Read-only recent Messages (iMessage/SMS).",
+    "phone-calls": "Read-only recent call history (Phone/FaceTime).",
+    "photos": "Query photo metadata and export via public PhotoKit.",
+    "safari": "Bounded Safari bookmarks and Reading List over a read-only plist snapshot plus guarded local-only mutation.",
+    "shortcuts": "Run and author shortcuts; bounded read-only classification and guarded copy-first editing.",
+}
+
+
+def route_group(route):
+    return route["path"].strip("/").split("/", 1)[0]
+
+
+def group_prefix(group):
+    if group in ("agent", "resources"):
+        return "A"
+    domains = [name for name in _GROUP_ORDER if name not in ("agent", "resources")]
+    return str(domains.index(group) + 1)
+
+
+def tag_group(group):
+    return "agent" if group == "resources" else group
+
+
+def build_paths(routes):
     paths = {}
-    for prefix, cmd in numbered_commands(commands):
-        tag = tag_name(cmd, prefix)
-        name = cmd.get("name", "")
-        if cmd.get("kind") == "leaf":
-            command = f"mpia {name}"
-            number = f"{prefix}.1"
-            paths["/" + name] = leaf_operation(cmd, tag=tag, command=command, title=name, group=name, leaf_name=name, number=number)
-        elif cmd.get("kind") == "group":
-            for sub_index, leaf in enumerate(cmd.get("subcommands") or [], start=1):
-                if leaf.get("kind") != "leaf":
-                    continue
-                leaf_name = leaf.get("name", "")
-                command = leaf.get("usage", "") if name == "agent" else f"mpia {name} {leaf_name}"
-                title = f"{name} {leaf_name}"
-                number = f"{prefix}.{sub_index}"
-                path = "/" + leaf_name.replace(" ", "/") if name == "agent" else "/" + name + "/" + leaf_name.replace(" ", "/")
-                paths[path] = leaf_operation(leaf, tag=tag, command=command, title=title, group=name, leaf_name=leaf_name, number=number)
+    counts = {}
+    order = {name: index for index, name in enumerate(_GROUP_ORDER)}
+    for route in sorted(routes, key=lambda item: (order.get(route_group(item), 999), item["path"])):
+        group = route_group(route)
+        prefix = group_prefix(group)
+        count_group = tag_group(group)
+        counts[count_group] = counts.get(count_group, 0) + 1
+        number = f"{prefix}.{counts[count_group]}"
+        leaf_name = route["path"].strip("/").split("/", 1)[-1].replace("/", " ")
+        tag_name_group = tag_group(group)
+        tag = tag_name({"name": tag_name_group}, group_prefix(tag_name_group))
+        command = f'mpia {route["method"]} "{route["path"]}"'
+        paths[route["path"]] = leaf_operation(
+            route, tag=tag, command=command, title=f"{group} {leaf_name}",
+            group=group, leaf_name=leaf_name, number=number, path=route["path"],
+        )
     return paths
 
 
-def build_tags(commands):
+def build_tags_from_routes(routes):
+    groups = []
+    for group in _GROUP_ORDER:
+        normalized = tag_group(group)
+        if any(route_group(route) == group for route in routes) and normalized not in groups:
+            groups.append(normalized)
     return [
-        {"name": tag_name(cmd, prefix), "description": cmd.get("description", "")}
-        for prefix, cmd in numbered_commands(commands)
+        {"name": tag_name({"name": group}, group_prefix(group)), "description": _GROUP_DESCRIPTIONS[group]}
+        for group in groups
     ]
 
 
@@ -257,9 +244,10 @@ def main():
             "title": "mpia",
             "version": cli.get("version", ""),
             "description": (
-                "Documentation-only OpenAPI view of the mpia macOS data CLI. "
-                "Paths mirror the CLI command tree (CLI-faithful) with slash-separated "
-                "subcommands; query parameters are CLI flags.\n\n"
+                "Executable REST-style contract for the local mpia macOS data CLI. "
+                "Invoke a path with `mpia METHOD \"/path\"`; this document does not describe "
+                "a network HTTP server. Parameters are passed as one strict inline JSON "
+                "object through `--params`; structured request bodies use `--body`.\n\n"
                 "HTTP methods are a semantic mapping:\n"
                 "| HTTP method | CLI semantics |\n"
                 "| --- | --- |\n"
@@ -272,8 +260,8 @@ def main():
                 "| `DELETE` | Delete |"
             ),
         },
-        "paths": build_paths(inner.get("commands", [])),
-        "tags": build_tags(inner.get("commands", [])),
+        "paths": build_paths(inner.get("routes", [])),
+        "tags": build_tags_from_routes(inner.get("routes", [])),
         "components": {"schemas": build_components(inner.get("schemas", {}))},
     }
     text = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"

@@ -24,17 +24,19 @@ jq -n --arg start "$START" --arg end "$END" '{
   recurrenceRules: [{frequency: "weekly", interval: 1, end: {occurrenceCount: 2}}]
 }' >"$TMP_DIR/create.json"
 
-"$CLI" calendar create --input "$TMP_DIR/create.json" --dry-run --format json >"$TMP_DIR/create-preview.json"
+"$CLI" POST /calendar/create --body "$(jq -c . "$TMP_DIR/create.json")" --dry-run >"$TMP_DIR/create-preview.json"
 jq -e '.ok == true and .data.operation == "create_preview" and .data.dryRun == true and .data.event.timeZone == "Asia/Tokyo" and .data.event.alarms[0].relativeMinutes == -10 and .data.event.recurrenceRules[0].frequency == "weekly"' "$TMP_DIR/create-preview.json" >/dev/null
 
 printf '%s' '{"title":"mpia all-day dry-run fixture","allDay":true,"startDate":"2026-11-01","endDate":"2026-11-02","timeZone":"America/Los_Angeles","alarms":[]}' >"$TMP_DIR/all-day.json"
-"$CLI" calendar create --input "$TMP_DIR/all-day.json" --dry-run --idempotent --format json >"$TMP_DIR/all-day-preview.json"
+"$CLI" POST /calendar/create --params '{"idempotent":true}' --body "$(jq -c . "$TMP_DIR/all-day.json")" --dry-run >"$TMP_DIR/all-day-preview.json"
 jq -e '.ok == true and .data.event.allDay == true and .data.event.startDate == "2026-11-01" and .data.event.endDate == "2026-11-02"' "$TMP_DIR/all-day-preview.json" >/dev/null
 
-"$CLI" calendar conflicts --start "$QUERY_START" --end "$QUERY_END" --format json >"$TMP_DIR/conflicts.json"
+params="$(jq -cn --arg start "$QUERY_START" --arg end "$QUERY_END" '{start:$start,end:$end}')"
+"$CLI" GET /calendar/conflicts --params "$params" >"$TMP_DIR/conflicts.json"
 jq -e '.ok == true and (.data.checkedEventCount | type == "number") and (.data.conflicts | type == "array")' "$TMP_DIR/conflicts.json" >/dev/null
 
-"$CLI" calendar query --start "$QUERY_START" --end "$QUERY_END" --limit 1 --format json >"$TMP_DIR/query.json"
+params="$(jq -cn --arg start "$QUERY_START" --arg end "$QUERY_END" '{start:$start,end:$end,limit:1}')"
+"$CLI" GET /calendar/query --params "$params" >"$TMP_DIR/query.json"
 jq -e '.ok == true and (.data.items | type == "array")' "$TMP_DIR/query.json" >/dev/null
 
 # Do not use an arbitrary user event as an edit/delete dry-run fixture. EventKit

@@ -12,7 +12,7 @@ ERROR_MESSAGES = {
     "CLI_ERROR": "Unexpected CLI error. Re-run the command; if it persists, inspect the exit code.",
     "CONTACTS_ERROR": "Contacts access is denied or the input is invalid. Grant access in System Settings → Privacy & Security → Contacts.",
     "CONTACT_QUERY_ERROR": "The contact lookup was ambiguous or returned no match. Provide a more specific external ID.",
-    "MAIL_ERROR": "Mail adapter error. Run `mpia mail doctor` to verify fast-path SQLite access.",
+    "MAIL_ERROR": "Mail adapter error. Run `mpia OPTIONS \"/mail/doctor\"` to verify fast-path SQLite access.",
     "CALENDAR_ERROR": "Calendar adapter error. Verify full Calendar access and the iCloud CalDAV source.",
     "REMINDERS_ERROR": "Reminders adapter error. Verify full Reminders access and the iCloud CalDAV source.",
     "PHOTOS_ERROR": "Photos access is limited or denied. Check System Settings → Privacy & Security → Photos.",

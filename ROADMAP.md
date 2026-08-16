@@ -968,6 +968,37 @@ Architecture: [Phone adapter 0.9.2](docs/development/phone-adapter-architecture.
 - [x] Redaction: never return raw counterparty numbers or account identifiers
 - [x] Same fail-closed, bounded, immutable, deadline discipline as Messages/Mail
 
+### 0.9.3: Breaking REST-style CLI refactor
+
+0.9.3 provides no adapter/subcommand compatibility layer. Apart from `--help`,
+`--version`, and `-v`, the only invocation form is `mpia METHOD "/path"`. The
+manifest is the single source of truth for runtime routes, params, body schemas,
+safety constraints, and output schemas. This is a local CLI contract, not a
+network HTTP service.
+
+- [x] Add the strict METHOD/path parser and dispatcher plus stable unknown-route,
+  method-mismatch, and `LEGACY_SYNTAX_REMOVED` errors
+- [x] Add strict inline JSON objects: 32 KiB `--params`, 384 KiB `--body`; reject
+  duplicate keys, unknown fields, type mismatches, missing required fields, and
+  bodies on routes that do not declare one
+- [x] Keep `--dry-run`, `--apply`, and `--confirm` as independent safety flags
+  outside JSON and fail closed on mutation routes
+- [x] Encode only `cli`, `routes`, and `schemas` in the public manifest; make
+  OpenAPI describe directly executable routes
+- [x] Migrate README, usage, development docs, and local test scripts to
+  METHOD/path invocations
+- [x] Split the 2,617-line `CLI.swift`; REST entrypoint and adapter
+  handlers/parsers are all below the 300-line hard cap
+- [x] Finish the repository legacy-syntax scan, Swift tests, CLI contracts,
+  docs generation, Release build, `git diff --check`, and version-consistency gate
+- [x] After every gate passes, update VERSION, Info.plist, CLI version, and
+  CHANGELOG together to 0.9.3
+- [ ] Resolve repository-wide historical line-count debt: 24 handwritten Swift
+  source/test files still exceed the parent repository's 300-line hard cap.
+  Every new 0.9.3 CLI/route file is below 300 lines, but the repository-wide
+  line gate must not be reported as passing until those older files are split.
+- [ ] Commit, tag, push, and Release await separate authorization
+
 ### 1.0.0: Docs completeness, experience, clarity, and demo app
 
 The 1.0.0 milestone is the product-polish gate: the 8 existing adapters plus

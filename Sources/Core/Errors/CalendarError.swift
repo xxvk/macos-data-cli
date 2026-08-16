@@ -44,7 +44,7 @@ public enum CalendarError: Error, Equatable, Sendable, CustomStringConvertible {
     public var description: String {
         switch self {
         case .permissionRequired:
-            "Calendar permission has not been granted. Run 'mpia calendar permission' and allow full access."
+            "Calendar permission has not been granted. Run 'mpia OPTIONS /calendar/permission' and allow full access."
         case .permissionDenied:
             "Calendar permission was denied. Enable full access in System Settings > Privacy & Security > Calendars."
         case .permissionRestricted:

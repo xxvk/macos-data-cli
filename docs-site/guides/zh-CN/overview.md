@@ -1,6 +1,6 @@
 ## 什么是 mpia
 
-`mpia` 是面向 agent 与开发者的本机 macOS 数据访问层，优先使用 Apple 公共框架；在没有公共框架时，使用窄范围、文档化的本地适配器，并保持 fail-closed 的读写边界。它只在本地运行，绝不上传通讯录、邮件、照片或笔记。
+`mpia` 的核心产品形态是一个面向 Agent 与开发者的本机 macOS 数据访问 CLI。它让不同 Agent 无需依赖特定厂商或客户端，只需通过统一、可发现、机器可读的命令契约，即可方便地访问 macOS 数据。底层优先使用 Apple 公共框架；在没有公共框架时，使用窄范围、文档化的本地适配器，并保持 fail-closed 的读写边界。它只在本地运行，绝不上传通讯录、邮件、照片或笔记。
 
 ## 安装与 TCC
 
@@ -38,5 +38,5 @@ bundle 标识符为 `com.xvk.mpia.cli`。访问受保护的 macOS 数据时，�
 通过以下命令获取命令注册表：
 
 ```bash
-mpia manifest --format json
+mpia GET "/agent/manifest"
 ```

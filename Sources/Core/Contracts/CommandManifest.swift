@@ -6,16 +6,33 @@ import Foundation
 ///
 /// It is deliberately framework-free and lives in `Core` so it has no
 /// dependency on the executable target or on any adapter.
-public struct CommandManifest: Codable, Sendable {
+public struct CommandManifest: Encodable, Sendable {
     public let cli: CLIDescriptor
     public let commands: [CommandNode]
+    /// Executable REST-style CLI routes derived from `commands`.
+    public let routes: [RESTRouteDescriptor]
     /// Named JSON Schemas referenced by `CommandNode.inputSchema`/`outputSchema`.
     public let schemas: [String: JSONSchema]
 
-    public init(cli: CLIDescriptor, commands: [CommandNode], schemas: [String: JSONSchema] = [:]) {
+    public init(
+        cli: CLIDescriptor,
+        commands: [CommandNode],
+        routes: [RESTRouteDescriptor] = [],
+        schemas: [String: JSONSchema] = [:]
+    ) {
         self.cli = cli
         self.commands = commands
+        self.routes = routes
         self.schemas = schemas
+    }
+
+    private enum CodingKeys: String, CodingKey { case cli, routes, schemas }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(cli, forKey: .cli)
+        try container.encode(routes, forKey: .routes)
+        try container.encode(schemas, forKey: .schemas)
     }
 }
 
@@ -34,14 +51,13 @@ public struct CommandNode: Codable, Sendable {
     public let name: String
     public let kind: CommandNodeKind
     public let description: String
-    public let usage: String
     /// Whether this command can mutate user data. Read-only commands are false.
     public let mutates: Bool
     public let params: [CommandParam]
     public let exitCodes: [ExitCodeSpec]
     public let safety: CommandSafety
-    /// Name of a schema in `CommandManifest.schemas` for the `--input`/`--stdin`
-    /// JSON payload. `nil` when the command accepts no structured input.
+    /// Name of a schema in `CommandManifest.schemas` for the REST `--body`
+    /// JSON object. `nil` when the route accepts no structured body.
     public let inputSchema: String?
     /// Name of a schema in `CommandManifest.schemas` for the success `data`.
     public let outputSchema: String?
@@ -52,7 +68,6 @@ public struct CommandNode: Codable, Sendable {
         name: String,
         kind: CommandNodeKind,
         description: String,
-        usage: String,
         mutates: Bool,
         params: [CommandParam],
         exitCodes: [ExitCodeSpec],
@@ -64,7 +79,6 @@ public struct CommandNode: Codable, Sendable {
         self.name = name
         self.kind = kind
         self.description = description
-        self.usage = usage
         self.mutates = mutates
         self.params = params
         self.exitCodes = exitCodes
@@ -105,10 +119,11 @@ public struct CommandParam: Codable, Sendable {
 
 public enum ParamType: String, Codable, Sendable {
     case string
+    case stringArray
     case int
     case bool
     case file
-    /// JSON payload supplied through `--input <file>` or `--stdin`.
+    /// Structured JSON value used by internal registry construction.
     case json
 }
 

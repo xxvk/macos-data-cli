@@ -106,14 +106,14 @@ fixtures.
   mutations do not accidentally target the first occurrence.
 - Create, edit, and delete require `--dry-run` or `--apply`; delete apply also
   requires `--confirm "DELETE EVENT"`.
-- Recurring edit/delete requires `--span this` or `--span future`.
+- Recurring edit/delete requires `"span":"this"` or `"span":"future"` in params.
 - Attendees are read-only in 0.3. The adapter does not send invitations and
   rejects non-empty attendee input.
 - Timed Calendar dates are ISO 8601; all-day events use date-only `YYYY-MM-DD`
   with an exclusive end date. Time zones use valid IANA identifiers.
 - Each alarm uses exactly one relative or absolute trigger. `alarms: []` clears
   alarms, and create removes inherited default alarms before applying JSON.
-- Calendar `create --idempotent` uses an opaque, privacy-minimized 60-second
+- Calendar `POST /calendar/create` with `"idempotent":true` in params uses an opaque, privacy-minimized 60-second
   receipt for immediate process retries. It must not persist event text.
 - Conflict scans are capped at 200 events; adjacent boundaries are not conflicts.
 - Dry-run private JSON remains in auto-deleted mode-700 temporary directories;

@@ -15,7 +15,7 @@ data.
 
 ## Adapters
 
-`mpia` ships ten adapters, each an independent command group with its own
+`mpia` ships ten adapters, each with independent REST-style routes and its own
 permission model:
 
 | Adapter | Command | Data source / framework | Access |
@@ -42,7 +42,7 @@ git clone https://github.com/xxvk/mpia-cli.git
 cd mpia-cli
 export DEVELOPER_DIR="$(xcode-select -p)"
 swift build
-.build/debug/mpia resources --format json
+.build/debug/mpia OPTIONS "/resources"
 ```
 
 Requirements: macOS 26 or newer, Apple Silicon, and Xcode with Swift 6.2.
@@ -68,10 +68,10 @@ Automation) must be authorized for the installed app bundle
 Start with capability and permission checks — they never modify data:
 
 ```bash
-mpia resources --format json
-mpia contacts permission
-mpia mail doctor --format json
-mpia phone-calls recent --limit 5 --format json
+mpia OPTIONS "/resources"
+mpia OPTIONS "/contacts/permission"
+mpia OPTIONS "/mail/doctor"
+mpia GET "/phone-calls/recent" --params '{"limit":5}'
 ```
 
 Every command returns the same JSON envelope:
@@ -83,8 +83,12 @@ Every command returns the same JSON envelope:
 Get the complete machine-readable command registry with:
 
 ```bash
-mpia manifest --format json
+mpia GET "/agent/manifest"
 ```
+
+Business commands use `mpia METHOD "/path" [--params JSON] [--body JSON]`.
+Inline JSON may be retained in shell history or process arguments; never use it
+for API keys, passwords, or other secrets.
 
 ## Safety model
 

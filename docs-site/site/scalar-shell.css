@@ -102,6 +102,39 @@ h1.section-header-label {
   color: #fff;
 }
 
+.introduction-section table :is(th, td) br + em {
+  color: #6b7280;
+  display: inline-block;
+  font-size: 0.78em;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.dark-mode .introduction-section table :is(th, td) br + em {
+  color: #a3a3a3;
+}
+
+/* The CLI/MCP comparison is the only overview matrix designed to use both
+   Scalar introduction columns. Keep surrounding prose at its readable width. */
+.scalar-app .introduction-section .markdown table:has(thead th br + em) {
+  width: calc(200% + 48px);
+  max-width: none;
+  table-layout: fixed;
+}
+
+.scalar-app .introduction-section .markdown table:has(thead th br + em) :is(th, td) {
+  text-align: center;
+}
+
+@media (max-width: 800px) {
+  .scalar-app .introduction-section .markdown table:has(thead th br + em) {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 /* --- Sidebar HTTP method colors (match Scalar operation cards) --- */
 .sidebar-heading-type--get { color: #4eb3ec !important; }
 .sidebar-heading-type--post { color: #00b648 !important; }
@@ -178,18 +211,18 @@ body:has(.mpia-topbar) .scalar-app {
 /* --- Dark mode --- */
 body.dark-mode .mpia-topbar,
 .dark-mode .mpia-topbar {
-  border-bottom: 1px solid rgb(255 255 255 / 12%);
-  background: rgb(16 16 20 / 96%);
+  border-bottom-color: #e5e7eb;
+  background: rgb(255 255 255 / 98%);
 }
 
 body.dark-mode .mpia-brand,
 .dark-mode .mpia-brand {
-  color: #f1f1f1;
+  color: #111;
 }
 
 body.dark-mode .mpia-brand-tagline,
 .dark-mode .mpia-brand-tagline {
-  color: #a7a7a7;
+  color: #666;
 }
 
 .mpia-group-icon {
@@ -223,9 +256,9 @@ body.dark-mode .mpia-brand-tagline,
 }
 
 .dark-mode .mpia-github-link {
-  color: #f1f1f1;
+  color: #111;
 }
 
 .dark-mode .mpia-github-link:hover {
-  background: rgb(255 255 255 / 10%);
+  background: rgb(53 70 91 / 8%);
 }

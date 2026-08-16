@@ -52,7 +52,7 @@ public enum ReminderError: Error, Equatable, Sendable, CustomStringConvertible {
     public var description: String {
         switch self {
         case .permissionRequired:
-            "Reminders permission has not been granted. Run 'mpia reminders permission' and allow full access."
+            "Reminders permission has not been granted. Run 'mpia OPTIONS /reminders/permission' and allow full access."
         case .permissionDenied:
             "Reminders permission was denied. Enable full access in System Settings > Privacy & Security > Reminders."
         case .permissionRestricted:

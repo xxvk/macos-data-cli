@@ -33,14 +33,14 @@ chmod 700 "$TMP_DIR"
 printf '%s' 'mpia-071-sentinel' >"$TMP_DIR/input.txt"
 chmod 600 "$TMP_DIR/input.txt"
 
-"$CLI" shortcuts author validate --source "$SOURCE" --format json >"$TMP_DIR/validate-created.json"
-"$CLI" shortcuts author validate --source "$UPDATED_SOURCE" --format json >"$TMP_DIR/validate-updated.json"
+"$CLI" POST /shortcuts/author/validate --params "$(jq -cn --arg source "$SOURCE" '{source:$source}')" >"$TMP_DIR/validate-created.json"
+"$CLI" POST /shortcuts/author/validate --params "$(jq -cn --arg source "$UPDATED_SOURCE" '{source:$source}')" >"$TMP_DIR/validate-updated.json"
 SOURCE_SHA="$(jq -er '.data.sourceSHA256' "$TMP_DIR/validate-created.json")"
 UPDATED_SOURCE_SHA="$(jq -er '.data.sourceSHA256' "$TMP_DIR/validate-updated.json")"
 jq -e '.ok == true and .data.actionCount == 1' "$TMP_DIR/validate-created.json" >/dev/null
 jq -e '.ok == true and .data.actionCount == 2' "$TMP_DIR/validate-updated.json" >/dev/null
 
-"$CLI" shortcuts create --source "$SOURCE" --dry-run --idempotent --format json >"$TMP_DIR/create-preview.json"
+"$CLI" POST /shortcuts/create --params "$(jq -cn --arg source "$SOURCE" '{source:$source,idempotent:true}')" --dry-run >"$TMP_DIR/create-preview.json"
 jq -e --arg hash "$SOURCE_SHA" '
   .ok == true and .data.operation == "create_preview" and .data.dryRun == true
   and .data.changed == false and .data.verification == "not_applied"
@@ -48,15 +48,15 @@ jq -e --arg hash "$SOURCE_SHA" '
   and .data.registrySaved == false
 ' "$TMP_DIR/create-preview.json" >/dev/null
 
-"$CLI" shortcuts list --limit 200 --format json >"$TMP_DIR/before.json"
+"$CLI" GET /shortcuts/list --params '{"limit":200}' >"$TMP_DIR/before.json"
 jq -e --arg name "$FIXTURE_NAME" '[.data.items[] | select(.name == $name or (.name | startswith($name + " (mpia ")))] | length == 0' "$TMP_DIR/before.json" >/dev/null || {
   echo "Refusing to run: a Shortcut with the disposable fixture name already exists." >&2
   exit 1
 }
 
 echo "Waiting for the visible Shortcuts.app Add Shortcut confirmation..."
-"$CLI" shortcuts create --source "$SOURCE" --apply --idempotent \
-  --confirm "CREATE MANAGED SHORTCUT" --format json >"$TMP_DIR/created.json"
+"$CLI" POST /shortcuts/create --params "$(jq -cn --arg source "$SOURCE" '{source:$source,idempotent:true}')" --apply \
+  --confirm "CREATE MANAGED SHORTCUT" >"$TMP_DIR/created.json"
 jq -e --arg hash "$SOURCE_SHA" '
   .ok == true and .data.operation == "created" and .data.verification == "readback_confirmed"
   and .data.sourceSHA256 == $hash and .data.actionCount == 1
@@ -65,17 +65,17 @@ jq -e --arg hash "$SOURCE_SHA" '
 ' "$TMP_DIR/created.json" >/dev/null
 SHORTCUT_ID="$(jq -er '.data.shortcutID' "$TMP_DIR/created.json")"
 
-"$CLI" shortcuts get --id "$SHORTCUT_ID" --format json >"$TMP_DIR/get-created.json"
+"$CLI" GET /shortcuts/get --params "$(jq -cn --arg id "$SHORTCUT_ID" '{id:$id}')" >"$TMP_DIR/get-created.json"
 jq -e --arg id "$SHORTCUT_ID" --arg name "$FIXTURE_NAME" '
   .ok == true and .data.id == $id and .data.name == $name
 ' "$TMP_DIR/get-created.json" >/dev/null
 
-"$CLI" shortcuts run --id "$SHORTCUT_ID" --input-path "$TMP_DIR/input.txt" \
-  --apply --confirm "RUN SHORTCUT" --format json >"$TMP_DIR/run-created.json"
+"$CLI" POST /shortcuts/run --params "$(jq -cn --arg id "$SHORTCUT_ID" --arg input "$TMP_DIR/input.txt" '{id:$id,"input-path":[$input]}')" \
+  --apply --confirm "RUN SHORTCUT" >"$TMP_DIR/run-created.json"
 jq -e '.ok == true and .data.verification == "completed" and .data.output == "mpia-071-sentinel"' "$TMP_DIR/run-created.json" >/dev/null
 
-"$CLI" shortcuts update --id "$SHORTCUT_ID" --source "$UPDATED_SOURCE" \
-  --expected-source-sha256 "$SOURCE_SHA" --strategy retain-old --dry-run --format json >"$TMP_DIR/update-preview.json"
+"$CLI" PUT /shortcuts/update --params "$(jq -cn --arg id "$SHORTCUT_ID" --arg source "$UPDATED_SOURCE" --arg sha "$SOURCE_SHA" '{id:$id,source:$source,"expected-source-sha256":$sha,strategy:"retain-old"}')" \
+  --dry-run >"$TMP_DIR/update-preview.json"
 jq -e --arg hash "$UPDATED_SOURCE_SHA" '
   .ok == true and .data.operation == "update_preview" and .data.dryRun == true
   and .data.verification == "not_applied" and .data.sourceSHA256 == $hash
@@ -83,9 +83,8 @@ jq -e --arg hash "$UPDATED_SOURCE_SHA" '
 ' "$TMP_DIR/update-preview.json" >/dev/null
 
 echo "Waiting for the visible Shortcuts.app Add Shortcut confirmation for the retain-old candidate..."
-"$CLI" shortcuts update --id "$SHORTCUT_ID" --source "$UPDATED_SOURCE" \
-  --expected-source-sha256 "$SOURCE_SHA" --strategy retain-old --apply \
-  --confirm "UPDATE MANAGED SHORTCUT" --format json >"$TMP_DIR/updated.json"
+"$CLI" PUT /shortcuts/update --params "$(jq -cn --arg id "$SHORTCUT_ID" --arg source "$UPDATED_SOURCE" --arg sha "$SOURCE_SHA" '{id:$id,source:$source,"expected-source-sha256":$sha,strategy:"retain-old"}')" \
+  --apply --confirm "UPDATE MANAGED SHORTCUT" >"$TMP_DIR/updated.json"
 jq -e --arg old "$SHORTCUT_ID" --arg hash "$UPDATED_SOURCE_SHA" '
   .ok == true and .data.operation == "updated" and .data.verification == "readback_confirmed"
   and .data.previousShortcutID == $old and .data.sourceSHA256 == $hash
@@ -96,30 +95,30 @@ jq -e --arg old "$SHORTCUT_ID" --arg hash "$UPDATED_SOURCE_SHA" '
 UPDATED_SHORTCUT_ID="$(jq -er '.data.shortcutID' "$TMP_DIR/updated.json")"
 UPDATED_FIXTURE_NAME="$FIXTURE_NAME (mpia ${UPDATED_SOURCE_SHA:0:8})"
 
-"$CLI" shortcuts get --id "$UPDATED_SHORTCUT_ID" --format json >"$TMP_DIR/get-updated.json"
+"$CLI" GET /shortcuts/get --params "$(jq -cn --arg id "$UPDATED_SHORTCUT_ID" '{id:$id}')" >"$TMP_DIR/get-updated.json"
 jq -e --arg id "$UPDATED_SHORTCUT_ID" --arg name "$UPDATED_FIXTURE_NAME" '
   .ok == true and .data.id == $id and .data.name == $name
 ' "$TMP_DIR/get-updated.json" >/dev/null
 
-"$CLI" shortcuts run --id "$UPDATED_SHORTCUT_ID" --input-path "$TMP_DIR/input.txt" \
-  --apply --confirm "RUN SHORTCUT" --format json >"$TMP_DIR/run-updated.json"
+"$CLI" POST /shortcuts/run --params "$(jq -cn --arg id "$UPDATED_SHORTCUT_ID" --arg input "$TMP_DIR/input.txt" '{id:$id,"input-path":[$input]}')" \
+  --apply --confirm "RUN SHORTCUT" >"$TMP_DIR/run-updated.json"
 jq -e '.ok == true and .data.verification == "completed" and .data.output == "mpia-071-sentinel"' "$TMP_DIR/run-updated.json" >/dev/null
 
 echo "Create, run, retain-old update, and read-back passed. Delete both disposable fixture Shortcuts in Shortcuts.app, then press Return here."
 read -r _
 
-"$CLI" shortcuts list --limit 200 --format json >"$TMP_DIR/after-ui-delete.json"
+"$CLI" GET /shortcuts/list --params '{"limit":200}' >"$TMP_DIR/after-ui-delete.json"
 jq -e --arg name "$FIXTURE_NAME" '[.data.items[] | select(.name == $name or (.name | startswith($name + " (mpia ")))] | length == 0' "$TMP_DIR/after-ui-delete.json" >/dev/null || {
   echo "Cleanup is not confirmed: at least one disposable Shortcut is still present." >&2
   exit 1
 }
 
-"$CLI" shortcuts managed forget --id "$UPDATED_SHORTCUT_ID" --dry-run --format json >"$TMP_DIR/forget-preview.json"
+"$CLI" DELETE /shortcuts/managed/forget --params "$(jq -cn --arg id "$UPDATED_SHORTCUT_ID" '{id:$id}')" --dry-run >"$TMP_DIR/forget-preview.json"
 jq -e --arg id "$UPDATED_SHORTCUT_ID" '.ok == true and .data.shortcutID == $id and .data.dryRun == true and .data.changed == false' "$TMP_DIR/forget-preview.json" >/dev/null
-"$CLI" shortcuts managed forget --id "$UPDATED_SHORTCUT_ID" --apply \
-  --confirm "FORGET MANAGED SHORTCUT" --format json >"$TMP_DIR/forgotten.json"
+"$CLI" DELETE /shortcuts/managed/forget --params "$(jq -cn --arg id "$UPDATED_SHORTCUT_ID" '{id:$id}')" --apply \
+  --confirm "FORGET MANAGED SHORTCUT" >"$TMP_DIR/forgotten.json"
 jq -e --arg id "$UPDATED_SHORTCUT_ID" '.ok == true and .data.shortcutID == $id and .data.dryRun == false and .data.changed == true' "$TMP_DIR/forgotten.json" >/dev/null
-"$CLI" shortcuts managed list --format json >"$TMP_DIR/managed-final.json"
+"$CLI" GET /shortcuts/managed/list >"$TMP_DIR/managed-final.json"
 jq -e --arg old "$SHORTCUT_ID" --arg current "$UPDATED_SHORTCUT_ID" '
   [.data[] | select(.shortcutID == $old or .shortcutID == $current)] | length == 0
 ' "$TMP_DIR/managed-final.json" >/dev/null

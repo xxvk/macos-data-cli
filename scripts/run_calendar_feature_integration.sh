@@ -36,7 +36,7 @@ TIMED_C_END="$(date -u -v+31d '+%Y-%m-%dT12:00:00Z')"
 ABSOLUTE_ALARM="$(date -u -v+29d '+%Y-%m-%dT12:00:00Z')"
 
 query_fixture() {
-  "$CLI" calendar query --start "$QUERY_START" --end "$QUERY_END" --limit 200 --format json \
+  "$CLI" GET /calendar/query --params "$(jq -cn --arg start "$QUERY_START" --arg end "$QUERY_END" '{start:$start,end:$end,limit:200}')" \
     | jq --arg url "$URL_VALUE" '[.data.items[] | select(.url == $url)] | sort_by(.startDate)'
 }
 
@@ -59,7 +59,7 @@ cleanup() {
   query_fixture >"$TMP_DIR/cleanup.json" 2>/dev/null
   jq -r '.[].id' "$TMP_DIR/cleanup.json" 2>/dev/null | while IFS= read -r id; do
     [[ -n "$id" ]] || continue
-    "$CLI" calendar delete --id "$id" --apply --confirm "DELETE EVENT" --format json >/dev/null 2>&1 || true
+    "$CLI" DELETE /calendar/delete --params "$(jq -cn --arg id "$id" '{id:$id}')" --apply --confirm "DELETE EVENT" >/dev/null 2>&1 || true
   done
   rm -rf "$TMP_DIR"
 }
@@ -77,9 +77,9 @@ jq -n \
     alarms: [{relativeMinutes: -15}]
   }' >"$TMP_DIR/all-day-create.json"
 
-"$CLI" calendar create --input "$TMP_DIR/all-day-create.json" --apply --format json >"$TMP_DIR/all-day-created.json"
+"$CLI" POST /calendar/create --body "$(jq -c . "$TMP_DIR/all-day-create.json")" --apply >"$TMP_DIR/all-day-created.json"
 ALL_DAY_ID="$(jq -r '.data.event.id' "$TMP_DIR/all-day-created.json")"
-"$CLI" calendar get --id "$ALL_DAY_ID" --format json >"$TMP_DIR/all-day-read.json"
+"$CLI" GET /calendar/get --params "$(jq -cn --arg id "$ALL_DAY_ID" '{id:$id}')" >"$TMP_DIR/all-day-read.json"
 jq -e --arg start "$ALL_DAY_START" --arg end "$ALL_DAY_END" '
   .ok == true and .data.allDay == true and .data.startDate == $start and .data.endDate == $end
   and .data.alarms == [{"relativeMinutes":-15}]
@@ -90,9 +90,9 @@ jq -n --arg absolute "$ABSOLUTE_ALARM" --arg end "$ALL_DAY_EDITED_END" '{
   endDate: $end,
   alarms: [{absoluteDate: $absolute}]
 }' >"$TMP_DIR/all-day-edit.json"
-"$CLI" calendar edit --id "$ALL_DAY_ID" --input "$TMP_DIR/all-day-edit.json" --apply --format json >"$TMP_DIR/all-day-edited.json"
+"$CLI" PATCH /calendar/edit --params "$(jq -cn --arg id "$ALL_DAY_ID" '{id:$id}')" --body "$(jq -c . "$TMP_DIR/all-day-edit.json")" --apply >"$TMP_DIR/all-day-edited.json"
 ALL_DAY_ID="$(jq -r '.data.event.id' "$TMP_DIR/all-day-edited.json")"
-"$CLI" calendar get --id "$ALL_DAY_ID" --format json >"$TMP_DIR/absolute-read.json"
+"$CLI" GET /calendar/get --params "$(jq -cn --arg id "$ALL_DAY_ID" '{id:$id}')" >"$TMP_DIR/absolute-read.json"
 jq -e --arg end "$ALL_DAY_EDITED_END" '
   .ok == true and .data.allDay == true and .data.endDate == $end
   and (.data.alarms | length) == 1 and .data.alarms[0].absoluteDate != null
@@ -100,9 +100,9 @@ jq -e --arg end "$ALL_DAY_EDITED_END" '
 echo "feature gate: absolute alarm replacement"
 
 printf '%s' '{"alarms":[]}' >"$TMP_DIR/clear-alarms.json"
-"$CLI" calendar edit --id "$ALL_DAY_ID" --input "$TMP_DIR/clear-alarms.json" --apply --format json >"$TMP_DIR/alarms-cleared.json"
+"$CLI" PATCH /calendar/edit --params "$(jq -cn --arg id "$ALL_DAY_ID" '{id:$id}')" --body "$(jq -c . "$TMP_DIR/clear-alarms.json")" --apply >"$TMP_DIR/alarms-cleared.json"
 ALL_DAY_ID="$(jq -r '.data.event.id' "$TMP_DIR/alarms-cleared.json")"
-"$CLI" calendar get --id "$ALL_DAY_ID" --format json >"$TMP_DIR/cleared-read.json"
+"$CLI" GET /calendar/get --params "$(jq -cn --arg id "$ALL_DAY_ID" '{id:$id}')" >"$TMP_DIR/cleared-read.json"
 jq -e '.ok == true and .data.alarms == []' "$TMP_DIR/cleared-read.json" >/dev/null
 echo "feature gate: alarm clear read-back"
 
@@ -112,7 +112,7 @@ create_timed_fixture() {
     --arg start "$start" --arg end "$end" --arg url "$URL_VALUE" '{
       title: $title, startDate: $start, endDate: $end, timeZone: "UTC", url: $url
     }' >"$TMP_DIR/$label-create.json"
-  "$CLI" calendar create --input "$TMP_DIR/$label-create.json" --apply --format json >"$output"
+  "$CLI" POST /calendar/create --body "$(jq -c . "$TMP_DIR/$label-create.json")" --apply >"$output"
 }
 
 create_timed_fixture A "$TIMED_A_START" "$TIMED_A_END" "$TMP_DIR/a.json"
@@ -129,7 +129,7 @@ jq -n --arg title "mpia disposable conflict A $SUFFIX" \
     notes: "different persisted payload"
   }' >"$TMP_DIR/idempotency-conflict.json"
 set +e
-"$CLI" calendar create --input "$TMP_DIR/idempotency-conflict.json" --apply --idempotent --format json >"$TMP_DIR/idempotency-conflict-result.json" 2>&1
+"$CLI" POST /calendar/create --params '{"idempotent":true}' --body "$(jq -c . "$TMP_DIR/idempotency-conflict.json")" --apply >"$TMP_DIR/idempotency-conflict-result.json" 2>&1
 IDEMPOTENCY_EXIT=$?
 set -e
 [[ "$IDEMPOTENCY_EXIT" -eq 5 ]] || { echo "Expected idempotency conflict exit 5, got $IDEMPOTENCY_EXIT" >&2; exit 1; }
@@ -137,7 +137,7 @@ jq -e '.ok == false and .error.code == "CALENDAR_IDEMPOTENCY_CONFLICT"' "$TMP_DI
 wait_for_fixture_count 4 "$TMP_DIR/four-fixtures.json"
 echo "feature gate: non-equivalent idempotent retry rejected without duplicate"
 
-"$CLI" calendar conflicts --start "$QUERY_START" --end "$QUERY_END" --format json >"$TMP_DIR/conflicts.json"
+"$CLI" GET /calendar/conflicts --params "$(jq -cn --arg start "$QUERY_START" --arg end "$QUERY_END" '{start:$start,end:$end}')" >"$TMP_DIR/conflicts.json"
 jq -e --arg a "$A_ID" --arg b "$B_ID" --arg c "$C_ID" '
   [.data.conflicts[] | select((.firstEventID == $a and .secondEventID == $b) or (.firstEventID == $b and .secondEventID == $a))] | length == 1
 ' "$TMP_DIR/conflicts.json" >/dev/null
@@ -147,7 +147,7 @@ jq -e --arg b "$B_ID" --arg c "$C_ID" '
 echo "feature gate: strict overlap detected and adjacent boundary ignored"
 
 jq -r '.[].id' "$TMP_DIR/four-fixtures.json" | while IFS= read -r id; do
-  "$CLI" calendar delete --id "$id" --apply --confirm "DELETE EVENT" --format json >/dev/null
+  "$CLI" DELETE /calendar/delete --params "$(jq -cn --arg id "$id" '{id:$id}')" --apply --confirm "DELETE EVENT" >/dev/null
 done
 wait_for_fixture_count 0 "$TMP_DIR/final.json"
 

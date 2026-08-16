@@ -58,7 +58,7 @@ public enum SafariError: Error, Equatable, CustomStringConvertible, Sendable {
         case .notFound:
             "The selected Safari bookmark or Reading List item was not found."
         case .permissionRequired:
-            "Safari Automation requires consent. Open Safari, then run 'mpia safari permission --request'."
+            "Safari Automation requires consent. Open Safari, then run: mpia OPTIONS /safari/permission --params '{\"request\":true}'."
         case .permissionDenied:
             "Safari Automation was denied. Enable mpia for Safari in System Settings > Privacy & Security > Automation."
         case .targetUnavailable:

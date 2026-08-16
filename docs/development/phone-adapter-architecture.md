@@ -65,9 +65,9 @@ bounded schema fingerprint at runtime and fail closed on mismatch.
 
 ## Command surface (0.9.2)
 
-- `mpia phone-calls permission` — status-only authorization/readability probe.
+- `mpia OPTIONS "/phone-calls/permission"` — status-only authorization/readability probe.
   Reports Full Disk Access and store accessibility without prompting.
-- `mpia phone-calls recent [--limit N] [--cursor C]` — read-only recent calls,
+- `mpia GET "/phone-calls/recent" --params '{"limit":20,"cursor":"<opaque-cursor>"}'` — read-only recent calls,
   newest first, cursor paginated. Returns per call: opaque local ID, direction,
   kind, answered flag, missed flag, duration, and timestamp.
 - Read-only only. No placing calls, deleting history, marking read, or any write.
@@ -116,8 +116,8 @@ Projection and redaction rules (non-negotiable):
 - Reading `CallHistory.storedata` requires Full Disk Access for the responsible
   process (the signed app bundle `.build/debug/mpia.app` during development,
   the released bundle in distribution).
-- `phone-calls permission` is status-only and must not prompt. There is no
-  `--request` path in 0.9.2.
+- `OPTIONS /phone-calls/permission` is status-only and must not prompt. It
+  accepts no consent-request parameter.
 
 ## Component design
 

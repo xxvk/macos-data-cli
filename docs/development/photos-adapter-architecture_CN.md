@@ -35,14 +35,11 @@ burst、Live Photo；只有 `--include-location` 才返回精确位置。metadat
 `contentAvailability` 为 `unknown`。query/get 不调用媒体 manager，也不触发 iCloud 下载；
 hidden asset 默认排除。
 
-```text
-mpia photos permission [--request] --format json
-mpia photos albums [--kind user|smart|all] [--limit N] [--cursor C] --format json
-mpia photos query --start <ISO-8601> --end <ISO-8601> [--album-id ID]
-  [--media image|video|audio|unknown] [--favorite true|false]
-  [--include-hidden] [--include-location] [--limit N] [--cursor C] --format json
-mpia photos get --id <opaque-asset-id> [--include-location] --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 query 使用 creation date，start 必须早于 end，并设置跨度上限。默认 50、最大 200；按 creation
 date 降序和 opaque ID 排序。分页使用绑定过滤条件的 opaque anchor cursor。

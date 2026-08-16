@@ -84,7 +84,7 @@ export function referencePage({ language, spec, assetPrefix = '../assets', rootP
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="${assetPrefix}/scalar-shell.css">
 </head>
-<body data-mpia-root-prefix="${rootPrefix}">
+<body data-mpia-root-prefix="${rootPrefix}" data-mpia-version="${spec.info.version}">
   ${topbar(language, languageHref)}
   <template id="mpia-language-switcher-template"><nav class="language-switcher" aria-label="Documentation language"><span class="language-tabs">${languageLinks(language, languageHref)}</span></nav></template>
   <script id="api-reference" type="application/json" data-configuration="${serialize(config).replace(/"/g, '&quot;')}"></script>

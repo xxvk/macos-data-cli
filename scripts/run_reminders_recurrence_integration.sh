@@ -14,12 +14,12 @@ usage() {
 cleanup() {
   if [[ -x "$CLI" ]] && command -v jq >/dev/null; then
     for _ in 1 2 3 4; do
-      ids="$("$CLI" reminders query --status all --title "$TITLE" --limit 20 --format json 2>/dev/null |
+      ids="$("$CLI" GET /reminders/query --params "$(jq -cn --arg title "$TITLE" '{status:"all",title:$title,limit:20}')" 2>/dev/null |
         jq -r --arg title "$TITLE" '.data.items[] | select(.title == $title) | .id' 2>/dev/null || true)"
       [[ -n "$ids" ]] || break
       while IFS= read -r id; do
         [[ -n "$id" ]] || continue
-        "$CLI" reminders delete --id "$id" --apply --confirm "DELETE REMINDER" --format json >/dev/null 2>&1 || true
+        "$CLI" DELETE /reminders/delete --params "$(jq -cn --arg id "$id" '{id:$id}')" --apply --confirm "DELETE REMINDER" >/dev/null 2>&1 || true
       done <<<"$ids"
     done
   fi
@@ -38,15 +38,15 @@ jq -n --arg title "$TITLE" --arg due "$start_date" '{
   recurrenceRules:[{frequency:"daily",interval:1,daysOfWeek:[],weekdayOrdinals:[],daysOfMonth:[],monthsOfYear:[],weeksOfYear:[],daysOfYear:[],setPositions:[],end:{endDate:null,occurrenceCount:2}}]
 }' >"$TMP_DIR/input.json"
 
-"$CLI" reminders create --input "$TMP_DIR/input.json" --apply --format json >"$TMP_DIR/created.json"
+"$CLI" POST /reminders/create --body "$(jq -c . "$TMP_DIR/input.json")" --apply >"$TMP_DIR/created.json"
 current_id="$(jq -er '.data.reminder.id' "$TMP_DIR/created.json")"
 current_due="$(jq -er '.data.reminder.due.value' "$TMP_DIR/created.json")"
 jq -e '.ok == true and .data.reminder.hasRecurrenceRules == true' "$TMP_DIR/created.json" >/dev/null
 
-"$CLI" reminders complete --id "$current_id" --apply --format json >"$TMP_DIR/completed.json"
+"$CLI" POST /reminders/complete --params "$(jq -cn --arg id "$current_id" '{id:$id}')" --apply >"$TMP_DIR/completed.json"
 jq -e '.ok == true and .data.operation == "completed" and .data.changed == true' "$TMP_DIR/completed.json" >/dev/null
 
-next="$("$CLI" reminders query --status incomplete --title "$TITLE" --limit 20 --format json)"
+next="$("$CLI" GET /reminders/query --params "$(jq -cn --arg title "$TITLE" '{status:"incomplete",title:$title,limit:20}')")"
 next_id="$(printf '%s' "$next" | jq -er --arg title "$TITLE" '[.data.items[] | select(.title == $title and .completed == false)] | first | .id')"
 next_due="$(printf '%s' "$next" | jq -er --arg title "$TITLE" '[.data.items[] | select(.title == $title and .completed == false)] | first | .due.value')"
 [[ "$next_due" != "$current_due" ]] || { echo "Recurring completion did not advance the due date." >&2; exit 1; }
@@ -64,7 +64,7 @@ fi
 
 cleanup
 trap - EXIT
-remaining="$("$CLI" reminders query --status all --title "$TITLE" --limit 20 --format json)"
+remaining="$("$CLI" GET /reminders/query --params "$(jq -cn --arg title "$TITLE" '{status:"all",title:$title,limit:20}')")"
 printf '%s' "$remaining" | jq -e --arg title "$TITLE" '[.data.items[] | select(.title == $title)] | length == 0' >/dev/null
 
 if [[ "$next_id" == "$current_id" ]]; then

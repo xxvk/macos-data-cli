@@ -67,24 +67,16 @@ Official references:
   selected iCloud source and is writable. Otherwise the only writable list is
   selected when exactly one exists; multiple writable lists require explicit
   `listID` and fail closed.
-- `mpia resources` should expose Reminders capability without exposing
+- `mpia OPTIONS "/resources"` should expose Reminders capability without exposing
   Apple IDs or account addresses.
 
 ## Proposed commands
 
-```text
-mpia reminders permission --format json
-mpia reminders sources --format json
-mpia reminders lists --format json
-mpia reminders query [--status incomplete|completed|all] [--due-start <value>] [--due-end <value>] [--list <id|unique-title>] [--title <text>] [--limit <1...200>] [--cursor <cursor>] --format json
-mpia reminders get --id <opaque-reminder-id> --format json
-mpia reminders create --input <file>|--stdin --dry-run|--apply [--idempotent] --format json
-mpia reminders edit --id <id> --input <file>|--stdin --dry-run|--apply --format json
-mpia reminders complete --id <id> --dry-run|--apply --format json
-mpia reminders reopen --id <id> --dry-run|--apply --format json
-mpia reminders delete --id <id> --dry-run --format json
-mpia reminders delete --id <id> --apply --confirm "DELETE REMINDER" --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+Discover executable 0.9.3 routes from the manifest; see `docs/usage.md` for examples.
 
 Permission prompting occurs only through the explicit permission command.
 

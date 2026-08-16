@@ -44,7 +44,7 @@ values use ISO 8601; all-day start/end values use `YYYY-MM-DD`. Calendar query r
 `nextCursor`, `truncated`, and `complete` fields. `calevent_`, source, calendar,
 and cursor IDs are machine-local opaque values and must not be parsed. A moved
 event's returned ID replaces the old ID. Recurring edit/delete requires an
-explicit `--span this` or `--span future`.
+explicit `"span":"this"` or `"span":"future"` field in params.
 
 Safari bookmark and Reading List IDs are machine-local opaque values. Query
 cursors bind the complete `Bookmarks.plist` fingerprint and return a stale

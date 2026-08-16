@@ -159,7 +159,7 @@ public struct ChatDbReader {
     /// Readability probe: full disk access + schema state, without prompting.
     public func permission() throws -> MessagesPermissionStatus {
         do {
-            try MessagesStoreLocator().locate()
+            _ = try MessagesStoreLocator().locate()
         } catch MessagesError.fullDiskAccessRequired {
             return MessagesPermissionStatus(readable: false, fullDiskAccess: false, schemaFingerprint: nil, limitations: ["Full Disk Access required"])
         }

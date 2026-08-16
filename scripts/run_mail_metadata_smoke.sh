@@ -12,9 +12,9 @@ if [[ ! -x "$CLI" ]]; then
   exit 1
 fi
 
-"$CLI" mail accounts --format json >"$TMP_DIR/accounts.json"
-"$CLI" mail mailboxes --format json >"$TMP_DIR/mailboxes.json"
-"$CLI" mail query --limit 2 --format json >"$TMP_DIR/query.json"
+"$CLI" GET /mail/accounts >"$TMP_DIR/accounts.json"
+"$CLI" GET /mail/mailboxes >"$TMP_DIR/mailboxes.json"
+"$CLI" GET /mail/query --params '{"limit":2}' >"$TMP_DIR/query.json"
 
 rg -q '"backend"[[:space:]]*:[[:space:]]*"sqlite"' "$TMP_DIR/accounts.json"
 rg -q '"accounts"[[:space:]]*:' "$TMP_DIR/accounts.json"

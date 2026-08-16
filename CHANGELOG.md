@@ -4,6 +4,8 @@ Summary of each major version. Detailed per-patch notes live in the git history.
 
 ## 0.9 — 2026-08-16
 
+- 0.9.3 replaces the adapter/subcommand surface with one strict local REST-style CLI contract: `mpia METHOD "/path"`, inline `--params`/`--body` JSON, route-derived manifest/OpenAPI, fixed JSON envelopes, and stable legacy-syntax errors. It is not a network HTTP server.
+- Split the former 2,617-line CLI dispatcher into bounded per-adapter parsers and handlers; all 0.9.3 CLI/route source files are below the 300-line hard cap.
 - Renamed the project from `macos-data-cli` to `mpia-cli`: canonical command `mpia`, bundle identifier `com.xvk.mpia.cli`, and Contacts external-ID scheme `mpia://ext-id/<id>`. TCC authorization must be granted once more for the new identity.
 - Added the read-only `messages` adapter over `~/Library/Messages/chat.db` (Full Disk Access): a status-only permission probe plus newest-first, cursor-paginated recent messages with a bounded 500-char text projection; handles and IDs never leave the adapter.
 - Added the read-only `phone-calls` adapter over `~/Library/Application Support/CallHistoryDB/CallHistory.storedata` (Full Disk Access): a permission probe plus recent calls with direction/time/duration/missed state; counterparty identifiers never leave the adapter.

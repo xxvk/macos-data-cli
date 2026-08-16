@@ -33,9 +33,11 @@ for (const { code } of languages) {
   const localized = localizeOpenApiSpec(sourceSpec, code);
   addRoadmapSections(localized, code);
   const overviewMarkdown = readFileSync(resolve(docsSiteRoot, 'guides', code, 'overview.md'), 'utf8');
+  const cliVsMcpMarkdown = readFileSync(resolve(docsSiteRoot, 'guides', code, 'cli-vs-mcp.md'), 'utf8');
   localized.info.description = [
     overviewMarkdown.trim(),
     `### ${semanticsHeadings[code]}\n\n${localized.info.description.trim()}`,
+    cliVsMcpMarkdown.trim(),
   ].join('\n\n');
 
   mkdirSync(resolve(dist, code), { recursive: true });

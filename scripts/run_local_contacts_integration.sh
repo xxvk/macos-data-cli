@@ -41,18 +41,18 @@ run() {
 
 echo "== Contacts local integration smoke test =="
 echo "CLI: $CLI"
-run contacts container --format json
-run contacts count
-run contacts get --external-id "$PERSON_ID" --format json
-run contacts get --external-id "$ORGANIZATION_ID" --format json
-run contacts get --external-id "$CREATE_ID" --format json
-run contacts query --organization "mpia Test Organization" --format json
-run contacts export --format json --output "${TMPDIR:-/tmp}/mpia-contacts-snapshot.json"
-run contacts create --input "$ROOT_DIR/Tests/Fixtures/organization-create.json" --dry-run --format json
-run contacts edit --external-id "$PERSON_ID" --input "$PATCH_FIXTURE" --dry-run --format json
-run contacts edit --external-id "$PERSON_ID" --image "$AVATAR_FIXTURE" --dry-run --format json
-run contacts delete --external-id "$PERSON_ID" --dry-run --format json
-run contacts external-id migrate --from "$PERSON_ID" --to "xvk-test-contacts-preview-001" --dry-run --format json
+run HEAD /contacts/container
+run HEAD /contacts/count
+run GET /contacts/get --params "$(jq -cn --arg id "$PERSON_ID" '{"external-id":$id}')"
+run GET /contacts/get --params "$(jq -cn --arg id "$ORGANIZATION_ID" '{"external-id":$id}')"
+run GET /contacts/get --params "$(jq -cn --arg id "$CREATE_ID" '{"external-id":$id}')"
+run GET /contacts/query --params '{"organization":"mpia Test Organization"}'
+run POST /contacts/export --params "$(jq -cn --arg output "${TMPDIR:-/tmp}/mpia-contacts-snapshot.json" '{output:$output}')"
+run POST /contacts/create --body "$(jq -c . "$ROOT_DIR/Tests/Fixtures/organization-create.json")" --dry-run
+run PATCH /contacts/edit --params "$(jq -cn --arg id "$PERSON_ID" '{"external-id":$id}')" --body "$(jq -c . "$PATCH_FIXTURE")" --dry-run
+run PATCH /contacts/avatar/edit --params "$(jq -cn --arg id "$PERSON_ID" --arg image "$AVATAR_FIXTURE" '{"external-id":$id,image:$image}')" --dry-run
+run DELETE /contacts/delete --params "$(jq -cn --arg id "$PERSON_ID" '{"external-id":$id}')" --dry-run
+run POST /contacts/external-id/migrate --params "$(jq -cn --arg from "$PERSON_ID" --arg to "xvk-test-contacts-preview-001" '{from:$from,to:$to}')" --dry-run
 
 if [[ "$WITH_WRITES" != true ]]; then
   echo "Read-only/dry-run integration checks passed."
@@ -63,34 +63,34 @@ created=false
 cleanup() {
   if [[ "$created" == true ]]; then
     echo "Cleaning up temporary contact: $TEMP_ID"
-    "$CLI" contacts delete --external-id "$TEMP_ID" --apply --confirm "DELETE CONTACT" --format json || true
+    "$CLI" DELETE /contacts/delete --params "$(jq -cn --arg id "$TEMP_ID" '{"external-id":$id}')" --apply --confirm "DELETE CONTACT" || true
   fi
 }
 trap cleanup EXIT
 
-run contacts create --input "$TEMP_FIXTURE" --apply --format json
+run POST /contacts/create --body "$(jq -c . "$TEMP_FIXTURE")" --apply
 created=true
-run contacts get --external-id "$TEMP_ID" --format json
-replacement_result="$("$CLI" contacts avatar replace --external-id "$TEMP_ID" --image "$AVATAR_FIXTURE" --apply --confirm "RECREATE CONTACT" --format json)"
+run GET /contacts/get --params "$(jq -cn --arg id "$TEMP_ID" '{"external-id":$id}')"
+replacement_result="$("$CLI" PUT /contacts/avatar/replace --params "$(jq -cn --arg id "$TEMP_ID" --arg image "$AVATAR_FIXTURE" '{"external-id":$id,image:$image}')" --apply --confirm "RECREATE CONTACT")"
 echo "$replacement_result"
 if ! echo "$replacement_result" | rg -q '"status"[[:space:]]*:[[:space:]]*"(readback_confirmed|save_accepted|verification_unknown)"'; then
   echo "Avatar replacement did not return a recognized verification status" >&2
   exit 1
 fi
-run contacts edit --external-id "$TEMP_ID" --input "$PATCH_FIXTURE" --apply --format json
-image_result="$("$CLI" contacts edit --external-id "$TEMP_ID" --image "$AVATAR_FIXTURE" --apply --format json)"
+run PATCH /contacts/edit --params "$(jq -cn --arg id "$TEMP_ID" '{"external-id":$id}')" --body "$(jq -c . "$PATCH_FIXTURE")" --apply
+image_result="$("$CLI" PATCH /contacts/avatar/edit --params "$(jq -cn --arg id "$TEMP_ID" --arg image "$AVATAR_FIXTURE" '{"external-id":$id,image:$image}')" --apply)"
 echo "$image_result"
 if ! echo "$image_result" | rg -q '"status"[[:space:]]*:[[:space:]]*"(readback_confirmed|save_accepted|verification_unknown)"'; then
   echo "Avatar write did not return a recognized verification status" >&2
   exit 1
 fi
-run contacts external-id migrate --from "$TEMP_ID" --to "$MIGRATED_ID" --apply --confirm "CHANGE EXTERNAL ID" --format json
+run POST /contacts/external-id/migrate --params "$(jq -cn --arg from "$TEMP_ID" --arg to "$MIGRATED_ID" '{from:$from,to:$to}')" --apply --confirm "CHANGE EXTERNAL ID"
 TEMP_ID="$MIGRATED_ID"
-run contacts get --external-id "$TEMP_ID" --format json
-run contacts delete --external-id "$TEMP_ID" --apply --confirm "DELETE CONTACT" --format json
+run GET /contacts/get --params "$(jq -cn --arg id "$TEMP_ID" '{"external-id":$id}')"
+run DELETE /contacts/delete --params "$(jq -cn --arg id "$TEMP_ID" '{"external-id":$id}')" --apply --confirm "DELETE CONTACT"
 created=false
 
-if "$CLI" contacts get --external-id "$TEMP_ID" --format json; then
+if "$CLI" GET /contacts/get --params "$(jq -cn --arg id "$TEMP_ID" '{"external-id":$id}')"; then
   echo "Expected deleted contact lookup to fail" >&2
   exit 1
 fi

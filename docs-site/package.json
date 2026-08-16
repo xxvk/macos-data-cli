@@ -1,7 +1,7 @@
 {
   "name": "mpia-docs-site",
   "private": true,
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Customer-facing Scalar documentation site for the mpia macOS data CLI.",
   "homepage": "https://mpia-cli-doc.vercel.app/",
   "repository": "https://github.com/xxvk/mpia-cli",

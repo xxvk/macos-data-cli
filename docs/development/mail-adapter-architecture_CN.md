@@ -105,7 +105,7 @@ macOS 26 安装都一定是 `V10`。因此 0.2.0 按运行时能力定义支持�
 确认，不能硬编码推断。`MailStoreLocator` 动态发现最高数字版本的 `V*`；首个
 `MailV10Schema` 只有在必要表、字段、索引、时间戳范围和 WAL 可读性全部符合时才启用。
 
-`mail doctor --format json` 应返回 `osVersion`、`sdkBaseline`、
+`OPTIONS /mail/doctor` 应返回 `osVersion`、`sdkBaseline`、
 `mailStoreVersion`、`schemaFingerprint`、`fullDiskAccess`、`automation` 和
 `fastPathAvailable`，以便在真实 macOS 26 主机上验收。
 
@@ -178,16 +178,11 @@ FTS；它无法回填历史邮件，而且需要签名 host app 与用户在 Mai
 
 ## 0.2.0 MVP
 
-```text
-mpia mail doctor --format json
-mpia mail accounts --format json
-mpia mail mailboxes [--account-id <id>] --format json
-mpia mail query [filters] [--limit <n>] [--cursor <cursor>] --format json
-mpia mail get --id <opaque-local-id> [--content metadata|text] --format json
-mpia mail get --id <opaque-local-id> --content raw --output <file|->
-mpia mail reveal --id <opaque-local-id> [--format json]
-mpia mail attachments verify --id <opaque-local-id> --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+0.9.3 可执行 route 请从 manifest 获取；完整示例见 `docs/usage_CN.md`。
 
 首版查询支持 account、mailbox、from、to、subject、received-after/before、
 unread、flagged 和 has-attachment。`get` 默认只返回 metadata；读取正文必须显式指定。
@@ -211,15 +206,15 @@ partial EMLX 永远不能产生 `matched`。
 
 ## CLI 语法与参数哲学
 
-统一语法是：
+Mail 使用统一的本机 REST 风格 CLI：
 
 ```text
-mpia <domain> <operation> [selector] [projection] [rendering]
+mpia METHOD "/mail/path" --params '<JSON object>'
 ```
 
-在 Mail 中，`mail` 是数据域；filter 和 `--id` 负责选择；`--content` 决定对选中
-邮件读取多少内容；`--format` 只决定序列化方式。选择、内容投影和输出表现互不混用，
-避免底层存储或显示格式改变查询语义。
+selector 与 projection 字段都位于严格的 `--params` object 中。例如 `id` 选择一封
+opaque 邮件，`content` 选择 `metadata|text|raw`，`output` 指定文件目标。stdout 始终
+返回带版本的 JSON envelope；raw bytes 只写入显式文件路径。
 
 设计遵循六条规则：
 
@@ -235,15 +230,15 @@ mpia <domain> <operation> [selector] [projection] [rendering]
 
 | 命令 | cardinality / effect | 参数形状的原因 |
 | --- | --- | --- |
-| `mail doctor` | 一个 capability report | Mail 可用性由 store、schema、FDA、Automation、cache 和 fast path 共同决定，不是单一 permission bit |
-| `mail accounts` | 0..N collection | 在 mailbox/message 操作前建立稳定账号作用域；0.2.0 只有只读 collection 语义，所以省略冗余 `list` |
-| `mail mailboxes` | 0..N collection | 把层级发现与计数从邮件搜索分离；`--account-id` 高效解决多账号歧义 |
-| `mail query` | 0..N envelopes | 有上限、cursor 分页的候选搜索，不读取正文 |
-| `mail get` | 唯一一封 | 把唯一定位与集合搜索分离，并显式控制内容投影 |
-| `mail reveal` | 一次可见 Mail.app 行为 | 把 Apple Events/UI 激活隔离在纯读取之外；reveal 表示在来源 app 中定位，不表示导出 |
+| `OPTIONS /mail/doctor` | 一个 capability report | Mail 可用性由 store、schema、FDA、Automation、cache 和 fast path 共同决定，不是单一 permission bit |
+| `GET /mail/accounts` | 0..N collection | 在 mailbox/message 操作前建立稳定账号作用域 |
+| `GET /mail/mailboxes` | 0..N collection | 把层级发现与计数从邮件搜索分离；params 中的 `account-id` 解决多账号歧义 |
+| `GET /mail/query` | 0..N envelopes | 有上限、cursor 分页的候选搜索，不读取正文 |
+| `GET /mail/get` | 唯一一封 | 把唯一定位与集合搜索分离，并显式控制内容投影 |
+| `POST /mail/reveal` | 一次可见 Mail.app 行为 | 把 Apple Events/UI 激活隔离在纯读取之外；reveal 表示在来源 app 中定位，不表示导出 |
 
-`mail doctor` 默认必须非交互、无副作用：不启动 Mail.app、不触发 Automation prompt、
-不自动打开 System Settings。`--open-settings` 之类的帮助行为必须显式指定。
+`OPTIONS /mail/doctor` 必须非交互、无副作用：不启动 Mail.app、不触发 Automation
+prompt、不自动打开 System Settings。
 
 `accounts` 和 `mailboxes` 返回 adapter 稳定 ID；display name 可能重复、本地化或被改名，
 不能作为可靠 selector。`query` 使用 typed filter 与 AND 语义，默认 50、最大 200，
@@ -251,7 +246,7 @@ mpia <domain> <operation> [selector] [projection] [rendering]
 
 ### ID 与内容投影
 
-公开的 `--id` 是 `query`/`get` 返回的 opaque adapter ID，不是裸 SQLite ROWID：
+公开的 `id` 参数是 query/get 返回的 opaque adapter ID，不是裸 SQLite ROWID：
 
 ```json
 {
@@ -264,18 +259,14 @@ mpia <domain> <operation> [selector] [projection] [rendering]
 这样内部 locator 编码可以演进而不破坏 CLI contract。该 ID 仍只在本机有效；Mail
 重建索引或移动数据后可能 stale，必须返回 `STALE_LOCAL_ID`，不能静默选中别的邮件。
 
-`--content` 是 projection，不是 format：
+`content` 参数是 projection：
 
 - `metadata`：header、地址、日期、flag、mailbox、大小和附件 metadata；默认值。
 - `text`：安全解码的纯文本，不加载 HTML 远程资源。
 - `raw`：准确 RFC 822 bytes。
 
-RFC 822 可能不是 UTF-8 且体积很大，因此 raw 不直接嵌入 JSON。`--content raw`
-必须配合 `--output <file>` 或 `--output -`：写文件时 stdout 返回小型 JSON/人类确认；
-`--output -` 时 stdout 是原始 bytes，不能再使用 `--format json`。
-
-`--format json` 只改变 rendering。Terminal 默认可读输出，Agent 显式请求 JSON。
-`reveal` 也接受 `--format json`，让 Agent 在执行可见 UI 行为后获得结构化确认。
+RFC 822 可能不是 UTF-8 且体积很大，因此 raw 不直接嵌入 JSON。
+`"content":"raw"` 必须同时提供文件 `output` 参数；stdout 仍返回小型 JSON 确认。
 
 ## Agent 与 MCP 边界
 

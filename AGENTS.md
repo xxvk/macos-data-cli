@@ -3,6 +3,13 @@
 This repository is a CLI, not an Agent Skill. Agents and Skills that invoke
 `mpia` should read these files before using it:
 
+From 0.9.3 onward, every business invocation must use `mpia METHOD "/path"` with
+strict inline `--params`/`--body` JSON. Only `--help`, `--version`, and `-v`
+remain bootstrap forms. Discover the executable surface through
+`mpia GET "/agent/manifest"`; never reconstruct or invoke the removed legacy
+adapter/subcommand syntax. Inline JSON may be visible in shell history or
+process arguments, so it must never contain credentials or other secrets.
+
 0. `https://mpia-cli-doc.vercel.app/` for the hosted, searchable command
    reference; repository Markdown remains the auditable source of truth
 1. `README.md` or `README_CN.md` for the supported command surface
@@ -73,7 +80,7 @@ Shortcuts authoring rules:
   requires explicit current-task authorization in addition to its exact outer
   confirmation. Cleanup is semantic UI deletion of the unique fixture followed
   by zero-residue read-back.
-- `shortcuts edit inspect` is read-only classification, not graph proof or edit
+- `GET /shortcuts/edit/inspect` is read-only classification, not graph proof or edit
   authorization. It accepts only one bounded non-symlink local `.cherri` or
   `.shortcut`; never echo input names, source, action identifiers, parameters,
   or embedded values. Classification alone never authorizes apply.
@@ -81,7 +88,7 @@ Shortcuts authoring rules:
   follow redirects, read the clipboard, or reinterpret a URL path as a local
   file. The reader must require `isFileURL`; only a future separately confirmed
   opt-in network contract may revisit this boundary.
-- `shortcuts edit plan` is also read-only. Require the exact inspected input
+- `GET /shortcuts/edit/plan` is also read-only. Require the exact inspected input
   SHA-256 and strict JSON; evaluate indexes sequentially against the in-memory
   visible-action shadow graph. Never log or return text values, action IDs, or
   parameters. Apply capability is limited to replace-text-only plans,
@@ -96,7 +103,7 @@ Shortcuts authoring rules:
   smaller semantic graph; Shortcuts may briefly expose the stale pre-delete
   graph. A stale or unknown read-back is fail-closed and must never trigger an
   automatic duplicate or delete retry.
-- `shortcuts edit ui-inspect` may read only bounded AX attributes. It must not
+- `GET /shortcuts/edit/ui-inspect` may read only bounded AX attributes. It must not
   prompt, launch/activate Shortcuts.app, perform AX actions, use coordinates or
   image matching, or emit labels/titles/identifiers. Generic or ambiguous UI
   structure is not a candidate, and discovery never authorizes apply.
@@ -114,7 +121,7 @@ Shortcuts authoring rules:
   after every adjacent step. Same-index moves, semantically indistinguishable
   adjacent actions, and plans mixed with another operation family fail closed
   before mutation.
-- `shortcuts edit copy --dry-run` must return before constructing the concrete
+- `PATCH /shortcuts/edit/copy --dry-run` must return before constructing the concrete
   system AX bridge. Apply requires the exact visible editor-name SHA-256 plus
   the confirmation phrase; output must remain value/title/path redacted and
   `outcome_unknown` must never be retried automatically.
@@ -181,14 +188,14 @@ not assume a Homebrew or Release binary while development is in progress.
   confirmation; `verification_unknown` means the save was accepted but the
   framework could not read the image back. Follow `avatar.nextAction`; never
   auto-retry, delete, or recreate a contact.
-- For a read-only existing-avatar check, use `contacts avatar verify --external-id`;
+- For a read-only existing-avatar check, use `OPTIONS /contacts/avatar/verify` with `external-id` in params;
   interpret `readback_confirmed`, `not_available`, and `verification_unknown`.
 - Ambiguous matches must be reported, never silently selected.
 - `metadata` is preserved in JSON but is not written to Contacts in 0.1.
 
 ## Non-negotiable Mail rules
 
-- Run `mail doctor` before relying on direct-store reads. Enable SQLite only
+- Run `OPTIONS /mail/doctor` before relying on direct-store reads. Enable SQLite only
   when `fastPathAvailable` is true; never infer support from the macOS version
   or a `V10` directory alone.
 - Open `Envelope Index` strictly read-only and query-only. Never write the
@@ -197,13 +204,15 @@ not assume a Homebrew or Release binary while development is in progress.
   not expose or reconstruct raw account authorities or full mailbox URLs.
 - Keep metadata queries bounded: default 50, maximum 200, cursor pagination,
   bound parameters, and the implementation deadline. Do not read bodies during
-  `mail accounts`, `mail mailboxes`, or `mail query`.
-- Use `mail get` for one opaque message ID. It defaults to metadata; body text
-  requires `--content text`, and raw RFC 822 requires `--content raw --output`.
+  `GET /mail/accounts`, `GET /mail/mailboxes`, or `GET /mail/query`.
+- Use `GET /mail/get` for one opaque message ID. It defaults to metadata; body text
+  requires `"content":"text"` in params, and raw RFC 822 requires
+  `"content":"raw"` plus an `output` path in params.
   Never put raw bytes in JSON or overwrite an existing output file.
 - Preserve `partial`, `metadata_only`, `incomplete`, and `fallbackReason` exactly;
   do not present missing or partial cache content as a complete empty message.
-- Missing cached text may fall back to Mail.app only for explicit `--content text`.
+- Missing cached text may fall back to Mail.app only for explicit
+  `"content":"text"` in params.
   Ordinary fallback must not launch Mail.app; raw RFC 822 never falls back because
   AppleScript text cannot provide a byte-exact replacement.
 - When SQLite is unavailable, Mail.app metadata fallback requires Mail to be
@@ -211,9 +220,9 @@ not assume a Homebrew or Release binary while development is in progress.
   top-level mailboxes, 25 message candidates, and five seconds. Preserve its
   `incomplete`, no-cursor, fallback-reason, and limitation fields; never treat a
   no-match response as complete. Its `ambx_`/`appmsg_` IDs are backend-specific.
-- `mail reveal` is an explicit visible operation that may launch and activate
+- `POST /mail/reveal` is an explicit visible operation that may launch and activate
   Mail.app. Do not use it as a hidden read path or claim it verifies content bytes.
-- `mail attachments verify` is metadata-only validation. It may compare SQLite
+- `OPTIONS /mail/attachments/verify` is metadata-only validation. It may compare SQLite
   row counts with cached MIME part counts, but it must not return attachment names,
   paths, or payloads. Partial EMLX is always unverified, even when counts agree.
 - Serialize Apple Events, keep the 3-second timeout and 30-second timeout circuit
@@ -249,17 +258,19 @@ not assume a Homebrew or Release binary while development is in progress.
   most 366 days. Default limit is 50 and maximum is 200.
 - Calendar create/edit/delete requires `--dry-run` or `--apply`. Delete apply also
   requires `--confirm "DELETE EVENT"`.
-- Recurring edit/delete requires `--span this` or `--span future`; never infer a
+- Recurring edit/delete requires `"span":"this"` or `"span":"future"` in
+  params; never infer a
   series scope.
 - Attendees are readable but read-only in 0.3. Do not claim invitations can be sent.
 - All-day event JSON uses `YYYY-MM-DD` and an exclusive end date. Timed events use
   ISO 8601 timestamps with offsets. Do not interchange the two forms.
 - Alarm writes use exactly one of `relativeMinutes` or `absoluteDate`; `alarms: []`
   clears reminders. Create must remove EventKit-inherited default alarms first.
-- `create --idempotent` uses a privacy-minimized 60-second local receipt because
+- `POST /calendar/create` with `"idempotent":true` in params uses a
+  privacy-minimized 60-second local receipt because
   separate EventKit processes are not immediately consistent. Receipts must never
   store event titles, notes, locations, attendees, or other event content.
-- `calendar conflicts` scans at most 200 events and treats adjacent boundaries as
+- `GET /calendar/conflicts` scans at most 200 events and treats adjacent boundaries as
   non-conflicting. Narrow the range when the hard cap is exceeded.
 - Do not use an existing user event as an apply fixture. Real CRUD verification
   must create and clean up one disposable event after explicit authorization.
@@ -292,7 +303,8 @@ not assume a Homebrew or Release binary while development is in progress.
 - `create --apply` saves exactly once and returns an opaque reminder ID. It must
   distinguish `readback_confirmed` from `save_accepted_readback_pending`; the
   latter is not a retry signal and must direct the caller to use `get`.
-- Optional `create --idempotent` uses a private 60-second local receipt. The
+- Optional `POST /reminders/create` with `"idempotent":true` in params uses a
+  private 60-second local receipt. The
   receipt may contain only a SHA-256 input fingerprint, opaque reminder/list
   IDs, and timestamp metadata; it must never contain reminder content.
 - `resources` reports Reminders as writable because guarded create apply exists;
@@ -329,8 +341,8 @@ not assume a Homebrew or Release binary while development is in progress.
 
 - Use public PhotoKit only. Never read Photos databases, library packages,
   caches, or private frameworks and never automate Photos.app coordinates.
-- `photos permission` is status-only and must not prompt. Only the explicit
-  `photos permission --request` command may request read/write authorization.
+- `OPTIONS /photos/permission` is status-only by default. Only explicit params
+  `{"request":true}` may request read/write authorization.
 - Treat limited access as readable but incomplete. Preserve `complete: false`;
   never interpret an empty limited result as an empty full library.
 - Treat asset, album, and cursor IDs as opaque local adapter values. Album names
@@ -371,8 +383,8 @@ not assume a Homebrew or Release binary while development is in progress.
   do not call it a native Notes Framework adapter.
 - Never inspect Notes databases, caches, private frameworks, or Notes-owned
   CloudKit containers, and never automate Notes.app by GUI coordinates.
-- `notes permission` is status-only and must not prompt. Only
-  `notes permission --request` may request Automation consent.
+- `OPTIONS /notes/permission` is status-only by default. Only explicit params
+  `{"request":true}` may request Automation consent.
 - The default future query path is metadata-only. Note plaintext/HTML body must
   require an explicit get projection, use a byte cap, and never enter logs.
 - Treat account, folder, note, attachment, and cursor IDs as adapter-owned opaque
@@ -384,11 +396,12 @@ not assume a Homebrew or Release binary while development is in progress.
   mutation fixtures.
 - Notes writes require a valid local user-confirmed iCloud write-account binding,
   an explicit non-shared opaque folder, dry-run/apply, and immediate read-back.
-- Supply create/rename/move JSON through stdin or a file. Never put note titles or
-  bodies in CLI arguments, diagnostics, idempotency receipts, or integration logs.
+- Supply create/rename/move JSON through the REST `--body` object. This deliberate
+  0.9.3 tradeoff can expose values to shell history/process inspection; never use
+  it for secrets, and never copy body content into diagnostics, receipts, or logs.
 - Never automatically retry `save_accepted_readback_pending` or `outcome_unknown`.
 - Released 0.6.1 does not support existing-body replacement. The 0.6.2
-  `notes edit-body` path is limited to simple, attachment-free content and
+  `PUT /notes/edit-body` route is limited to simple, attachment-free content and
   additionally requires the exact current plaintext SHA-256. Its disposable
   signed-app apply/read-back/cleanup gate is recorded as passed.
 - The 0.6.2 folder create/rename and move-preview commands require strict
@@ -479,12 +492,12 @@ not assume a Homebrew or Release binary while development is in progress.
 - Messages 0.9.1 is read-only. It reads `~/Library/Messages/chat.db` through a
   fail-closed SQLite fast path; never write the database, WAL/SHM sidecars, or
   Messages account configuration.
-- `messages permission` is status-only and must not prompt. There is no
-  `--request` path. Reading requires Full Disk Access for the responsible process.
+- `OPTIONS /messages/permission` is status-only and must not prompt. It accepts
+  no consent-request parameter. Reading requires Full Disk Access for the responsible process.
 - Run a runtime schema fingerprint and a bounded structural gate before any
   query; an unknown schema is fail-closed and must not be guessed.
-- `messages recent` is newest-first, cursor-paginated, default 50 / max 200,
-  with a query deadline. `--service` accepts `imessage` or `sms`.
+- `GET /messages/recent` is newest-first, cursor-paginated, default 50 / max 200,
+  with a query deadline. Its `service` param accepts `imessage` or `sms`.
 - Never return or log raw `ROWID`, `guid`, `chat_identifier`, participant
   handles, phone numbers, emails, or attachment paths. Only opaque `msg_` /
   `chat_` / `cur_` tokens cross the contract.
@@ -502,11 +515,11 @@ not assume a Homebrew or Release binary while development is in progress.
   `~/Library/Application Support/CallHistoryDB/CallHistory.storedata` (a Core
   Data SQLite store in WAL mode) through a fail-closed SQLite fast path; never
   write the store or its WAL/SHM sidecars.
-- `phone-calls permission` is status-only and must not prompt. There is no
-  `--request` path. Reading requires Full Disk Access for the responsible process.
+- `OPTIONS /phone-calls/permission` is status-only and must not prompt. It accepts
+  no consent-request parameter. Reading requires Full Disk Access for the responsible process.
 - Run a runtime schema fingerprint and a bounded structural gate (required
   `ZCALLRECORD` columns) before any query; an unknown schema is fail-closed.
-- `phone-calls recent` is newest-first, cursor-paginated, default 50 / max 200,
+- `GET /phone-calls/recent` is newest-first, cursor-paginated, default 50 / max 200,
   with a query deadline. `ZDATE` is Apple-epoch **seconds** (not nanoseconds);
   `ZORIGINATED` is direction (0=incoming, 1=outgoing); incoming +
   `ZANSWERED=0` is missed; outgoing "connected" is derived from `ZDURATION>0`.

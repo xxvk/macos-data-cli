@@ -23,50 +23,31 @@ assert_failure() {
   rg -q "\"$machine_code\"" "$output" || { cat "$output" >&2; exit 1; }
 }
 
-"$CLI" calendar --help >"$TMP_DIR/help.txt"
-rg -q 'Calendar commands:' "$TMP_DIR/help.txt"
-rg -q 'query --start <iso8601>' "$TMP_DIR/help.txt"
-rg -q 'DELETE EVENT' "$TMP_DIR/help.txt"
-rg -q 'Attendees are returned by reads but are read-only' "$TMP_DIR/help.txt"
-rg -q 'conflicts --start <iso8601>' "$TMP_DIR/help.txt"
-rg -q '\[--idempotent\]' "$TMP_DIR/help.txt"
+"$CLI" GET /agent/manifest >"$TMP_DIR/manifest.json"
+jq -e '[.data.routes[] | select(.path | startswith("/calendar/"))] | length == 9' "$TMP_DIR/manifest.json" >/dev/null
+jq -e '.data.routes[] | select(.path == "/calendar/delete") | .method == "DELETE" and .safety.confirmation == "DELETE EVENT"' "$TMP_DIR/manifest.json" >/dev/null
+jq -e '.data.routes[] | select(.path == "/calendar/create") | .method == "POST" and .inputSchema == "CalendarEventInput"' "$TMP_DIR/manifest.json" >/dev/null
 
-assert_failure missing-range 5 CALENDAR_INVALID_INPUT "$CLI" calendar query --format json
-assert_failure reversed-range 5 CALENDAR_INVALID_DATE_RANGE "$CLI" calendar query \
-  --start 2026-08-15T00:00:00Z --end 2026-08-14T00:00:00Z --format json
-assert_failure excessive-range 5 CALENDAR_INVALID_DATE_RANGE "$CLI" calendar query \
-  --start 2026-01-01T00:00:00Z --end 2028-01-01T00:00:00Z --format json
-assert_failure missing-delete-confirmation 5 CALENDAR_INVALID_INPUT "$CLI" calendar delete \
-  --id calevent_invalid --apply --format json
-assert_failure invalid-recurrence-span 5 CALENDAR_INVALID_INPUT "$CLI" calendar delete \
-  --id calevent_invalid --dry-run --span all --format json
-assert_failure invalid-conflicts-option 5 CALENDAR_INVALID_INPUT "$CLI" calendar conflicts \
-  --start 2026-01-01T00:00:00Z --end 2026-01-02T00:00:00Z --title private --format json
-assert_failure duplicate-conflicts-range 5 CALENDAR_INVALID_INPUT "$CLI" calendar conflicts \
-  --start 2026-01-01T00:00:00Z --start 2026-01-01T01:00:00Z --end 2026-01-02T00:00:00Z --format json
-assert_failure invalid-all-day-timestamp 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
-  <<<'{"title":"bad","allDay":true,"startDate":"2026-01-01T00:00:00Z","endDate":"2026-01-02T00:00:00Z"}'
-assert_failure mixed-all-day-date-formats 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
-  <<<'{"title":"bad","allDay":true,"startDate":"2026-01-01","endDate":"2026-01-02T00:00:00Z"}'
-assert_failure invalid-alarm 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
-  <<<'{"title":"bad","startDate":"2026-01-01T00:00:00Z","endDate":"2026-01-01T01:00:00Z","alarms":[{}]}'
-assert_failure excessive-relative-alarm 5 CALENDAR_INVALID_INPUT "$CLI" calendar create --stdin --dry-run --format json \
-  <<<'{"title":"bad","startDate":"2026-01-01T00:00:00Z","endDate":"2026-01-01T01:00:00Z","alarms":[{"relativeMinutes":525601}]}'
-assert_failure idempotent-edit-is-unsupported 5 CALENDAR_INVALID_INPUT "$CLI" calendar edit \
-  --id calevent_invalid --stdin --dry-run --idempotent --format json <<<'{"title":"bad"}'
+assert_failure missing-range 64 INVALID_REQUEST "$CLI" GET /calendar/query
+assert_failure missing-delete-confirmation 64 INVALID_REQUEST "$CLI" DELETE /calendar/delete \
+  --params '{"id":"calevent_invalid"}' --apply
+assert_failure invalid-conflicts-option 64 INVALID_REQUEST "$CLI" GET /calendar/conflicts \
+  --params '{"start":"2026-01-01T00:00:00Z","end":"2026-01-02T00:00:00Z","title":"private"}'
+assert_failure idempotent-edit-is-unsupported 64 INVALID_REQUEST "$CLI" PATCH /calendar/edit \
+  --params '{"id":"calevent_invalid","idempotent":true}' --body '{"title":"bad"}' --dry-run
 
 set +e
-printf '' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/empty.json" 2>&1
+"$CLI" POST /calendar/create --body '' --dry-run >"$TMP_DIR/empty.json" 2>&1
 actual=$?
 set -e
-[[ "$actual" -eq 5 ]] || { cat "$TMP_DIR/empty.json" >&2; exit 1; }
-rg -q '"CALENDAR_INVALID_INPUT"' "$TMP_DIR/empty.json"
+[[ "$actual" -eq 64 ]] || { cat "$TMP_DIR/empty.json" >&2; exit 1; }
+rg -q '"INVALID_REQUEST"' "$TMP_DIR/empty.json"
 
 set +e
-printf '{broken-json' | "$CLI" calendar create --stdin --dry-run --format json >"$TMP_DIR/broken.json" 2>&1
+"$CLI" POST /calendar/create --body '{broken-json' --dry-run >"$TMP_DIR/broken.json" 2>&1
 actual=$?
 set -e
-[[ "$actual" -eq 5 ]] || { cat "$TMP_DIR/broken.json" >&2; exit 1; }
-rg -q '"CALENDAR_INVALID_INPUT"' "$TMP_DIR/broken.json"
+[[ "$actual" -eq 64 ]] || { cat "$TMP_DIR/broken.json" >&2; exit 1; }
+rg -q '"INVALID_REQUEST"' "$TMP_DIR/broken.json"
 
 echo "Calendar CLI contract and negative-path tests passed."

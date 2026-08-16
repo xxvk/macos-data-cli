@@ -34,30 +34,11 @@ the system `/usr/bin/shortcuts sign` command.
 
 ## 0.7.1 commands
 
-```text
-mpia shortcuts author validate --source <file.cherri> --format json
-
-mpia shortcuts author build --source <file.cherri> \
-  --output <file.shortcut> \
-  [--signing-mode people-who-know-me|anyone] --format json
-
-mpia shortcuts create --source <file.cherri> [--idempotent] \
-  [--dry-run] --format json
-mpia shortcuts create --source <file.cherri> [--idempotent] \
-  --apply --confirm "CREATE MANAGED SHORTCUT" --format json
-
-mpia shortcuts update --id <managed-opaque-id> --source <file.cherri> \
-  --expected-source-sha256 <sha256> --strategy replace|retain-old \
-  [--dry-run] --format json
-mpia shortcuts update --id <managed-opaque-id> --source <file.cherri> \
-  --expected-source-sha256 <sha256> --strategy replace|retain-old \
-  --apply --confirm "UPDATE MANAGED SHORTCUT" --format json
-
-mpia shortcuts managed list --format json
-mpia shortcuts managed forget --id <managed-opaque-id> [--dry-run] --format json
-mpia shortcuts managed forget --id <managed-opaque-id> --apply \
-  --confirm "FORGET MANAGED SHORTCUT" --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+Discover executable 0.9.3 routes from the manifest; see `docs/usage.md` for examples.
 
 `validate` compiles only inside a private temporary directory and removes the
 artifact. `build` additionally signs and writes a mode-`0600` output, refusing

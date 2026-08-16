@@ -5,14 +5,11 @@
 0.7.2 currently has public read-only acquisition/classification, semantic
 planning, Accessibility discovery, and one guarded copy-first mutation:
 
-```text
-mpia shortcuts edit inspect --input <local.cherri|local.shortcut> --format json
-mpia shortcuts edit plan --input <local.shortcut> --patch <plan.json>|--stdin --format json
-mpia shortcuts edit copy --input <local.shortcut> --patch <plan.json>|--stdin \
-  --expected-editor-name-sha256 <sha256> --dry-run|--apply \
-  [--confirm "EDIT SHORTCUT COPY"] --format json
-mpia shortcuts edit ui-inspect --format json
+```bash
+mpia GET "/agent/manifest"
 ```
+
+Discover executable 0.9.3 routes from the manifest; see `docs/usage.md` for examples.
 
 Inspect, plan, UI inspection, and edit-copy dry-run do not mutate any object.
 Planning reads the artifact once, verifies the exact input hash, and applies
@@ -160,7 +157,7 @@ alone is not graph proof, apply authorization, or a compatibility promise.
 
 ### Public `edit copy` contract
 
-- Require exactly one of `--patch`/`--stdin` and exactly one of
+- Require one strict `--body` JSON object and exactly one of
   `--dry-run`/`--apply`.
 - Require the exact visible editor-name SHA-256. The hash is computed over its
   UTF-8 bytes without a newline; the name itself never enters JSON or logs.

@@ -60,7 +60,7 @@ Do not create another copy if the record already exists.
 
 The local Contacts store currently exposes one container named `iCloud`. The create smoke test was written through the default container and verified by reading the record back through the CLI. All three fixture records use the reserved URL label `mpia-cli`.
 
-Explicit `--container iCloud` selection is also verified locally. A future
+Explicit `"container":"iCloud"` selection in params is also verified locally. A future
 multi-account expansion must not weaken the current iCloud-only restriction.
 
 ## Avatar fixtures
@@ -80,12 +80,10 @@ They were written with the installed CLI using `contacts edit --image ... --appl
 Run the installed CLI:
 
 ```bash
-mpia contacts permission
-mpia contacts count
-mpia contacts get --external-id xvk-test-contacts-001 --format json
-mpia contacts get --external-id xvk-test-organizations-001 --format json
-mpia contacts get --external-id org-create-apply-001 --format json
+mpia GET "/agent/manifest"
 ```
+
+Discover executable 0.9.3 routes from the manifest; see `docs/usage.md` for examples.
 
 The commands must return one JSON object each, with `kind` values of `person` and `organization` respectively.
 

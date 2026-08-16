@@ -13,7 +13,7 @@ fi
 
 query_file="$TEMP_DIR/query.json"
 result_file="$TEMP_DIR/result.json"
-"$CLI" mail query --has-attachment --limit 25 --format json > "$query_file"
+"$CLI" GET /mail/query --params '{"has-attachment":true,"limit":25}' > "$query_file"
 
 inspected=0
 matched=0
@@ -21,7 +21,8 @@ partial=0
 unavailable=0
 mismatched=0
 while IFS= read -r message_id; do
-  "$CLI" mail attachments verify --id "$message_id" --format json > "$result_file"
+  params="$(jq -cn --arg id "$message_id" '{id:$id}')"
+  "$CLI" OPTIONS /mail/attachments/verify --params "$params" > "$result_file"
   inspected=$((inspected + 1))
   cache_state="$(/usr/bin/jq -r '.data.cacheState' "$result_file")"
   mime_count="$(/usr/bin/jq -r '.data.mimeCount // "none"' "$result_file")"

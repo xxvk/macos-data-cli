@@ -18,8 +18,8 @@ require_quiet() {
   ! lsof "$SOURCE" >/dev/null 2>&1 || fail "Bookmarks.plist has an open handle"
 }
 snapshot() {
-  "$CLI" safari bookmarks list --limit 200 --format json >"$1.bookmarks"
-  "$CLI" safari reading-list list --limit 200 --format json >"$1.reading"
+  "$CLI" GET /safari/bookmarks/list --params '{"limit":200}' >"$1.bookmarks"
+  "$CLI" GET /safari/reading-list/list --params '{"limit":200}' >"$1.reading"
   jq -e '.ok == true and .data.complete == true' "$1.bookmarks" >/dev/null
   jq -e '.ok == true and .data.complete == true' "$1.reading" >/dev/null
   # Safari normalizes the two built-in root titles after opening. Treat those
@@ -35,14 +35,21 @@ snapshot() {
 }
 apply_json() {
   local collection="$1" action="$2" input="$3" confirmation="${4:-}"
-  "$CLI" safari "$collection" "$action" --input "$input" --dry-run --format json >"$TMP_DIR/preview.json"
+  local method
+  case "$action" in
+    create) method=POST ;;
+    edit|move|rename) method=PATCH ;;
+    delete) method=DELETE ;;
+    *) fail "unsupported local mutation action: $action" ;;
+  esac
+  "$CLI" "$method" "/safari/$collection/$action" --body "$(jq -c . "$input")" --dry-run >"$TMP_DIR/preview.json"
   local source_hash
   source_hash="$(jq -er '.data.sourceSHA256Before' "$TMP_DIR/preview.json")"
   jq --arg hash "$source_hash" '. + {expectedSourceSHA256:$hash}' "$input" >"$TMP_DIR/apply-input.json"
   if [[ -n "$confirmation" ]]; then
-    "$CLI" safari "$collection" "$action" --input "$TMP_DIR/apply-input.json" --apply --confirm "$confirmation" --format json >"$TMP_DIR/apply.json"
+    "$CLI" "$method" "/safari/$collection/$action" --body "$(jq -c . "$TMP_DIR/apply-input.json")" --apply --confirm "$confirmation" >"$TMP_DIR/apply.json"
   else
-    "$CLI" safari "$collection" "$action" --input "$TMP_DIR/apply-input.json" --apply --format json >"$TMP_DIR/apply.json"
+    "$CLI" "$method" "/safari/$collection/$action" --body "$(jq -c . "$TMP_DIR/apply-input.json")" --apply >"$TMP_DIR/apply.json"
   fi
   jq -e '.ok == true and .data.verification == "readback_confirmed" and .data.syncStatus == "local_only"' "$TMP_DIR/apply.json" >/dev/null
 }
